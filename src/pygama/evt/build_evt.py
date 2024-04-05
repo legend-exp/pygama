@@ -15,7 +15,6 @@ from typing import Any
 import awkward as ak
 import numpy as np
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
-from lgdo.lh5 import LH5Store
 
 from . import aggregators, utils
 
@@ -47,16 +46,23 @@ def build_evt(
         name of configuration file or dictionary defining event fields. Channel
         lists can be defined by importing a metadata module.
 
-        - ``operations`` defines the fields ``name=key``, where ``channels``
-          specifies the channels used to for this field (either a string or a
-          list of strings),
+        - ``channels`` specifies the channels used to for this field (either a
+          string or a list of strings).
+        - ``operations`` defines the event fields (``name=key``). If the key
+          contains slahes it will be interpreted as the path to the output
+          field inside nested sub-tables.
+        - ``outputs`` defines the fields that are actually included in the
+          output table.
+
+        Inside the ``operations`` block:
+
         - ``aggregation_mode`` defines how the channels should be combined (see
           :func:`evaluate_expression`).
         - ``expression`` defines the expression or function call to apply
           (see :func:`evaluate_expression`),
         - ``query`` defines an expression to mask the aggregation.
         - ``parameters`` defines any other parameter used in expression.
-        - ``dtype` defines the NumPy data type of the resulting data.
+        - ``dtype`` defines the NumPy data type of the resulting data.
         - ``initial`` defines the initial/default value. Useful with some types
           of aggregators.
 
@@ -70,6 +76,7 @@ def build_evt(
                 "spms_on": ["ch1057600", "ch1059201", "ch1062405"],
                 "muon": "ch1027202",
               },
+              "outputs": ["energy_id", "multiplicity"],
               "operations": {
                 "energy_id":{
                   "channels": "geds_on",
@@ -148,7 +155,7 @@ def build_evt(
 
     channels = {}
 
-    for k, v in config["channels"].items():
+    for key, v in config["channels"].items():
         if isinstance(v, dict):
             # it is a meta module. module_name must exist
             if "module" not in v.keys():
@@ -168,13 +175,13 @@ def build_evt(
             # load module
             p, m = v["module"].rsplit(".", 1)
             met = getattr(importlib.import_module(p, package=__package__), m)
-            channels[k] = met(v | attr)
+            channels[key] = met(v | attr)
 
         elif isinstance(v, str):
-            channels[k] = [v]
+            channels[key] = [v]
 
         elif isinstance(v, list):
-            channels[k] = [e for e in v]
+            channels[key] = [e for e in v]
 
     # load tcm data from disk
     tcm = utils.TCMData(
@@ -190,8 +197,8 @@ def build_evt(
     table = Table(size=n_rows)
 
     # now loop over operations (columns in evt table)
-    for k, v in config["operations"].items():
-        log.debug(f"processing field: '{k}'")
+    for field, v in config["operations"].items():
+        log.debug(f"processing field: '{field}'")
 
         # if mode not defined in operation, it can only be an operation on the
         # evt level
@@ -276,29 +283,50 @@ def build_evt(
 
                 fldata_ptr.nda = fldata_ptr.nda.astype(type_)
 
-        log.debug(f"new column {k!s} = {obj!r}")
-        table.add_field(k, obj)
+        log.debug(f"new column {field!s} = {obj!r}")
+        table.add_field(field, obj)
 
-    store = LH5Store()
+    # might need to re-organize fields in subtables, create a new object for that
+    nested_tbl = Table(size=n_rows)
+    output_fields = config.get("outputs", table.keys())
+
+    for field, obj in table.items():
+        # also only add fields requested by the user
+        if field not in output_fields:
+            continue
+
+        # if names contain slahes, put in sub-tables
+        lvl_ptr = nested_tbl
+        subfields = field.strip("/").split("/")
+        for level in subfields:
+            # if we are at the end, just add the field
+            if level == subfields[-1]:
+                lvl_ptr.add_field(level, obj)
+                break
+
+            if not level:
+                msg = f"invalid field name '{field}'"
+                raise RuntimeError(msg)
+
+            # otherwise, increase nesting
+            if level not in nested_tbl:
+                lvl_ptr.add_field(level, Table(size=n_rows))
+            lvl_ptr = nested_tbl[level]
 
     # write output fields into outfile
-    if "outputs" in config.keys() and len(config["outputs"]) > 0:
-        clms_to_remove = [e for e in table.keys() if e not in config["outputs"]]
-        for fld in clms_to_remove:
-            table.remove_field(fld, True)
+    if output_fields:
+        if f.evt.file is None:
+            return nested_tbl
 
-        if f.evt.file is not None:
-            store.write(
-                obj=table,
-                name=f.evt.group,
-                lh5_file=f.evt.file,
-                wo_mode=wo_mode,
-            )
-        else:
-            return table
+        lh5.write(
+            obj=nested_tbl,
+            name=f.evt.group,
+            lh5_file=f.evt.file,
+            wo_mode=wo_mode,
+        )
     else:
         log.warning("no output fields specified, no file will be written.")
-        return table
+        return nested_tbl
 
 
 def evaluate_expression(

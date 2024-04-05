@@ -4,7 +4,7 @@ from pathlib import Path
 import awkward as ak
 import numpy as np
 import pytest
-from lgdo import Array, VectorOfVectors, lh5
+from lgdo import Array, Table, VectorOfVectors, lh5
 from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt
@@ -67,6 +67,48 @@ def test_basics(lgnd_test_data, files_config):
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     ids = ids[eidx]
     assert ak.all(ids == eid[eid != 0])
+
+
+def test_field_nesting(lgnd_test_data, files_config):
+    config = {
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "outputs": [
+            "sub1/timestamp",
+            "sub2/multiplicity",
+        ],
+        "operations": {
+            "sub1/timestamp": {
+                "channels": "geds_on",
+                "aggregation_mode": "first_at:dsp.tp_0_est",
+                "expression": "dsp.timestamp",
+            },
+            "sub2/multiplicity": {
+                "channels": "geds_on",
+                "aggregation_mode": "sum",
+                "expression": "hit.cuspEmax_ctc_cal > a",
+                "parameters": {"a": 25},
+                "initial": 0,
+            },
+        },
+    }
+
+    build_evt(
+        files_config,
+        config=config,
+        wo_mode="of",
+    )
+
+    outfile = files_config["evt"][0]
+    evt = lh5.read("/evt", outfile)
+
+    assert isinstance(evt, Table)
+    assert isinstance(evt.sub1, Table)
+    assert isinstance(evt.sub2, Table)
+    assert isinstance(evt.sub1.timestamp, Array)
+
+    assert sorted(evt.keys()) == ["sub1", "sub2"]
+    assert sorted(evt.sub1.keys()) == ["timestamp"]
+    assert sorted(evt.sub2.keys()) == ["multiplicity"]
 
 
 def test_spms_module(lgnd_test_data, files_config):
