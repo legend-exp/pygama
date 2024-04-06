@@ -1770,7 +1770,7 @@ class CalAoE:
             self.update_cal_dicts(
                 {
                     "AoE_High_Side_Cut": {
-                        "expression": f"(a<AoE_Classifier)& ({self.dt_cut_param})",
+                        "expression": f"(a>AoE_Classifier)& ({self.dt_cut_param})",
                         "parameters": {"a": self.high_cut_val},
                     }
                 }
@@ -1779,7 +1779,7 @@ class CalAoE:
             self.update_cal_dicts(
                 {
                     "AoE_High_Side_Cut": {
-                        "expression": "(a<AoE_Classifier)",
+                        "expression": "(a>AoE_Classifier)",
                         "parameters": {"a": self.high_cut_val},
                     }
                 }
