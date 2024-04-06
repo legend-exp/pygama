@@ -14,10 +14,44 @@ import numpy as np
 import pandas as pd
 from lgdo.types import Table
 from scipy import stats
+from scipy.stats import chi2, skewnorm
 
 import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
+from pygama.math.binned_fitting import goodness_of_fit
+from pygama.math.distributions import exgauss, gaussian
+from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.unbinned_fitting import fit_unbinned
+
+(x_lo, x_hi, n_sig, mu, sigma, n_bkg, tau) = range(7)
+par_array = [(gaussian, [mu, sigma]), (exgauss, [mu, sigma, tau])]
+gauss_on_exgauss_areas = sum_dists(
+    par_array,
+    [n_sig, n_bkg],
+    "areas",
+    parameter_names=["x_lo", "x_hi", "n_sig", "mu", "sigma", "n_bkg", "tau"],
+    name="gauss_on_exgauss_areas",
+)
+
+(x_lo, x_hi, n_sig, mu, sigma, tau1, n_bkg, tau2) = range(8)
+par_array = [(exgauss, [mu, sigma, tau1]), (exgauss, [mu, sigma, tau2])]
+double_exgauss = sum_dists(
+    par_array,
+    [n_sig, n_bkg],
+    "areas",
+    parameter_names=["x_lo", "x_hi", "n_sig", "mu", "sigma", "tau1", "n_bkg", "tau2"],
+    name="double_exgauss",
+)
+
+
+def skewed_fit(x, n_sig, mu, sigma, alpha):
+    return n_sig, n_sig * skewnorm.pdf(x, alpha, mu, sigma)
+
+
+def skewed_pdf(x, n_sig, mu, sigma, alpha):
+    return n_sig * skewnorm.pdf(x, alpha, mu, sigma)
+
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -129,6 +163,180 @@ def get_mode_stdev(par_array):
             mean = float(bin_centres[np.argmax(counts)])
             std = fwhm / 2.355
     return mean, std
+
+
+def fit_distributions(x_lo, x_hi, norm_par_array):
+    peak_par_array = norm_par_array[(norm_par_array > x_lo) & (norm_par_array < x_hi)]
+
+    hist, bins, _ = pgh.get_hist(peak_par_array, dx=0.1, range=(x_lo, x_hi))
+
+    exgauss_pars, _, _ = fit_unbinned(
+        exgauss.pdf_ext,
+        peak_par_array,
+        [x_lo, x_hi, len(peak_par_array), 0, 1, -0.01],
+        simplex=True,
+        bounds=[
+            (None, None),
+            (None, None),
+            (0, None),
+            (-0.8, 0.8),
+            (0.8, 1.2),
+            (None, None),
+        ],
+        fixed=["x_lo", "x_hi"],
+    )
+
+    gauss_pars, _, _ = fit_unbinned(
+        gaussian.pdf_ext,
+        peak_par_array,
+        [x_lo, x_hi, len(peak_par_array), 0, 1],
+        simplex=True,
+        bounds=[(None, None), (None, None), (0, None), (-0.5, 0.5), (0.5, 1.5)],
+        fixed=["x_lo", "x_hi"],
+    )
+
+    gauss_on_exgauss_pars, _, _ = fit_unbinned(
+        gauss_on_exgauss_areas.pdf_ext,
+        peak_par_array,
+        [x_lo, x_hi, len(peak_par_array) * 0.9, 0, 1, len(peak_par_array) * 0.1, -0.01],
+        simplex=True,
+        bounds=[
+            (None, None),
+            (None, None),
+            (0, None),
+            (-0.5, 0.5),
+            (0, None),
+            (0, None),
+            (-3, 1),
+        ],
+        fixed=["x_lo", "x_hi"],
+    )
+
+    skewed_pars, _, _ = fit_unbinned(
+        skewed_fit,
+        peak_par_array,
+        [len(peak_par_array), 0, 1, 0.1],
+        simplex=True,
+        bounds=[(0, None), (None, None), (0, None), (None, None)],
+    )
+
+    double_exgauss_pars, _, _ = fit_unbinned(
+        double_exgauss.pdf_ext,
+        peak_par_array,
+        [
+            x_lo,
+            x_hi,
+            len(peak_par_array) * 0.5,
+            0,
+            1,
+            -0.01,
+            len(peak_par_array) * 0.5,
+            0.01,
+        ],
+        simplex=True,
+        bounds=[
+            (None, None),
+            (None, None),
+            (0, None),
+            (-0.5, 0.5),
+            (0, None),
+            (-3, 0),
+            (0, None),
+            (0, 1),
+        ],
+        fixed=["x_lo", "x_hi"],
+    )
+
+    gauss_csqr = goodness_of_fit(
+        hist,
+        bins,
+        None,
+        lambda x, *args: gaussian.pdf_ext(x, *args)[1],
+        gauss_pars,
+        method="LR",
+        scale_bins=True,
+    )
+
+    exgauss_csqr = goodness_of_fit(
+        hist,
+        bins,
+        None,
+        lambda x, *args: exgauss.pdf_ext(x, *args)[1],
+        exgauss_pars,
+        method="LR",
+        scale_bins=True,
+    )
+
+    skewed_csqr = goodness_of_fit(
+        hist,
+        bins,
+        None,
+        lambda x, *args: skewed_fit(x, *args)[1],
+        skewed_pars,
+        method="LR",
+        scale_bins=True,
+    )
+
+    gauss_on_exgauss_csqr = goodness_of_fit(
+        hist,
+        bins,
+        None,
+        gauss_on_exgauss_areas.get_pdf,
+        gauss_on_exgauss_pars,
+        method="LR",
+        scale_bins=True,
+    )
+
+    double_exgauss_csqr = goodness_of_fit(
+        hist,
+        bins,
+        None,
+        double_exgauss.get_pdf,
+        double_exgauss_pars,
+        method="LR",
+        scale_bins=True,
+    )
+
+    gauss_p_val = chi2.sf(gauss_csqr[0], gauss_csqr[1] + 2)
+    exgauss_p_val = chi2.sf(exgauss_csqr[0], exgauss_csqr[1] + 2)
+    skewed_p_val = chi2.sf(skewed_csqr[0], skewed_csqr[1])
+    gauss_on_exgauss_p_val = chi2.sf(
+        gauss_on_exgauss_csqr[0], gauss_on_exgauss_csqr[1] + 2
+    )
+    double_exgauss_p_val = chi2.sf(double_exgauss_csqr[0], double_exgauss_csqr[1] + 2)
+
+    funcs = [gaussian, exgauss, skewed_fit, gauss_on_exgauss_areas, double_exgauss]
+    pars = [
+        gauss_pars,
+        exgauss_pars,
+        skewed_pars,
+        gauss_on_exgauss_pars,
+        double_exgauss_pars,
+    ]
+    pvals = np.array(
+        [
+            gauss_p_val,
+            exgauss_p_val,
+            skewed_p_val,
+            gauss_on_exgauss_p_val,
+            double_exgauss_p_val,
+        ]
+    )
+    csqrs = [
+        gauss_csqr[0],
+        exgauss_csqr[0],
+        skewed_csqr[0],
+        gauss_on_exgauss_csqr[0],
+        double_exgauss_csqr[0],
+    ]
+
+    if (pvals == 0).all():
+        idx = np.nanargmin(csqrs)
+    else:
+        idx = np.nanargmax(pvals)
+    func = funcs[idx]
+    pars = pars[idx]
+    return func, pars
 
 
 def generate_cuts(
@@ -406,7 +614,8 @@ def generate_cut_classifiers(
                 output_dict[out_par].update({"parameters": cut["parameters"]})
         else:
             par = cut["cut_parameter"]
-            num_sigmas = cut["cut_level"]
+            num_sigmas = cut.get("cut_level", None)
+            percentile = cut.get("cut_percentile", None)
             mode = cut["mode"]
             try:
                 all_par_array = data[par].to_numpy()
@@ -415,39 +624,93 @@ def generate_cut_classifiers(
 
             mean, std = get_mode_stdev(all_par_array)
 
-            if isinstance(num_sigmas, (int, float)):
-                num_sigmas_left = -num_sigmas
-                num_sigmas_right = num_sigmas
-            elif isinstance(num_sigmas, dict):
-                if "low_side" in num_sigmas:
-                    num_sigmas_left = num_sigmas["low_side"]
+            norm_par_array = (all_par_array - mean) / std
+
+            if num_sigmas is not None:
+                if isinstance(num_sigmas, (int, float)):
+                    cut_left = -num_sigmas
+                    cut_right = num_sigmas
+                elif isinstance(num_sigmas, dict):
+                    if "low_side" in num_sigmas:
+                        cut_left = num_sigmas["low_side"]
+                    else:
+                        cut_left = None
+                    if "high_side" in num_sigmas:
+                        cut_right = num_sigmas["high_side"]
+                    else:
+                        cut_right = None
+
+            elif percentile is not None:
+                try:
+                    x_lo = -10
+                    x_hi = 10
+                    func, pars = fit_distributions(x_lo, x_hi, norm_par_array)
+
+                except RuntimeError:
+                    x_lo = -20
+                    x_hi = 20
+                    func, pars = fit_distributions(x_lo, x_hi, norm_par_array)
+
+                range_low, range_high = (-100, 100)
+                xs = np.arange(range_low, range_high, 0.1)
+                if func == exgauss:
+                    cdf = exgauss.cdf_norm(
+                        xs,
+                        range_low,
+                        range_high,
+                        pars["mu"],
+                        pars["sigma"],
+                        pars["tau"],
+                    )
+                elif func == gaussian:
+                    cdf = gaussian.cdf_norm(
+                        xs,
+                        range_low,
+                        range_high,
+                        pars["mu"],
+                        pars["sigma"],
+                    )
+                elif func == gauss_on_exgauss_areas or func == double_exgauss:
+                    cdf = func.cdf_norm(xs, range_low, range_high, *pars[2:])
+                elif func == skewed_fit:
+                    cdf = skewnorm.cdf(xs, pars["alpha"], pars["mu"], pars["sigma"])
                 else:
-                    num_sigmas_left = None
-                if "high_side" in num_sigmas:
-                    num_sigmas_right = num_sigmas["high_side"]
-                else:
-                    num_sigmas_right = None
+                    raise ValueError("unknown func")
+
+                if isinstance(percentile, (int, float)):
+                    cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
+                    cut_right = xs[np.argmin(np.abs(cdf - (percentile / 100)))]
+
+                elif isinstance(percentile, dict):
+                    if "low_side" in percentile:
+                        cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
+                    else:
+                        cut_left = None
+                    if "high_side" in percentile:
+                        cut_right = xs[np.argmin(np.abs(cdf - (percentile / 100)))]
+                    else:
+                        cut_right = None
 
             if mode == "inclusive":
-                if num_sigmas_right is not None and num_sigmas_left is not None:
+                if cut_right is not None and cut_left is not None:
                     cut_string = f"({out_par}_classifier>a) & ({out_par}_classifier<b)"
-                    par_dict = {"a": num_sigmas_left, "b": num_sigmas_right}
-                elif num_sigmas_right is None:
+                    par_dict = {"a": cut_left, "b": cut_right}
+                elif cut_right is None:
                     cut_string = f"{out_par}_classifier>a"
-                    par_dict = {"a": num_sigmas_left}
-                elif num_sigmas_left is None:
+                    par_dict = {"a": cut_left}
+                elif cut_left is None:
                     cut_string = f"{out_par}_classifier<a"
-                    par_dict = {"a": num_sigmas_right}
+                    par_dict = {"a": cut_right}
             elif mode == "exclusive":
-                if num_sigmas_right is not None and num_sigmas_left is not None:
+                if cut_right is not None and cut_left is not None:
                     cut_string = f"({out_par}_classifier<a) | ({out_par}_classifier>b)"
-                    par_dict = {"a": num_sigmas_left, "b": num_sigmas_right}
-                elif num_sigmas_right is None:
+                    par_dict = {"a": cut_left, "b": cut_right}
+                elif cut_right is None:
                     cut_string = f"{out_par}_classifier<a"
-                    par_dict = {"a": num_sigmas_left}
-                elif num_sigmas_left is None:
+                    par_dict = {"a": cut_left}
+                elif cut_left is None:
                     cut_string = f"{out_par}_classifier>a"
-                    par_dict = {"a": num_sigmas_right}
+                    par_dict = {"a": cut_right}
 
             output_dict[f"{out_par}_classifier"] = {
                 "expression": f"(({par})-a)/b",
@@ -455,20 +718,26 @@ def generate_cut_classifiers(
             }
 
             output_dict[out_par] = {"expression": cut_string, "parameters": par_dict}
-
             if display > 0:
                 fig = plt.figure()
-                low = -10 if num_sigmas_left > -10 else num_sigmas_left
-                hi = 10 if num_sigmas_right < 10 else num_sigmas_right
-                plt.hist(
-                    (all_par_array - mean) / std,
+                low = -10 if cut_left > -10 else cut_left
+                hi = 10 if cut_right < 10 else cut_right
+                hist, _, _ = plt.hist(
+                    norm_par_array,
                     bins=np.arange(low, hi, 0.1),
                     histtype="step",
                 )
-                if num_sigmas_left is not None:
-                    plt.axvline(num_sigmas_left)
-                if num_sigmas_right is not None:
-                    plt.axvline(num_sigmas_right)
+                if percentile is not None:
+                    xs = np.arange(low, hi, 0.1)
+                    if func == skewed_fit:
+                        pdf_values = func(xs, *pars)[1] * 0.1
+                    else:
+                        pdf_values = func.pdf_ext(xs, *pars)[1] * 0.1
+                    plt.plot(xs, pdf_values)
+                if cut_left is not None:
+                    plt.axvline(cut_left)
+                if cut_right is not None:
+                    plt.axvline(cut_right)
 
                 plt.ylabel("counts")
                 plt.xlabel(f"{out_par}_classifier")
