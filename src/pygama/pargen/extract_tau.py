@@ -15,6 +15,7 @@ import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
+from pygama.data_cleaning import get_mode_stdev
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -46,42 +47,22 @@ class ExtractTau:
         - out_plot_dict: dictionary containing the plot figure (only returned if display > 0)
         """
 
-        counts, bins, var = pgh.get_hist(
-            slopes,
-            dx=np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
-            range=(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99)),
-        )
-        bin_centres = pgh.get_bin_centers(bins)
-        high_bin = bin_centres[np.argmax(counts)]
-        try:
-            pars, _ = pgf.gauss_mode_width_max(
-                counts,
-                bins,
-                n_bins=10,
-                cost_func="Least Squares",
-                inflate_errors=False,
-                gof_method="var",
-            )
-            if np.abs(np.abs(pars[0] - high_bin) / high_bin) > 0.05:
-                raise ValueError
-            high_bin = pars[0]
-        except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
-                raise (e)
-        tau = round(-1 / (high_bin), 1)
+        mode, stdev = get_mode_stdev(slopes)
+        tau = round(-1 / (mode), 1)
+        err = round(-1 / (stdev / np.sqrt(len(slopes))), 1)
 
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]
         tau = f"{tau*sampling_rate}*{units}"
 
         if "pz" in self.output_dict:
-            self.output_dict["pz"].update({"tau": tau})
+            self.output_dict["pz"].update({"tau": tau, "tau_err": err})
         else:
-            self.output_dict["pz"] = {"tau": tau}
+            self.output_dict["pz"] = {"tau": tau, "tau_err": err}
 
-        self.results_dict.update({"single_decay_constant": {"slope_pars": pars}})
+        self.results_dict.update(
+            {"single_decay_constant": {"slope_pars": {"mode": mode, "stdev": stdev}}}
+        )
         if display <= 0:
             return
         else:
