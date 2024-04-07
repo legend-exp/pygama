@@ -304,6 +304,8 @@ class HPGeCalibration:
         if peaks_kev is None:
             peaks_kev = self.peaks_kev
 
+        peaks_kev = np.asarray(peaks_kev)
+
         # re-bin the histogram in ~0.2 kev bins with updated E scale par for peak-top fits
         if erange is None:
             euc_min, euc_max = (
@@ -379,11 +381,16 @@ class HPGeCalibration:
         self.peaks_kev = matched_energies
 
         # Calculate updated calibration curve
-        poly_pars = (
-            Polynomial.fit(got_peak_locations, matched_energies, len(self.pars) - 1)
-            .convert()
-            .coef
-        )
+        if self.deg == 0:
+            scale, _ = fit_simple_scaling(got_peak_locations, matched_energies)
+            poly_pars = np.array([0, scale])
+        else:
+            # Calculate updated calibration curve
+            poly_pars = (
+                Polynomial.fit(got_peak_locations, matched_energies, len(self.pars) - 1)
+                .convert()
+                .coef
+            )
         c = cost.LeastSquares(
             matched_energies,
             got_peak_locations,
