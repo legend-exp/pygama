@@ -298,9 +298,9 @@ def build_evt(
                 raise RuntimeError(msg)
 
             # otherwise, increase nesting
-            if level not in nested_tbl:
+            if level not in lvl_ptr:
                 lvl_ptr.add_field(level, Table(size=n_rows))
-            lvl_ptr = nested_tbl[level]
+            lvl_ptr = lvl_ptr[level]
 
     # write output fields into outfile
     if output_fields:
