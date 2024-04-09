@@ -203,12 +203,10 @@ def build_evt(
         # if mode not defined in operation, it can only be an operation on the
         # evt level
         if "aggregation_mode" not in v.keys():
-            var = {}
-            if "parameters" in v.keys():
-                var = var | v["parameters"]
-
             # compute and eventually get rid of evt. suffix
-            obj = table.eval(v["expression"].replace("evt.", ""), var)
+            obj = table.eval(
+                v["expression"].replace("evt.", ""), v.get("parameters", {})
+            )
 
             # add attributes if present
             if "lgdo_attrs" in v.keys():
@@ -235,20 +233,11 @@ def build_evt(
                         )
                     )
 
-            pars, query, defaultv, srter = None, None, np.nan, None
-            if "parameters" in v.keys():
-                pars = v["parameters"]
-            if "query" in v.keys():
-                query = v["query"]
-            if "initial" in v.keys():
-                defaultv = v["initial"]
-                if isinstance(defaultv, str) and (
-                    defaultv in ["np.nan", "np.inf", "-np.inf"]
-                ):
-                    defaultv = eval(defaultv)
-
-            if "sort" in v.keys():
-                srter = v["sort"]
+            defaultv = v.get("initial", np.nan)
+            if isinstance(defaultv, str) and (
+                defaultv in ["np.nan", "np.inf", "-np.inf"]
+            ):
+                defaultv = eval(defaultv)
 
             obj = evaluate_expression(
                 datainfo,
@@ -259,10 +248,10 @@ def build_evt(
                 expr=v["expression"],
                 n_rows=n_rows,
                 table=table,
-                parameters=pars,
-                query=query,
+                parameters=v.get("parameters", None),
+                query=v.get("query", None),
                 default_value=defaultv,
-                sorter=srter,
+                sorter=v.get("sort", None),
             )
 
             # add attribute if present
@@ -297,7 +286,7 @@ def build_evt(
 
         # if names contain slahes, put in sub-tables
         lvl_ptr = nested_tbl
-        subfields = field.strip("/").split("/")
+        subfields = field.strip("/").split("___")
         for level in subfields:
             # if we are at the end, just add the field
             if level == subfields[-1]:
@@ -412,8 +401,9 @@ def evaluate_expression(
     pars_dict = {}
 
     if table is not None:
-        ok_types = (Array, ArrayOfEqualSizedArrays, VectorOfVectors)
-        pars_dict = {k: v for k, v in table.items() if isinstance(v, ok_types)}
+        pars_dict = {
+            k: v for k, v in table.items() if isinstance(v, (Array, VectorOfVectors))
+        }
 
     # ...or defined through the configuration
     if parameters:

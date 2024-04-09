@@ -73,20 +73,26 @@ def test_field_nesting(lgnd_test_data, files_config):
     config = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "outputs": [
-            "sub1/timestamp",
-            "sub2/multiplicity",
+            "sub1___timestamp",
+            "sub2___multiplicity",
+            "sub2___dummy",
         ],
         "operations": {
-            "sub1/timestamp": {
+            "sub1___timestamp": {
                 "channels": "geds_on",
                 "aggregation_mode": "first_at:dsp.tp_0_est",
                 "expression": "dsp.timestamp",
             },
-            "sub2/multiplicity": {
+            "sub2___multiplicity": {
                 "channels": "geds_on",
                 "aggregation_mode": "sum",
-                "expression": "hit.cuspEmax_ctc_cal > a",
-                "parameters": {"a": 25},
+                "expression": "hit.cuspEmax_ctc_cal > 25",
+                "initial": 0,
+            },
+            "sub2___dummy": {
+                "channels": "geds_on",
+                "aggregation_mode": "sum",
+                "expression": "hit.cuspEmax_ctc_cal > evt.sub1___timestamp",
                 "initial": 0,
             },
         },
@@ -108,7 +114,7 @@ def test_field_nesting(lgnd_test_data, files_config):
 
     assert sorted(evt.keys()) == ["sub1", "sub2"]
     assert sorted(evt.sub1.keys()) == ["timestamp"]
-    assert sorted(evt.sub2.keys()) == ["multiplicity"]
+    assert sorted(evt.sub2.keys()) == ["dummy", "multiplicity"]
 
 
 def test_spms_module(lgnd_test_data, files_config):
