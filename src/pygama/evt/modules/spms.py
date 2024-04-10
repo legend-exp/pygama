@@ -302,7 +302,7 @@ def make_pulse_data_mask(
     return types.VectorOfVectors(mask)
 
 
-def geds_spms_coincidence_classifier(
+def geds_coincidence_classifier(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],

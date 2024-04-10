@@ -71,7 +71,7 @@
     "lar_coin_class": {
       "channels": "spms_on",
       "aggregation_mode": "function",
-      "expression": "pygama.evt.modules.spms.geds_spms_coincidence_classifier(<...>, geds_t0_ns=evt.t0)"
+      "expression": "pygama.evt.modules.spms.geds_coincidence_classifier(<...>, geds_t0_ns=evt.t0)"
     }
   }
 }
