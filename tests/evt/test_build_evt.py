@@ -158,6 +158,10 @@ def test_spms_module(lgnd_test_data, files_config):
     rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
     assert ak.count(rawids_wo_empty) == 7
 
+    vhit = evt.is_valid_hit.view_as("ak")
+    vhit.show()
+    assert ak.all(ak.num(vhit, axis=-1) == ak.num(full, axis=-1))
+
 
 def test_vov(lgnd_test_data, files_config):
     build_evt(

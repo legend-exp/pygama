@@ -358,3 +358,23 @@ def geds_coincidence_classifier(
     ts_data = larveto.l200_combined_test_stat(data["t0"], data["amp"], geds_t0_ns)
 
     return types.Array(ts_data)
+
+
+# REMOVE ME: not needed anymore with VectorOfVectors DSP outputs
+def gather_is_valid_hit(datainfo, tcm, table_names):
+    data = {}
+    for field in ("is_valid_hit", "trigger_pos"):
+        data[field] = gather_pulse_data(
+            datainfo,
+            tcm,
+            table_names,
+            observable=f"hit.{field}",
+            pulse_mask=None,
+            drop_empty=False,
+        ).view_as("ak")
+
+    return types.VectorOfVectors(
+        data["is_valid_hit"][
+            ak.local_index(data["is_valid_hit"]) < ak.num(data["trigger_pos"], axis=-1)
+        ]
+    )
