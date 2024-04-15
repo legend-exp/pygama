@@ -41,6 +41,7 @@ dependencies = [
     "numpy>=1.21",
     "pandas>=1.4.4",
     "pint",
+    "pyyaml",
     "scikit-learn",
     "scipy>=1.0.1",
     "tables",

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import importlib
 import itertools
-import json
 import logging
 import re
 from collections.abc import Mapping, Sequence
@@ -16,6 +15,7 @@ import awkward as ak
 import numpy as np
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
 
+from ..utils import load_dict
 from . import aggregators, utils
 
 log = logging.getLogger(__name__)
@@ -120,8 +120,7 @@ def build_evt(
         writing mode, see :func:`lgdo.lh5.core.write`.
     """
     if not isinstance(config, dict):
-        with open(config) as f:
-            config = json.load(f)
+        config = load_dict(config)
 
     if "channels" not in config.keys():
         raise ValueError("channel field needs to be specified in the config")

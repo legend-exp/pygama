@@ -29,7 +29,7 @@ def files_config(lgnd_test_data, tmptestdir):
 def test_basics(lgnd_test_data, files_config):
     build_evt(
         files_config,
-        config=f"{config_dir}/basic-evt-config.json",
+        config=f"{config_dir}/basic-evt-config.yaml",
         wo_mode="of",
     )
 
@@ -120,7 +120,7 @@ def test_field_nesting(lgnd_test_data, files_config):
 def test_spms_module(lgnd_test_data, files_config):
     build_evt(
         files_config,
-        config=f"{config_dir}/spms-module-config.json",
+        config=f"{config_dir}/spms-module-config.yaml",
         wo_mode="of",
     )
 
