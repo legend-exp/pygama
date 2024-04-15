@@ -9,6 +9,7 @@ outputs:
   - energy
   - energy_id
   - energy_idx
+  - energy_hit_idx
   - energy_any_above1MeV
   - energy_all_above1MeV
   - energy_sum
@@ -47,6 +48,12 @@ operations:
     aggregation_mode: first_at:dsp.tp_0_est
     query: hit.cuspEmax_ctc_cal>25
     expression: tcm.index
+    initial: 999999999999
+  energy_hit_idx:
+    channels: geds_on
+    aggregation_mode: first_at:dsp.tp_0_est
+    query: hit.cuspEmax_ctc_cal>25
+    expression: tcm.array_idx
     initial: 999999999999
   energy_any_above1MeV:
     channels: geds_on

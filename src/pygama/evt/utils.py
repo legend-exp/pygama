@@ -160,6 +160,8 @@ def get_data_at_channel(
 
     if expr == "tcm.array_id":
         res = np.full(outsize, table_id, dtype=int)
+    elif expr == "tcm.array_idx":
+        res = idx_ch
     elif expr == "tcm.index":
         res = np.where(tcm.id == table_id)[0]
     else:

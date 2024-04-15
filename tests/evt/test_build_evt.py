@@ -47,6 +47,7 @@ def test_basics(lgnd_test_data, files_config):
         "energy",
         "energy_all_above1MeV",
         "energy_any_above1MeV",
+        "energy_hit_idx",
         "energy_id",
         "energy_idx",
         "energy_sum",
@@ -67,6 +68,11 @@ def test_basics(lgnd_test_data, files_config):
     ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
     ids = ids[eidx]
     assert ak.all(ids == eid[eid != 0])
+
+    ehidx = store.read("/evt/energy_hit_idx", outfile)[0].view_as("np")
+    ids = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ids = ids[eidx]
+    assert ak.all(ids == ehidx[ehidx != 999999999999])
 
 
 def test_field_nesting(lgnd_test_data, files_config):
