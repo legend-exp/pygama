@@ -5,6 +5,7 @@ functions. It it inspired by the design of Celery's sphinx extension
 
 Adapted from https://github.com/numba/numba/issues/5755#issuecomment-646587651
 """
+
 from copy import copy
 from typing import Iterator, List
 

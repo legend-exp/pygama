@@ -1081,9 +1081,9 @@ class CalAoE:
                 np.nanpercentile(dep_events[self.dt_param], 99),
             ]
 
-            self.dt_res_dict[
-                "final_selection"
-            ] = f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{self.dt_param}>{dt_range[0]}&{self.dt_param}<{dt_range[1]}&{self.dt_param}=={self.dt_param}"
+            self.dt_res_dict["final_selection"] = (
+                f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{self.dt_param}>{dt_range[0]}&{self.dt_param}<{dt_range[1]}&{self.dt_param}=={self.dt_param}"
+            )
 
             final_df = dep_events.query(self.dt_res_dict["final_selection"])
 
@@ -1695,9 +1695,11 @@ class CalAoE:
                         fit_range=fit_range,
                         mode=mode,
                         high_cut=self.high_cut_val,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     sfs = pd.concat(
                         [
