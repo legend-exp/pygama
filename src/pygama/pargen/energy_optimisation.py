@@ -98,6 +98,7 @@ def get_peak_fwhm_with_dt_corr(
     guess=None,
     kev=False,
     frac_max=0.5,
+    bin_width=1,
     allow_tail_drop=False,
     display=0,
 ):
@@ -111,7 +112,6 @@ def get_peak_fwhm_with_dt_corr(
     )
     ct_energy = np.add(correction, energies)
 
-    bin_width = 1
     lower_bound = (np.nanmin(ct_energy) // bin_width) * bin_width
     upper_bound = ((np.nanmax(ct_energy) // bin_width) + 1) * bin_width
     hist, bins, var = pgh.get_hist(
@@ -143,6 +143,7 @@ def get_peak_fwhm_with_dt_corr(
             tol=tol,
             guess=guess,
             allow_tail_drop=allow_tail_drop,
+            bin_width=bin_width,
             display=display,
         )
         if display > 0:
@@ -229,6 +230,7 @@ def fom_fwhm_with_alpha_fit(
     energies = energies.astype("float64")
     peak = kwarg_dict["peak"]
     kev_width = kwarg_dict["kev_width"]
+    bin_width = kwarg_dict.get("bin_width", 1)
     min_alpha = 0
     max_alpha = 3.50e-06
     alphas = np.linspace(min_alpha, max_alpha, nsteps, dtype="float64")
@@ -270,6 +272,7 @@ def fom_fwhm_with_alpha_fit(
                 kev_width,
                 guess=None,
                 frac_max=0.5,
+                bin_width=bin_width,
                 allow_tail_drop=False,
             )
             if not np.isnan(fwhm_o_max):
@@ -359,6 +362,7 @@ def fom_fwhm_with_alpha_fit(
             kev=True,
             frac_max=frac_max,
             allow_tail_drop=True,
+            bin_width=bin_width,
             display=display,
         )
         if np.isnan(final_fwhm) or np.isnan(final_err):
@@ -398,6 +402,7 @@ def fom_fwhm_no_alpha_sweep(
     peak = kwarg_dict["peak"]
     kev_width = kwarg_dict["kev_width"]
     alpha = kwarg_dict.get("alpha", alpha)
+    bin_width = kwarg_dict.get("bin_width", 1)
     if isinstance(alpha, dict):
         alpha = alpha[parameter]
     if "ctc_param" in kwarg_dict or ctc_param is not None:
@@ -442,6 +447,7 @@ def fom_fwhm_no_alpha_sweep(
         kev_width=kev_width,
         frac_max=frac_max,
         kev=True,
+        bin_width=bin_width,
         display=display,
     )
     return {
