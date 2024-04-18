@@ -4,7 +4,6 @@ This module implements routines to evaluate expressions to columnar data.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from collections import OrderedDict
@@ -13,6 +12,8 @@ from typing import Iterable, Mapping
 import lgdo
 import numpy as np
 from lgdo.lh5 import LH5Iterator, LH5Store, ls
+
+from .. import utils
 
 log = logging.getLogger(__name__)
 
@@ -96,20 +97,17 @@ def build_hit(
         tbl_cfg = lh5_tables_config
         # sanitize config
         if isinstance(tbl_cfg, str):
-            with open(tbl_cfg) as f:
-                tbl_cfg = json.load(f)
+            tbl_cfg = utils.load_dict(tbl_cfg)
 
         for k, v in tbl_cfg.items():
             if isinstance(v, str):
-                with open(v) as f:
-                    tbl_cfg[k] = json.load(f)
+                tbl_cfg[k] = utils.load_dict(v)
         lh5_tables_config = tbl_cfg
 
     else:
         if isinstance(hit_config, str):
             # sanitize config
-            with open(hit_config) as f:
-                hit_config = json.load(f)
+            hit_config = utils.load_dict(hit_config)
 
         if lh5_tables is None:
             lh5_tables_config = {}

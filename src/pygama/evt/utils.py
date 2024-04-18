@@ -4,192 +4,189 @@ This module provides utilities to build the `evt` tier.
 
 from __future__ import annotations
 
+import copy
 import re
+from collections import namedtuple
 
 import awkward as ak
 import numpy as np
-from lgdo.lh5 import LH5Store
+from lgdo import lh5
 from numpy.typing import NDArray
 
+H5DataLoc = namedtuple(
+    "H5DataLoc", ("file", "group", "table_fmt"), defaults=3 * (None,)
+)
 
-def get_tcm_id_by_pattern(tcm_id_table_pattern: str, ch: str) -> int:
-    pre = tcm_id_table_pattern.split("{")[0]
-    post = tcm_id_table_pattern.split("}")[1]
+DataInfo = namedtuple(
+    "DataInfo", ("raw", "tcm", "dsp", "hit", "evt"), defaults=5 * (None,)
+)
+
+TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
+
+
+def make_files_config(data: dict):
+    if not isinstance(data, DataInfo):
+        return DataInfo(
+            *[
+                H5DataLoc(*data[tier]) if tier in data else H5DataLoc()
+                for tier in DataInfo._fields
+            ]
+        )
+
+    return data
+
+
+def make_numpy_full(size, fill_value, try_dtype):
+    if np.can_cast(fill_value, try_dtype):
+        return np.full(size, fill_value, dtype=try_dtype)
+    else:
+        return np.full(size, fill_value)
+
+
+def copy_lgdo_attrs(obj):
+    attrs = copy.copy(obj.attrs)
+    attrs.pop("datatype")
+    return attrs
+
+
+def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:
+    pre = table_id_fmt.split("{")[0]
+    post = table_id_fmt.split("}")[1]
     return int(ch.strip(pre).strip(post))
 
 
-def get_table_name_by_pattern(tcm_id_table_pattern: str, ch_id: int) -> str:
-    # check tcm_id_table_pattern validity
-    pattern_check = re.findall(r"{([^}]*?)}", tcm_id_table_pattern)[0]
+def get_table_name_by_pattern(table_id_fmt: str, ch_id: int) -> str:
+    # check table_id_fmt validity
+    pattern_check = re.findall(r"{([^}]*?)}", table_id_fmt)[0]
     if pattern_check == "" or ":" == pattern_check[0]:
-        return tcm_id_table_pattern.format(ch_id)
+        return table_id_fmt.format(ch_id)
     else:
         raise NotImplementedError(
-            "Only empty placeholders with format specifications are currently implemented"
+            "only empty placeholders {} in format specifications are currently supported"
         )
-
-
-def num_and_pars(value: str, par_dic: dict):
-    # function tries to convert a string to a int, float, bool
-    # or returns the value if value is a key in par_dic
-    if value in par_dic.keys():
-        return par_dic[value]
-    try:
-        value = int(value)
-    except ValueError:
-        try:
-            value = float(value)
-        except ValueError:
-            try:
-                value = bool(value)
-            except ValueError:
-                pass
-    return value
 
 
 def find_parameters(
-    f_hit: str,
-    f_dsp: str,
-    ch: str,
-    idx_ch: NDArray,
-    exprl: list,
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
+    datainfo,
+    ch,
+    idx_ch,
+    field_list,
 ) -> dict:
-    """Wraps :func:`load_vars_to_nda` to return parameters from `hit` and `dsp`
-    tiers.
+    """Finds and returns parameters from `hit` and `dsp` tiers.
 
     Parameters
     ----------
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     ch
        "rawid" in the tiers.
     idx_ch
-       index array of entries to be read from files.
-    exprl
+       index array of entries to be read from datainfo.
+    field_list
        list of tuples ``(tier, field)`` to be found in the `hit/dsp` tiers.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
     """
+    f = make_files_config(datainfo)
 
     # find fields in either dsp, hit
-    dsp_flds = [e[1] for e in exprl if e[0] == dsp_group]
-    hit_flds = [e[1] for e in exprl if e[0] == hit_group]
+    dsp_flds = [e[1] for e in field_list if e[0] == f.dsp.group]
+    hit_flds = [e[1] for e in field_list if e[0] == f.hit.group]
 
-    store = LH5Store()
     hit_dict, dsp_dict = {}, {}
+
     if len(hit_flds) > 0:
-        hit_ak = store.read(
-            f"{ch.replace('/','')}/{hit_group}/", f_hit, field_mask=hit_flds, idx=idx_ch
-        )[0].view_as("ak")
-        hit_dict = dict(
-            zip([f"{hit_group}_" + e for e in ak.fields(hit_ak)], ak.unzip(hit_ak))
+        hit_ak = lh5.read_as(
+            f"{ch.replace('/','')}/{f.hit.group}/",
+            f.hit.file,
+            field_mask=hit_flds,
+            idx=idx_ch,
+            library="ak",
         )
+
+        hit_dict = dict(
+            zip([f"{f.hit.group}_" + e for e in ak.fields(hit_ak)], ak.unzip(hit_ak))
+        )
+
     if len(dsp_flds) > 0:
-        dsp_ak = store.read(
-            f"{ch.replace('/','')}/{dsp_group}/", f_dsp, field_mask=dsp_flds, idx=idx_ch
-        )[0].view_as("ak")
+        dsp_ak = lh5.read_as(
+            f"{ch.replace('/','')}/{f.dsp.group}/",
+            f.dsp.file,
+            field_mask=dsp_flds,
+            idx=idx_ch,
+            library="ak",
+        )
+
         dsp_dict = dict(
-            zip([f"{dsp_group}_" + e for e in ak.fields(dsp_ak)], ak.unzip(dsp_ak))
+            zip([f"{f.dsp.group}_" + e for e in ak.fields(dsp_ak)], ak.unzip(dsp_ak))
         )
 
     return hit_dict | dsp_dict
 
 
 def get_data_at_channel(
-    ch: str,
-    ids: NDArray,
-    idx: NDArray,
-    expr: str,
-    exprl: list,
-    var_ph: dict,
-    is_evaluated: bool,
-    f_hit: str,
-    f_dsp: str,
-    defv,
-    tcm_id_table_pattern: str = "ch{}",
-    evt_group: str = "evt",
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> np.ndarray:
+    datainfo,
+    ch,
+    tcm,
+    expr,
+    field_list,
+    pars_dict,
+) -> NDArray:
     """Evaluates an expression and returns the result.
 
     Parameters
     ----------
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
     ch
        "rawid" of channel to be evaluated.
-    idx
-       `tcm` index array.
-    ids
-       `tcm` id array.
+    tcm
+        TCM data arrays in an object that can be accessed by attribute.
     expr
        expression to be evaluated.
-    exprl
+    field_list
        list of parameter-tuples ``(root_group, field)`` found in the expression.
-    var_ph
+    pars_dict
        dict of additional parameters that are not channel dependent.
     is_evaluated
        if false, the expression does not get evaluated but an array of default
        values is returned.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    defv
+    default_value
        default value.
-    tcm_id_table_pattern
-        Pattern to format tcm id values to table name in higher tiers. Must have one
-        placeholder which is the tcm id.
-    dsp_group
-        LH5 root group in dsp file.
-    hit_group
-        LH5 root group in hit file.
-    evt_group
-        LH5 root group in evt file.
     """
+    f = make_files_config(datainfo)
+    table_id = get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
     # get index list for this channel to be loaded
-    idx_ch = idx[ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch)]
+    idx_ch = tcm.idx[tcm.id == table_id]
     outsize = len(idx_ch)
 
-    if not is_evaluated:
-        res = np.full(outsize, defv, dtype=type(defv))
-    elif "tcm.array_id" == expr:
-        res = np.full(
-            outsize, get_tcm_id_by_pattern(tcm_id_table_pattern, ch), dtype=int
-        )
-    elif "tcm.index" == expr:
-        res = np.where(ids == get_tcm_id_by_pattern(tcm_id_table_pattern, ch))[0]
+    if expr == "tcm.array_id":
+        res = np.full(outsize, table_id, dtype=int)
+    elif expr == "tcm.array_idx":
+        res = idx_ch
+    elif expr == "tcm.index":
+        res = np.where(tcm.id == table_id)[0]
     else:
         var = find_parameters(
-            f_hit=f_hit,
-            f_dsp=f_dsp,
+            datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
-            exprl=exprl,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            field_list=field_list,
         )
 
-        if var_ph is not None:
-            var = var | var_ph
+        if pars_dict is not None:
+            var = var | pars_dict
 
         # evaluate expression
         # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
         res = eval(
-            expr.replace(f"{dsp_group}.", f"{dsp_group}_")
-            .replace(f"{hit_group}.", f"{hit_group}_")
-            .replace(f"{evt_group}.", ""),
+            expr.replace(f"{f.dsp.group}.", f"{f.dsp.group}_")
+            .replace(f"{f.hit.group}.", f"{f.hit.group}_")
+            .replace(f"{f.evt.group}.", ""),
             var,
         )
 
         # in case the expression evaluates to a single value blow it up
-        if (not hasattr(res, "__len__")) or (isinstance(res, str)):
+        if not hasattr(res, "__len__") or isinstance(res, str):
             return np.full(outsize, res)
 
         # the resulting arrays need to be 1D from the operation,
@@ -200,27 +197,28 @@ def get_data_at_channel(
         # in this method only 1D values are allowed
         if res.ndim > 1:
             raise ValueError(
-                f"expression '{expr}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
+                f"expression '{expr}' must return 1D array. If you are using "
+                "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
+                "reduction functions to reduce the dimension"
             )
 
     return res
 
 
 def get_mask_from_query(
-    qry: str | NDArray,
-    length: int,
-    ch: str,
-    idx_ch: NDArray,
-    f_hit: str,
-    f_dsp: str,
-    hit_group: str = "hit",
-    dsp_group: str = "dsp",
-) -> np.ndarray:
+    datainfo,
+    query,
+    length,
+    ch,
+    idx_ch,
+) -> NDArray:
     """Evaluates a query expression and returns a mask accordingly.
 
     Parameters
     ----------
-    qry
+    datainfo
+        input and output LH5 datainfo with HDF5 groups where tables are found.
+    query
        query expression.
     length
        length of the return mask.
@@ -228,33 +226,23 @@ def get_mask_from_query(
        "rawid" of channel to be evaluated.
     idx_ch
        channel indices to be read.
-    f_hit
-       path to `hit` tier file.
-    f_dsp
-       path to `dsp` tier file.
-    hit_group
-        LH5 root group in hit file.
-    dsp_group
-        LH5 root group in dsp file.
     """
+    f = make_files_config(datainfo)
 
     # get sub evt based query condition if needed
-    if isinstance(qry, str):
-        qry_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", qry)
-        qry_var = find_parameters(
-            f_hit=f_hit,
-            f_dsp=f_dsp,
+    if isinstance(query, str):
+        query_lst = re.findall(r"(hit|dsp).([a-zA-Z_$][\w$]*)", query)
+        query_var = find_parameters(
+            datainfo=datainfo,
             ch=ch,
             idx_ch=idx_ch,
-            exprl=qry_lst,
-            hit_group=hit_group,
-            dsp_group=dsp_group,
+            field_list=query_lst,
         )
         limarr = eval(
-            qry.replace(f"{dsp_group}.", f"{dsp_group}_").replace(
-                f"{hit_group}.", f"{hit_group}_"
+            query.replace(f"{f.dsp.group}.", f"{f.dsp.group}_").replace(
+                f"{f.hit.group}.", f"{f.hit.group}_"
             ),
-            qry_var,
+            query_var,
         )
 
         # in case the expression evaluates to a single value blow it up
@@ -264,12 +252,14 @@ def get_mask_from_query(
         limarr = ak.to_numpy(limarr, allow_missing=False)
         if limarr.ndim > 1:
             raise ValueError(
-                f"query '{qry}' must return 1D array. If you are using VectorOfVectors or ArrayOfEqualSizedArrays, use awkward reduction functions to reduce the dimension"
+                f"query '{query}' must return 1D array. If you are using "
+                "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
+                "reduction functions to reduce the dimension"
             )
 
     # or forward the array
-    elif isinstance(qry, np.ndarray):
-        limarr = qry
+    elif isinstance(query, np.ndarray):
+        limarr = query
 
     # if no condition, it must be true
     else:
