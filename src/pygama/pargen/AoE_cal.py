@@ -37,7 +37,6 @@ log = logging.getLogger(__name__)
 
 
 class PDF:
-
     """
     Base class for A/E pdfs.
     """
@@ -1518,9 +1517,9 @@ class cal_aoe:
                 np.nanpercentile(dep_events[self.dt_param], 99),
             ]
 
-            self.dt_res_dict[
-                "final_selection"
-            ] = f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{self.dt_param}>{dt_range[0]}&{self.dt_param}<{dt_range[1]}&{self.dt_param}=={self.dt_param}"
+            self.dt_res_dict["final_selection"] = (
+                f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{self.dt_param}>{dt_range[0]}&{self.dt_param}<{dt_range[1]}&{self.dt_param}=={self.dt_param}"
+            )
 
             final_df = dep_events.query(self.dt_res_dict["final_selection"])
 
@@ -1550,12 +1549,12 @@ class cal_aoe:
                 "errs": m.errors,
                 "object": m,
             }
-            aoe_grp1 = self.dt_res_dict[
-                "aoe_grp1"
-            ] = f'{self.dt_param}>{m.values["mu1"] - 2 * m.values["sigma1"]} & {self.dt_param}<{m.values["mu1"] + 2 * m.values["sigma1"]}'
-            aoe_grp2 = self.dt_res_dict[
-                "aoe_grp2"
-            ] = f'{self.dt_param}>{m.values["mu2"] - 2 * m.values["sigma2"]} & {self.dt_param}<{m.values["mu2"] + 2 * m.values["sigma2"]}'
+            aoe_grp1 = self.dt_res_dict["aoe_grp1"] = (
+                f'{self.dt_param}>{m.values["mu1"] - 2 * m.values["sigma1"]} & {self.dt_param}<{m.values["mu1"] + 2 * m.values["sigma1"]}'
+            )
+            aoe_grp2 = self.dt_res_dict["aoe_grp2"] = (
+                f'{self.dt_param}>{m.values["mu2"] - 2 * m.values["sigma2"]} & {self.dt_param}<{m.values["mu2"] + 2 * m.values["sigma2"]}'
+            )
 
             aoe_pars, aoe_errs, _ = unbinned_aoe_fit(
                 final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
@@ -2021,9 +2020,11 @@ class cal_aoe:
                         self.low_cut_val,
                         peak,
                         fwhm,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     self.low_side_sf = pd.concat(
                         [
@@ -2043,9 +2044,11 @@ class cal_aoe:
                         self.low_cut_val,
                         peak,
                         fwhm,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     self.low_side_sf = pd.concat(
                         [
@@ -2083,9 +2086,11 @@ class cal_aoe:
                         peak_df[aoe_param].to_numpy(),
                         self.low_cut_val,
                         self.high_cut_val,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     sf = sf_dict["sf"]
                     sf_err = sf_dict["sf_err"]
@@ -2107,9 +2112,11 @@ class cal_aoe:
                         peak,
                         fwhm,
                         high_cut=self.high_cut_val,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     self.two_side_sf = pd.concat(
                         [

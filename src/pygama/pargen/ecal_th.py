@@ -1183,13 +1183,11 @@ def bin_pulser_stability(ecal_class, data, pulser_field="is_pulser", time_slice=
             "spread": np.full_like(times_average, np.nan),
         }
 
-    nanmedian = (
-        lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
+    nanmedian = lambda x: (
+        np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
     )
-    error = (
-        lambda x: np.nanvar(x) / np.sqrt(len(x))
-        if len(x[~np.isnan(x)]) >= 10
-        else np.nan
+    error = lambda x: (
+        np.nanvar(x) / np.sqrt(len(x)) if len(x[~np.isnan(x)]) >= 10 else np.nan
     )
 
     par_average, _, _ = binned_statistic(
@@ -1225,13 +1223,11 @@ def bin_stability(ecal_class, data, time_slice=180, energy_range=[2585, 2660]):
             "spread": np.full_like(times_average, np.nan),
         }
 
-    nanmedian = (
-        lambda x: np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
+    nanmedian = lambda x: (
+        np.nanpercentile(x, 50) if len(x[~np.isnan(x)]) >= 10 else np.nan
     )
-    error = (
-        lambda x: np.nanvar(x) / np.sqrt(len(x))
-        if len(x[~np.isnan(x)]) >= 10
-        else np.nan
+    error = lambda x: (
+        np.nanvar(x) / np.sqrt(len(x)) if len(x[~np.isnan(x)]) >= 10 else np.nan
     )
 
     par_average, _, _ = binned_statistic(

@@ -5,107 +5,106 @@ ci:
 
 exclude: ^(attic|tutorials|src/pygama/math|src/pygama/flow/datagroup.py)
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: "v4.5.0"
-    hooks:
-      - id: check-added-large-files
-      - id: check-case-conflict
-      - id: check-executables-have-shebangs
-      - id: check-merge-conflict
-      - id: check-symlinks
-      - id: check-yaml
-      - id: check-json
-      - id: check-toml
-      - id: check-docstring-first
-        exclude: ^src/pygama/raw/(fc/fc_event_decoder.py|compass/compass_event_decoder.py)$
-      - id: debug-statements
-      - id: end-of-file-fixer
-      - id: forbid-new-submodules
-      - id: mixed-line-ending
-      - id: requirements-txt-fixer
-      - id: trailing-whitespace
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: "v4.5.0"
+  hooks:
+  - id: check-added-large-files
+  - id: check-case-conflict
+  - id: check-executables-have-shebangs
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-yaml
+  - id: check-json
+  - id: check-toml
+  - id: check-docstring-first
+    exclude: ^src/pygama/raw/(fc/fc_event_decoder.py|compass/compass_event_decoder.py)$
+  - id: debug-statements
+  - id: end-of-file-fixer
+  - id: forbid-new-submodules
+  - id: mixed-line-ending
+  - id: requirements-txt-fixer
+  - id: trailing-whitespace
 
-  - repo: https://github.com/asottile/setup-cfg-fmt
-    rev: "v2.5.0"
-    hooks:
-      - id: setup-cfg-fmt
+- repo: https://github.com/asottile/setup-cfg-fmt
+  rev: "v2.5.0"
+  hooks:
+  - id: setup-cfg-fmt
 
-  - repo: https://github.com/PyCQA/isort
-    rev: "5.13.2"
-    hooks:
-      - id: isort
+- repo: https://github.com/PyCQA/isort
+  rev: "5.13.2"
+  hooks:
+  - id: isort
 
-  - repo: https://github.com/asottile/pyupgrade
-    rev: "v3.15.0"
-    hooks:
-      - id: pyupgrade
-        args: ["--py38-plus"]
+- repo: https://github.com/asottile/pyupgrade
+  rev: "v3.15.2"
+  hooks:
+  - id: pyupgrade
+    args: ["--py38-plus"]
 
-  - repo: https://github.com/psf/black
-    rev: "23.12.1"
-    hooks:
-      - id: black-jupyter
+- repo: https://github.com/psf/black
+  rev: "24.3.0"
+  hooks:
+  - id: black-jupyter
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: "v1.8.0"
-    hooks:
-      - id: mypy
-        files: src
-        stages: [manual]
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: "v1.9.0"
+  hooks:
+  - id: mypy
+    files: src
+    stages: [manual]
 
-  - repo: https://github.com/hadialqattan/pycln
-    rev: "v2.4.0"
-    hooks:
-      - id: pycln
-        exclude: ^src/pygama/pargen
-        args: [--all]
+- repo: https://github.com/hadialqattan/pycln
+  rev: "v2.4.0"
+  hooks:
+  - id: pycln
+    exclude: ^src/pygama/pargen
+    args: [--all]
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: "6.1.0"
-    hooks:
-      - id: flake8
-        exclude: ^src/pygama/pargen
-        additional_dependencies:
-          [flake8-bugbear>=23.1.17, flake8-print, pep8-naming]
-        args: ["--extend-ignore", "E203,E501"]
+- repo: https://github.com/PyCQA/flake8
+  rev: "7.0.0"
+  hooks:
+  - id: flake8
+    exclude: ^src/pygama/pargen
+    additional_dependencies: [
+      flake8-bugbear>=23.1.17,
+      flake8-print,
+      pep8-naming
+    ]
+    args: ["--extend-ignore", "E203,E501"]
 
-  - repo: https://github.com/kynan/nbstripout
-    rev: "0.6.1"
-    hooks:
-      - id: nbstripout
-        args:
-          [
-            "--drop-empty-cells",
-            "--extra-keys",
-            "metadata.kernelspec metadata.language_info",
-          ]
+- repo: https://github.com/kynan/nbstripout
+  rev: "0.7.1"
+  hooks:
+    - id: nbstripout
+      args: ["--drop-empty-cells",
+             "--extra-keys", "metadata.kernelspec metadata.language_info"]
 
-  - repo: https://github.com/mgedmin/check-manifest
-    rev: "0.49"
-    hooks:
-      - id: check-manifest
-        stages: [manual]
+- repo: https://github.com/mgedmin/check-manifest
+  rev: "0.49"
+  hooks:
+  - id: check-manifest
+    stages: [manual]
 
-  - repo: https://github.com/codespell-project/codespell
-    rev: "v2.2.6"
-    hooks:
-      - id: codespell
+- repo: https://github.com/codespell-project/codespell
+  rev: "v2.2.6"
+  hooks:
+  - id: codespell
 
-  - repo: https://github.com/shellcheck-py/shellcheck-py
-    rev: "v0.9.0.6"
-    hooks:
-      - id: shellcheck
+- repo: https://github.com/shellcheck-py/shellcheck-py
+  rev: "v0.10.0.1"
+  hooks:
+  - id: shellcheck
 
-  - repo: https://github.com/pre-commit/pygrep-hooks
-    rev: "v1.10.0"
-    hooks:
-      - id: python-no-log-warn
-      - id: rst-backticks
-      - id: rst-directive-colons
-      - id: rst-inline-touching-normal
+- repo: https://github.com/pre-commit/pygrep-hooks
+  rev: "v1.10.0"
+  hooks:
+  - id: python-no-log-warn
+  - id: rst-backticks
+  - id: rst-directive-colons
+  - id: rst-inline-touching-normal
 
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: "v4.0.0-alpha.8"
-    hooks:
-      - id: prettier
-        types_or: [json, yaml]
+- repo: https://github.com/pre-commit/mirrors-prettier
+  rev: "v4.0.0-alpha.8"
+  hooks:
+    - id: prettier
+      types_or: [json]

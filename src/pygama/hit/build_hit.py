@@ -1,6 +1,7 @@
 """
 This module implements routines to evaluate expressions to columnar data.
 """
+
 from __future__ import annotations
 
 import logging

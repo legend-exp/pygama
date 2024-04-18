@@ -1,4 +1,5 @@
 """Utilities for LH5 file inventory."""
+
 from __future__ import annotations
 
 import json
