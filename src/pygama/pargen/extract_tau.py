@@ -15,7 +15,7 @@ import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
 import pygama.pargen.dsp_optimize as opt
 import pygama.pargen.energy_optimisation as om
-from pygama.data_cleaning import get_mode_stdev
+from pygama.pargen.data_cleaning import get_mode_stdev
 
 log = logging.getLogger(__name__)
 sto = lh5.LH5Store()
@@ -49,7 +49,7 @@ class ExtractTau:
 
         mode, stdev = get_mode_stdev(slopes)
         tau = round(-1 / (mode), 1)
-        err = round(-1 / (stdev / np.sqrt(len(slopes))), 1)
+        err = round((-1 / (mode + (stdev / np.sqrt(len(slopes))))) -tau, 1) 
 
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]
@@ -155,7 +155,8 @@ class ExtractTau:
         return plot_dict
 
     def plot_slopes(self, slopes, display=0):
-        high_bin, sigma, _ = self.results_dict["single_decay_constant"]["slope_pars"]
+        high_bin = self.results_dict["single_decay_constant"]["slope_pars"]["mode"]
+        sigma = self.results_dict["single_decay_constant"]["slope_pars"]["stdev"]
         plt.rcParams["figure.figsize"] = (10, 6)
         plt.rcParams["font.size"] = 8
         fig, ax = plt.subplots()
