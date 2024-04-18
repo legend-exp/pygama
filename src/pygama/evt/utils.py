@@ -1,6 +1,7 @@
 """
 This module provides utilities to build the `evt` tier.
 """
+
 from __future__ import annotations
 
 import copy

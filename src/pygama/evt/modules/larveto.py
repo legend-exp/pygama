@@ -1,4 +1,5 @@
 """Routines to evaluate the correlation between HPGe and SiPM signals."""
+
 from __future__ import annotations
 
 import awkward as ak
