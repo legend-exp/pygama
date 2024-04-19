@@ -1,5 +1,5 @@
 import awkward as ak
-import cross_talk
+from pygama.evt.modules import cross_talk
 import pytest
 def test_cross_talk_corrected_energy_awkard_slow():
 
@@ -24,20 +24,20 @@ def test_cross_talk_corrected_energy_awkard_slow():
 
     ## checks on the matrix
     # first check if the matrix has empty elements an exception is raised if allow_non_existing is false
-    matrix_not_full ={1:{1:1.00, 2:0.01, 3:0.02, 4:0.00},
-            2:{1:0.01, 2:1.00, 3:0},
-            3:{1:0.02, 2:0.00, 3:1.00, 4:0.01},
-            4:{1:0.00, 3:0.01, 4:1.00}
-            }  
+    matrix_not_full={1:{1:1.00, 2:0.01, 3:0.02, 4:0.00},
+                    2:{1:0.01, 2:1.00, 3:0},
+                    3:{1:0.02, 2:0.00, 3:1.00, 4:0.01},
+                    4:{1:0.00, 3:0.01, 4:1.00}
+                    }  
     
     with pytest.raises(ValueError):
         cross_talk.cross_talk_corrected_energy_awkard_slow(energies_test,rawid_test,matrix_not_full,False)
     
-     matrix_not_sym={1:{1:1.00, 2:0.0, 3:0.02, 4:0.00},
-            2:{1:0.01, 2:1.00, 3:0,    4:0.01},
-            3:{1:0.02, 2:0.00, 3:1.00, 4:0.01},
-            4:{1:0.00, 2:0.01, 3:0.01, 4:1.00}
-            } 
+    matrix_not_sym={1:{1:1.00, 2:0.0, 3:0.02, 4:0.00},
+                    2:{1:0.01, 2:1.00, 3:0,    4:0.01},
+                    3:{1:0.02, 2:0.00, 3:1.00, 4:0.01},
+                    4:{1:0.00, 2:0.01, 3:0.01, 4:1.00}
+                    } 
     with pytest.raises(ValueError):  
         cross_talk.cross_talk_corrected_energy_awkard_slow(energies_test,rawid_test,matrix_not_sym,True)
 
