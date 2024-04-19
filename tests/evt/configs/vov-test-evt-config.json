@@ -28,14 +28,15 @@
       "channels": "geds_on",
       "aggregation_mode": "gather",
       "query": "hit.cuspEmax_ctc_cal>25",
-      "expression": "hit.cuspEmax_ctc_cal"
+      "expression": "hit.cuspEmax_ctc_cal",
+      "dtype": "float32"
     },
     "energy_sum": {
       "channels": "geds_on",
       "aggregation_mode": "sum",
       "query": "hit.cuspEmax_ctc_cal>25",
       "expression": "hit.cuspEmax_ctc_cal",
-      "initial": 0.0
+      "initial": 0
     },
     "energy_idx": {
       "channels": "geds_on",
@@ -66,7 +67,8 @@
       "aggregation_mode": "sum",
       "expression": "hit.cuspEmax_ctc_cal > a",
       "parameters": { "a": 25 },
-      "initial": 0
+      "initial": 0,
+      "dtype": "int16"
     },
     "is_saturated": {
       "aggregation_mode": "keep_at_ch:evt.energy_id",

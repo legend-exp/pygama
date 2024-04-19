@@ -1,4 +1,5 @@
 """This module implements some helpers for setting up logging."""
+
 import logging
 
 import colorlog
