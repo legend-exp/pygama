@@ -18,10 +18,13 @@ def apply_xtalk_correction(
     energy_observable: types.VectorOfVectors,
     rawids: types.VectorOfVectors,
     xtalk_matrix_filename: str,
+    threshold:float
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
+    The format of `xtalk_matrix_filename` should be currently be a path to a JSON file.
 
-    The format of `xtalk_matrix_filename` should be...
+    The correction is appplied recursively, the energies are sorted and then the correction
+    is applied from the largest to smallest (above the threshold).
 
     Parameters
     ----------
@@ -34,6 +37,10 @@ def apply_xtalk_correction(
         array of detector identifiers for each energy in `energy_observable`.
     xtalk_matrix_filename
         name of the file containing the cross-talk matrices.
+    threshold
+        threshold used for cross talk correction, hits below this energy will not
+        be used to correct the other hits.
+
     """
     # read in xtalk matrices (currently a json file)
 
