@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
 
-from lgdo import lh5, types
+from lgdo import types
 
 from .. import utils
 from . import cross_talk
-import json
+
 
 def apply_xtalk_correction(
     datainfo: utils.DataInfo,
@@ -18,7 +19,7 @@ def apply_xtalk_correction(
     energy_observable: types.VectorOfVectors,
     rawids: types.VectorOfVectors,
     xtalk_matrix_filename: str,
-    threshold:float
+    threshold: float,
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a JSON file.

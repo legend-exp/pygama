@@ -7,7 +7,6 @@ import numpy as np
 from lgdo import Array, VectorOfVectors
 from lgdo.lh5 import LH5Store
 
-from pygama.evt import utils
 
 def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,matrix:dict,allow_non_existing:bool=True,threshold:float=None):
     """
@@ -41,10 +40,10 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
     if not isinstance(rawids, ak.Array):
         raise TypeError("rawids must be an awkward array")
 
-    if not isinstance(matrix,dict):
+    if not isinstance(matrix, dict):
         raise TypeError("matrix must be a python dictonary")
 
-    if not isinstance(allow_non_existing,bool):
+    if not isinstance(allow_non_existing, bool):
         raise TypeError("allow_non_existing must be a Boolean")
 
     # first check that energies and rawids have the same dimensions
@@ -53,33 +52,38 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
     
     if (ak.num(energies,axis=-2)!=ak.num(rawids,axis=-2)):
         raise ValueError("Error: the number of energies is not equal to rawids")
-    
+
     # check that the matrix elements exist
     for c1 in np.unique(ak.flatten(rawids).to_numpy()):
         if c1 not in matrix.keys():
 
-            if allow_non_existing==True:
-                matrix[c1]={}
+            if allow_non_existing == True:
+                matrix[c1] = {}
             else:
-                raise ValueError(f"Error allow_non_existing is set to False and {c1} isnt present in the matrix")
+                raise ValueError(
+                    f"Error allow_non_existing is set to False and {c1} isnt present in the matrix"
+                )
 
         for c2 in np.unique(ak.flatten(rawids).to_numpy()):
-            if (c1==c2):
+            if c1 == c2:
                 continue
             else:
                 if c2 not in matrix[c1].keys():
-                    if allow_non_existing==True:
-                        matrix[c1][c2]=0
+                    if allow_non_existing == True:
+                        matrix[c1][c2] = 0
                     else:
-                        raise ValueError(f"Error allow_non_existing is set to False and {c2} isnt present in the matrix[{c1}]")
+                        raise ValueError(
+                            f"Error allow_non_existing is set to False and {c2} isnt present in the matrix[{c1}]"
+                        )
 
     ## add a check that the matrix is symmetric
 
     for c1 in matrix.keys():
         for c2 in matrix[c1].keys():
-            if abs(matrix[c1][c2]-matrix[c2][c1])>1e-6:
-                raise ValueError(f"Error input cross talk matrix is not symmetric for {c1},{c2}")
-
+            if abs(matrix[c1][c2] - matrix[c2][c1]) > 1e-6:
+                raise ValueError(
+                    f"Error input cross talk matrix is not symmetric for {c1},{c2}"
+                )
 
     ## sort the energies and rawids
     args = ak.argsort(energies,ascending=False)
@@ -93,8 +97,8 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
     energies_corrected = []
 
     ## we should try to speed this up
-    for energy_vec_tmp,rawid_vec_tmp in zip(energies,rawids):
-        
+    for energy_vec_tmp, rawid_vec_tmp in zip(energies, rawids):
+
         energies_corrected_tmp = list(energy_vec_tmp)
         for id_main, (energy_main,rawid_main) in enumerate(zip(energy_vec_tmp,rawid_vec_tmp)):
             if (threshold is not None and energy_main<threshold):
