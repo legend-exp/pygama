@@ -4,11 +4,15 @@ Module for cross talk correction of energies.
 
 import awkward as ak
 import numpy as np
-from lgdo import Array, VectorOfVectors
-from lgdo.lh5 import LH5Store
 
 
-def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,matrix:dict,allow_non_existing:bool=True,threshold:float=None):
+def cross_talk_corrected_energy_awkard_slow(
+    energies: ak.Array,
+    rawids: ak.Array,
+    matrix: dict,
+    allow_non_existing: bool = True,
+    threshold: float = None,
+):
     """
     Function to perform the cross talk correction on awkward arrays of energy and rawid.
     The energies are first sorted from largest to smallest, a term is then added to the
@@ -31,7 +35,7 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
         ak.Array of corrected energies
 
     """
-  
+
     # some exceptions
     # check types
     if not isinstance(energies, ak.Array):
@@ -47,10 +51,12 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
         raise TypeError("allow_non_existing must be a Boolean")
 
     # first check that energies and rawids have the same dimensions
-    if (ak.any(ak.num(energies,axis=-1)!=ak.num(rawids,axis=-1))):
-        raise ValueError("Error: the length of each subarray of energies and rawids must be equal")
-    
-    if (ak.num(energies,axis=-2)!=ak.num(rawids,axis=-2)):
+    if ak.any(ak.num(energies, axis=-1) != ak.num(rawids, axis=-1)):
+        raise ValueError(
+            "Error: the length of each subarray of energies and rawids must be equal"
+        )
+
+    if ak.num(energies, axis=-2) != ak.num(rawids, axis=-2):
         raise ValueError("Error: the number of energies is not equal to rawids")
 
     # check that the matrix elements exist
@@ -86,13 +92,11 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
                 )
 
     ## sort the energies and rawids
-    args = ak.argsort(energies,ascending=False)
-    energies= energies[args]
+    args = ak.argsort(energies, ascending=False)
+    energies = energies[args]
     rawids = rawids[args]
 
-
-
-    ## run the correction  
+    ## run the correction
     ## --------------------
     energies_corrected = []
 
@@ -100,19 +104,20 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
     for energy_vec_tmp, rawid_vec_tmp in zip(energies, rawids):
 
         energies_corrected_tmp = list(energy_vec_tmp)
-        for id_main, (energy_main,rawid_main) in enumerate(zip(energy_vec_tmp,rawid_vec_tmp)):
-            if (threshold is not None and energy_main<threshold):
+        for id_main, (energy_main, rawid_main) in enumerate(
+            zip(energy_vec_tmp, rawid_vec_tmp)
+        ):
+            if threshold is not None and energy_main < threshold:
                 break
-            for id_other, (energy_other,rawid_other) in enumerate(zip(energy_vec_tmp,rawid_vec_tmp)):
-                if (id_main!=id_other):
-                    energies_corrected_tmp[id_other]+=matrix[rawid_main][rawid_other]*energy_main
-        
+            for id_other, (energy_other, rawid_other) in enumerate(
+                zip(energy_vec_tmp, rawid_vec_tmp)
+            ):
+                if id_main != id_other:
+                    energies_corrected_tmp[id_other] += (
+                        matrix[rawid_main][rawid_other] * energy_main
+                    )
+
         energies_corrected.append(energies_corrected_tmp)
 
     ## convert to awkward array and unsort
     return ak.Array(energies_corrected)[args]
-
-
-
-
-

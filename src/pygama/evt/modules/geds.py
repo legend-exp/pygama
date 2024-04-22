@@ -45,21 +45,22 @@ def apply_xtalk_correction(
     """
     # read in xtalk matrices (currently a json file)
 
-  
-
     try:
-        with open(xtalk_matrix_filename, 'r') as file:
-                cross_talk_matrix = json.load(file)
+        with open(xtalk_matrix_filename) as file:
+            cross_talk_matrix = json.load(file)
     except FileNotFoundError:
-         raise ValueError(f"path to x-talk matrix {xtalk_matrix_filename} does not exist")
+        raise ValueError(
+            f"path to x-talk matrix {xtalk_matrix_filename} does not exist"
+        )
 
     # do the correction
-    energies_corr = cross_talk.cross_talk_corrected_energy_awkard_slow(energies=energy_observable.view_as("ak"),
-                                                                       rawids=rawids.view_as("ak"),
-                                                                       matrix=cross_talk_matrix,
-                                                                       allow_non_existing=False,
-                                                                       threshold=threshold
-                                                                       )
+    energies_corr = cross_talk.cross_talk_corrected_energy_awkard_slow(
+        energies=energy_observable.view_as("ak"),
+        rawids=rawids.view_as("ak"),
+        matrix=cross_talk_matrix,
+        allow_non_existing=False,
+        threshold=threshold,
+    )
 
     # return the result as LGDO
     return types.VectorOfVectors(
