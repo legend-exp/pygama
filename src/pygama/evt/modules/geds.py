@@ -12,7 +12,10 @@ from . import cross_talk
 from legendmeta import LegendMetadata
 
 
-def read_ctx_matrix(xtalk_matrix_filename:str,positive_xtalk_matrix_filename:str,det_names:bool):
+
+
+
+def manipulate_ctx_matrix(cross_talk_matrix:dict,positive_cross_talk_matrix:dict=None,det_names:bool=False):
     """
     Function to read in and manipulate the cross talk matrix.
     Parameters
@@ -25,25 +28,15 @@ def read_ctx_matrix(xtalk_matrix_filename:str,positive_xtalk_matrix_filename:str
         bool to convert det names to rawids
      
     """
-    # read in xtalk matrices (currently a json file)
-    try:
-        with open(xtalk_matrix_filename, 'r') as file:
-                cross_talk_matrix = json.load(file)
-    except FileNotFoundError:
-         raise ValueError(f"path to x-talk matrix {xtalk_matrix_filename} does not exist")
+  
     
-    if (det_names==False):
+    if (det_names is True):
         cross_talk_matrix=convert_matrix_det_names_to_rawid(cross_talk_matrix)
 
     # read the positive matrix
-    if (positive_xtalk_matrix_filename is not None):
-        try:
-            with open(xtalk_matrix_filename, 'r') as file:
-                positive_cross_talk_matrix = json.load(file)
-        except FileNotFoundError:
-            raise ValueError(f"path to x-talk matrix {positive_xtalk_matrix_filename} does not exist")
-
-        if (det_names==False):
+    if (positive_cross_talk_matrix is not None):
+        
+        if (det_names is True):
             positive_cross_talk_matrix=convert_matrix_det_names_to_rawid(positive_cross_talk_matrix)
         
         # merge +ive and -ive matrix
@@ -57,6 +50,9 @@ def read_ctx_matrix(xtalk_matrix_filename:str,positive_xtalk_matrix_filename:str
 
                 if (positive_ctx>negative_ctx):
                     matrix_merge[key_row][key_col]=-positive_ctx
+                else:
+                    matrix_merge[key_row][key_col]=negative_ctx
+
         cross_talk_matrix=matrix_merge
 
     return cross_talk_matrix
@@ -79,8 +75,16 @@ def convert_matrix_det_names_to_rawid(matrix:dict)->dict:
     }
     matrix_conv={}
     for key_row,row in matrix.items():
+
+        if key_row not in geds_mapping.keys():
+            raise ValueError(f"channel {key_row} doesnt have a valid rawid")
+
         matrix_conv[geds_mapping[key_row]]={}
         for key_col,data in row.items():
+
+            if key_col not in geds_mapping.keys():
+                raise ValueError(f"channel {key_col} doesnt have a valid rawid")
+
             matrix_conv[geds_mapping[key_row]][geds_mapping[key_col]]=data
     
     return matrix_conv
@@ -97,7 +101,7 @@ def apply_xtalk_correction(
     threshold: float,
     det_names: bool=False,
     energy_observable_negative: types.VectorOfVectors=None,
-    postive_xtalk_matrix_filename: str=None
+    positive_xtalk_matrix_filename: str=None
 
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
@@ -129,8 +133,21 @@ def apply_xtalk_correction(
         name of the file containing the positive cross-talk matrices.
 
     """
+    try:
+        with open(xtalk_matrix_filename, 'r') as file:
+                xtalk_matrix = json.load(file)
+    except FileNotFoundError:
+         raise ValueError(f"path to x-talk matrix {xtalk_matrix_filename} does not exist")
     
-    cross_talk_matrix=read_ctx_matrix(xtalk_matrix_filename,postive_xtalk_matrix_filename,det_names)
+    positive_xtalk_matrix=None
+    if (positive_xtalk_matrix_filename is not None):
+        try:
+            with open(xtalk_matrix_filename, 'r') as file:
+                positive_xtalk_matrix = json.load(file)
+        except FileNotFoundError:
+            raise ValueError(f"path to x-talk matrix {positive_xtalk_matrix_filename} does not exist")
+
+    cross_talk_matrix=manipulate_ctx_matrix(xtalk_matrix,positive_xtalk_matrix,det_names)
 
     # do the correction
     energies_corr = cross_talk.cross_talk_corrected_energy_awkard_slow(energies=energy_observable.view_as("ak"),

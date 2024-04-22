@@ -91,7 +91,6 @@ def cross_talk_corrected_energy_awkard_slow(energies:ak.Array,rawids:ak.Array,ma
     rawids = rawids[args]
 
 
-
     ## run the correction  
     ## --------------------
     energies_corrected = []
