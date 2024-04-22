@@ -150,12 +150,13 @@ def apply_xtalk_correction(
     cross_talk_matrix=manipulate_ctx_matrix(xtalk_matrix,positive_xtalk_matrix,det_names)
 
     # do the correction
-    energies_corr = cross_talk.cross_talk_corrected_energy_awkard_slow(energies=energy_observable.view_as("ak"),
-                                                                       rawids=rawids.view_as("ak"),
-                                                                       matrix=cross_talk_matrix,
-                                                                       allow_non_existing=False,
-                                                                       threshold=threshold
-                                                                       )
+    energies_corr = cross_talk.cross_talk_corrected_energy_awkard_slow(
+        energies=energy_observable.view_as("ak"),
+        rawids=rawids.view_as("ak"),
+        matrix=cross_talk_matrix,
+        allow_non_existing=False,
+        threshold=threshold,
+    )
 
     # return the result as LGDO
     return types.VectorOfVectors(
