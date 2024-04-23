@@ -105,14 +105,13 @@ def test_manipulate_xtalk_matrix():
 
 def test_numpy_to_dict():
 
-    array=np.array([[1,0],[0,1]])
-    rawids=np.array([1,2])
-    matrix_dict =xtalk.numpy_to_dict(array,rawids)
-    assert(matrix_dict=={"ch1":{"ch1":1,"ch2":0},"ch2":{"ch1":0,"ch2":1}})
+    array = np.array([[1, 0], [0, 1]])
+    rawids = np.array([1, 2])
+    matrix_dict = xtalk.numpy_to_dict(array, rawids)
+    assert matrix_dict == {"ch1": {"ch1": 1, "ch2": 0}, "ch2": {"ch1": 0, "ch2": 1}}
 
     with pytest.raises(ValueError):
-        xtalk.numpy_to_dict(array,np.array([1,2,3]))
-    
+        xtalk.numpy_to_dict(array, np.array([1, 2, 3]))
+
     with pytest.raises(ValueError):
-        xtalk.numpy_to_dict(array,np.array([[1,2,3],[4,5,6]]))
-    
+        xtalk.numpy_to_dict(array, np.array([[1, 2, 3], [4, 5, 6]]))
