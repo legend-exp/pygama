@@ -5,7 +5,7 @@ import pytest
 from pygama.evt.modules import xtalk
 
 
-def test_xtalk_corrected_energy_awkard_slow():
+def test_xtalk_corrected_energy_awkward_slow():
 
     energies_test = ak.Array([[1000, 200], [100], [500, 3000, 100]])
     rawid_test = ak.Array([[1, 2], [3], [1, 2, 3]])
@@ -20,13 +20,13 @@ def test_xtalk_corrected_energy_awkard_slow():
 
     # if rawid and energies have different shapes (juts the first entry)
     with pytest.raises(ValueError):
-        xtalk.xtalk_corrected_energy_awkard_slow(
+        xtalk.xtalk_corrected_energy_awkward_slow(
             ak.Array([[1000, 200]]), rawid_test, matrix, True
         )
 
     # filter some values from energy first so each event has a different size
     with pytest.raises(ValueError):
-        xtalk.xtalk_corrected_energy_awkard_slow(
+        xtalk.xtalk_corrected_energy_awkward_slow(
             energies_test[energies_test < 600], rawid_test, matrix, True
         )
 
@@ -40,7 +40,7 @@ def test_xtalk_corrected_energy_awkard_slow():
     }
 
     with pytest.raises(ValueError):
-        xtalk.xtalk_corrected_energy_awkard_slow(
+        xtalk.xtalk_corrected_energy_awkward_slow(
             energies_test, rawid_test, matrix_not_full, False
         )
 
@@ -51,7 +51,7 @@ def test_xtalk_corrected_energy_awkard_slow():
         4: {1: 0.00, 2: 0.01, 3: 0.01, 4: 1.00},
     }
     with pytest.raises(ValueError):
-        xtalk.xtalk_corrected_energy_awkard_slow(
+        xtalk.xtalk_corrected_energy_awkward_slow(
             energies_test, rawid_test, matrix_not_sym, True
         )
 
@@ -62,7 +62,7 @@ def test_xtalk_corrected_energy_awkard_slow():
     ### E= [530,3000,100]
     ### next correct E2--> 3005, E3-->110]
     ## finally correct from E3, 530-> 532 , 3005->3005
-    energy_corr = xtalk.xtalk_corrected_energy_awkard_slow(
+    energy_corr = xtalk.xtalk_corrected_energy_awkward_slow(
         energies_test, rawid_test, matrix, True
     )
 
@@ -105,14 +105,13 @@ def test_manipulate_xtalk_matrix():
 
 def test_numpy_to_dict():
 
-    array=np.array([[1,0],[0,1]])
-    rawids=np.array([1,2])
-    matrix_dict =xtalk.numpy_to_dict(array,rawids)
-    assert(matrix_dict=={"ch1":{"ch1":1,"ch2":0},"ch2":{"ch1":0,"ch2":1}})
+    array = np.array([[1, 0], [0, 1]])
+    rawids = np.array([1, 2])
+    matrix_dict = xtalk.numpy_to_dict(array, rawids)
+    assert matrix_dict == {"ch1": {"ch1": 1, "ch2": 0}, "ch2": {"ch1": 0, "ch2": 1}}
 
     with pytest.raises(ValueError):
-        xtalk.numpy_to_dict(array,np.array([1,2,3]))
-    
+        xtalk.numpy_to_dict(array, np.array([1, 2, 3]))
+
     with pytest.raises(ValueError):
-        xtalk.numpy_to_dict(array,np.array([[1,2,3],[4,5,6]]))
-    
+        xtalk.numpy_to_dict(array, np.array([[1, 2, 3], [4, 5, 6]]))
