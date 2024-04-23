@@ -7,6 +7,34 @@ import numpy as np
 from legendmeta import LegendMetadata
 
 
+def numpy_to_dict(array: np.ndarray, rawids: np.ndarray) -> dict:
+    """Converts a 2D numpy array with a 1D array of rawids (channel names) to a dictonary
+    Parameters
+    ----------
+    array
+        2D numpy array
+    rawids
+        numpy array of associated channels / rawids
+    """
+
+    if array.ndim != 2:
+        raise ValueError("array must be 2D ")
+    if rawids.ndim != 1:
+        raise ValueError("rawids must be 1D")
+    if len(rawids) != array.shape[0] or len(rawids) != array.shape[1]:
+        raise ValueError(
+            "The number of elements of rawids should match the shape of 'array'"
+        )
+
+    out_dict = {}
+    for i, row in enumerate(array):
+        out_dict[f"ch{rawids[i]}"] = {}
+        for j, value in enumerate(row):
+            out_dict[f"ch{rawids[i]}"][f"ch{rawids[j]}"] = value
+
+    return out_dict
+
+
 def manipulate_xtalk_matrix(
     xtalk_matrix: dict, positive_xtalk_matrix: dict = None, det_names: bool = False
 ):
@@ -190,7 +218,7 @@ def xtalk_corrected_energy_awkard_slow(
         ):
             if threshold is not None and energy_main < threshold:
                 break
-            for id_other, (energy_other, rawid_other) in enumerate(
+            for id_other, (_energy_other, rawid_other) in enumerate(
                 zip(energy_vec_tmp, rawid_vec_tmp)
             ):
                 if id_main != id_other:
