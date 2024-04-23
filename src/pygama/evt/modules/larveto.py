@@ -52,12 +52,21 @@ def l200_test_stat(relative_t0, amp):
     amp
         amplitude in p.e. of the SiPM pulses.
     """
-    return -ak.sum(ak.transform(_ak_l200_test_stat_terms, relative_t0, amp), axis=-1)
+    # convert to integer number of pes
+    n_pes = pulse_amp_round(amp)
+    n_pe_tot = np.sum(n_pes, axis=-1)
+    n_pe_tot = np.where(n_pe_tot == 0, np.nan, n_pe_tot)
+
+    ts_time = -ak.sum(ak.transform(_ak_l200_time_term, relative_t0, amp), axis=-1)
+    ts_amp = [l200_rc_amp_logpdf(n) for n in n_pe_tot]
+
+    t_stat = np.where(np.isnan(n_pe_tot), np.inf, ts_time / n_pe_tot + ts_amp)
+    return t_stat
 
 
 # need to define this function and use it with ak.transform() because scipy
 # routines are not NumPy universal functions
-def _ak_l200_test_stat_terms(layouts, **kwargs):
+def _ak_l200_time_term(layouts, **kwargs):
     """Awkward transform to compute the per-pulse terms of the test statistics.
 
     The two arguments are the pulse times `t0` and their amplitude `amp`. The
@@ -77,19 +86,13 @@ def _ak_l200_test_stat_terms(layouts, **kwargs):
     # sanity check
     assert len(t0) == len(amp)
 
-    # if there are no pulses return NaN
-    if len(t0) == 0 or any(np.isnan(t0)):
-        return ak.contents.NumpyArray([np.nan])
-
     # convert to integer number of pes
     n_pes = pulse_amp_round(amp)
-    n_pe_tot = np.sum(n_pes)
 
-    t_stat = n_pes * np.log(l200_tc_time_pdf(t0)) / n_pe_tot + np.log(
-        l200_rc_amp_pdf(n_pe_tot)
-    )
+    # calculate the time term of the test statistic
+    ts_time = n_pes * np.log(l200_tc_time_pdf(t0))
 
-    return ak.contents.NumpyArray(t_stat)
+    return ak.contents.NumpyArray(ts_time)
 
 
 def pulse_amp_round(amp: float | ArrayLike):
@@ -105,7 +108,7 @@ def l200_tc_time_pdf(
     domain_ns: tuple[float] = (-1_000, 5_000),
     tau_singlet_ns: float = 6,
     tau_triplet_ns: float = 1100,
-    sing2trip_ratio: float = 1 / 3,
+    sing2tot_ratio: float = 1 / 3,
     t0_res_ns: float = 35,
     t0_bias_ns: float = -80,
     bkg_prob: float = 0.42,
@@ -124,8 +127,8 @@ def l200_tc_time_pdf(
         The lifetime of the LAr singlet state in ns.
     tau_triplet_ns
         The lifetime of the LAr triplet state in ns.
-    sing2trip_ratio
-        The singlet-to-triplet excitation probability ratio.
+    sing2tot_ratio
+        The singlet-to-total excitation probability ratio.
     t0_res_ns
         sigma (ns) of the normal distribution.
     t0_bias_ns
@@ -134,21 +137,23 @@ def l200_tc_time_pdf(
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution).
     """
-    if not np.all(t0 <= domain_ns[1] and t0 >= domain_ns[0]):
-        msg = f"{t0=} out of bounds for {domain_ns=}"
-        raise ValueError(msg)
+    # if not np.all(t0 <= domain_ns[1] and t0 >= domain_ns[0]):
+    #     msg = f"{t0=} out of bounds for {domain_ns=}"
+    #     raise ValueError(msg)
 
-    # TODO: make this a true pdf, i.e. normalize to integral 1
     return (
         # the triplet
-        (1 - sing2trip_ratio)
-        * scipy.stats.exponnorm.pdf(
-            t0, tau_triplet_ns / t0_res_ns, loc=t0_bias_ns, scale=t0_res_ns
-        )
-        # the singlet
-        + sing2trip_ratio
-        * scipy.stats.exponnorm.pdf(
-            t0, tau_singlet_ns / t0_res_ns, loc=t0_bias_ns, scale=t0_res_ns
+        (1 - bkg_prob)
+        * (
+            (1 - sing2tot_ratio)
+            * scipy.stats.exponnorm.pdf(
+                t0, tau_triplet_ns / t0_res_ns, loc=t0_bias_ns, scale=t0_res_ns
+            )
+            # the singlet
+            + sing2tot_ratio
+            * scipy.stats.exponnorm.pdf(
+                t0, tau_singlet_ns / t0_res_ns, loc=t0_bias_ns, scale=t0_res_ns
+            )
         )
         # the random coincidences (uniform pdf)
         + bkg_prob
@@ -156,5 +161,17 @@ def l200_tc_time_pdf(
     )
 
 
-def l200_rc_amp_pdf(n):
-    return np.exp(-n)
+def l200_rc_amp_logpdf(n):
+    return -n
+
+
+# # first draft of the amplitude log pdf using the RC n p.e. density
+# # dens_array would be the density of the RC n p.e. histogram
+# def l200_rc_amp_logpdf(dens_array, n):
+#     limit = min(dens_array, 20)
+#     if n <= limit:
+#         return np.log(dens_array[int(n)])
+#     # analytical continuation
+#     else:
+#         slope = -1/15
+#         return slope * (n-int(limit)) + np.log(dens_array[int(limit)])
