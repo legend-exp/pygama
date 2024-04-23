@@ -113,6 +113,53 @@ def convert_matrix_det_names_to_rawid(matrix: dict) -> dict:
 
     return matrix_conv
 
+def xtalk_corrected_energy(
+    energies: np.ndarray,
+    matrix: np.ndarray,
+    threshold: float = None,
+):
+    """
+    Function to perform the cross talk correction on awkward arrays of energy and rawid.
+    1. The energies are converted to a sparse format where each row corresponds to a rawid
+    2. All energy less than the threshold are set to 0
+    3. The correction is computed as:
+    .. math::
+        E_{\text{cor},i}=E_{j}\times M_{ij}
+
+    where $M_{ij}$ is the cross talk matrix.
+    Parameters
+    ----------
+    energies
+        2D numpy array of the energies in each event, the row corresponds to an event and the column the rawid
+    matrix
+        2D numpy array of the cross talk correction matrix, the indexs should correspond to rawids (with same mapping as energies)
+    threshold
+        energy threshold below which a hit is not used in xtalk correction.
+
+    """
+    # check input shapes and sizes
+
+    if (energies.ndim!=2):
+        raise ValueError("energies must be a 2D array")
+
+    if (matrix.ndim!=2):
+        raise ValueError("xtalk matrix must be a 2D array")
+
+    if (matrix_rawids.ndim!=1):
+        raise ValueError("matrix_rawids must be a 1D array")
+
+    if (matrix.shape[0]!=energies.shape[1]):
+        raise ValueError("the energy vector must have the smae size as the cross talk matrix")
+
+    energies_threshold = energies*(energies>threshold)
+
+    energies_correction=np.matmul( energies_threshold,matrix.T).T
+
+    return energies+energies_correction
+
+
+
+
 
 def xtalk_corrected_energy_awkard_slow(
     energies: ak.Array,

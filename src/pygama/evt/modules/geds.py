@@ -119,7 +119,7 @@ def apply_xtalk_correction(
         )
 
         # do the correction
-        energies_corr = xtalk.xtalk_corrected_energy_awkard_slow(
+        energies_corr = xtalk.xtalk_corrected_energy_awkward_slow(
             energies=energy_observable.view_as("ak"),
             rawids=rawids.view_as("ak"),
             matrix=xtalk_matrix,
