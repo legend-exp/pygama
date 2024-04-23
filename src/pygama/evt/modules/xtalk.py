@@ -153,7 +153,7 @@ def xtalk_corrected_energy(
 
     energies_threshold = energies * (energies > threshold)
 
-    energies_correction = np.matmul(matrix,energies_threshold.T).T
+    energies_correction = np.matmul(matrix, energies_threshold.T).T
     return energies + energies_correction
 
 
