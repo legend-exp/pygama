@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
+from legendmeta import LegendMetadata
 from lgdo import types
 
 from .. import utils
@@ -24,10 +25,9 @@ def apply_xtalk_correction(
     rawids: types.VectorOfVectors,
     xtalk_matrix_filename: str,
     threshold: float,
-    det_names: bool=False,
-    energy_observable_negative: types.VectorOfVectors=None,
-    positive_xtalk_matrix_filename: str=None
-
+    det_names: bool = False,
+    energy_observable_negative: types.VectorOfVectors = None,
+    positive_xtalk_matrix_filename: str = None,
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a JSON file.
@@ -59,8 +59,8 @@ def apply_xtalk_correction(
 
     """
     try:
-        with open(xtalk_matrix_filename, 'r') as file:
-                xtalk_matrix = json.load(file)
+        with open(xtalk_matrix_filename) as file:
+            xtalk_matrix = json.load(file)
     except FileNotFoundError:
          raise ValueError(f"path to x-talk matrix {xtalk_matrix_filename} does not exist")
     
@@ -68,10 +68,12 @@ def apply_xtalk_correction(
     positive_xtalk_matrix=None
     if (positive_xtalk_matrix_filename is not None):
         try:
-            with open(xtalk_matrix_filename, 'r') as file:
+            with open(xtalk_matrix_filename) as file:
                 positive_xtalk_matrix = json.load(file)
         except FileNotFoundError:
-            raise ValueError(f"path to x-talk matrix {positive_xtalk_matrix_filename} does not exist")
+            raise ValueError(
+                f"path to x-talk matrix {positive_xtalk_matrix_filename} does not exist"
+            )
 
     xtalk_matrix=xtalk.manipulate_xtalk_matrix(xtalk_matrix,positive_xtalk_matrix,det_names)
 

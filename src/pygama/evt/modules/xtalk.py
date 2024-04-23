@@ -173,10 +173,9 @@ def xtalk_corrected_energy_awkard_slow(
     energies = energies[args]
     rawids = rawids[args]
 
-
     ## run the correction
     ## --------------------
-    
+
     energies_corrected = []
 
     ## we should try to speed this up

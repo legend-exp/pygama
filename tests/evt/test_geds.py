@@ -1,4 +1,5 @@
-import awkward as ak
+import pytest
+
 from pygama.evt.modules import geds
 
 
