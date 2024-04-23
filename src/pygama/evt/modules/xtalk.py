@@ -7,7 +7,9 @@ import numpy as np
 from legendmeta import LegendMetadata
 
 
-def manipulate_xtalk_matrix(xtalk_matrix:dict,positive_xtalk_matrix:dict=None,det_names:bool=False):
+def manipulate_xtalk_matrix(
+    xtalk_matrix: dict, positive_xtalk_matrix: dict = None, det_names: bool = False
+):
     """
     Function to read in and manipulate the cross talk matrix.
     Parameters
@@ -18,38 +20,40 @@ def manipulate_xtalk_matrix(xtalk_matrix:dict,positive_xtalk_matrix:dict=None,de
         Path to the positive polarity cross talk matrix
     det_names
         bool to convert det names to rawids
-     
+
     """
-  
-    
-    if (det_names is True):
-        xtalk_matrix=convert_matrix_det_names_to_rawid(xtalk_matrix)
+
+    if det_names is True:
+        xtalk_matrix = convert_matrix_det_names_to_rawid(xtalk_matrix)
 
     # read the positive matrix
-    if (positive_xtalk_matrix is not None):
-        
-        if (det_names is True):
-            positive_xtalk_matrix=convert_matrix_det_names_to_rawid(positive_xtalk_matrix)
-        
+    if positive_xtalk_matrix is not None:
+
+        if det_names is True:
+            positive_xtalk_matrix = convert_matrix_det_names_to_rawid(
+                positive_xtalk_matrix
+            )
+
         # merge +ive and -ive matrix
-        matrix_merge={}
-        for key_row,row in xtalk_matrix.items():
-            matrix_merge[key_row]={}
-            for key_col,data in row.items():
-                
+        matrix_merge = {}
+        for key_row, row in xtalk_matrix.items():
+            matrix_merge[key_row] = {}
+            for key_col, data in row.items():
+
                 positive_xtalk = positive_xtalk_matrix[key_row][key_col]
                 negative_xtalk = data
 
-                if (positive_xtalk>negative_xtalk):
-                    matrix_merge[key_row][key_col]=-positive_xtalk
+                if positive_xtalk > negative_xtalk:
+                    matrix_merge[key_row][key_col] = -positive_xtalk
                 else:
-                    matrix_merge[key_row][key_col]=negative_xtalk
+                    matrix_merge[key_row][key_col] = negative_xtalk
 
-        xtalk_matrix=matrix_merge
+        xtalk_matrix = matrix_merge
 
     return xtalk_matrix
 
-def convert_matrix_det_names_to_rawid(matrix:dict)->dict:
+
+def convert_matrix_det_names_to_rawid(matrix: dict) -> dict:
     """
     Converts a cross talk matrix with keys of detector names to one with keys rawids
     Parameters
@@ -61,26 +65,25 @@ def convert_matrix_det_names_to_rawid(matrix:dict)->dict:
     chmap = metadb.channelmap("20230323T000000Z")
 
     geds_mapping = {
-         _name :f"ch{_dict['daq']['rawid']}"
+        _name: f"ch{_dict['daq']['rawid']}"
         for _name, _dict in chmap.items()
         if chmap[_name]["system"] == "geds"
     }
-    matrix_conv={}
-    for key_row,row in matrix.items():
+    matrix_conv = {}
+    for key_row, row in matrix.items():
 
         if key_row not in geds_mapping.keys():
             raise ValueError(f"channel {key_row} doesnt have a valid rawid")
 
-        matrix_conv[geds_mapping[key_row]]={}
-        for key_col,data in row.items():
+        matrix_conv[geds_mapping[key_row]] = {}
+        for key_col, data in row.items():
 
             if key_col not in geds_mapping.keys():
                 raise ValueError(f"channel {key_col} doesnt have a valid rawid")
 
-            matrix_conv[geds_mapping[key_row]][geds_mapping[key_col]]=data
-    
-    return matrix_conv
+            matrix_conv[geds_mapping[key_row]][geds_mapping[key_col]] = data
 
+    return matrix_conv
 
 
 def xtalk_corrected_energy_awkard_slow(
