@@ -82,9 +82,9 @@ def test_xtalk_corrected_energy_awkward_slow():
     assert np.all(energy_corr[1].to_numpy() == np.array([100]))
     assert np.allclose(energy_corr[2].to_numpy(), np.array([532.0, 3005.0, 110.0]))
 
-    ## test with a threshold of 1 MeV
+    # test with a threshold of 1 MeV
 
-    energy_corr_threshold = xtalk.xtalk_corrected_energy_awkard_slow(
+    energy_corr_threshold = xtalk.xtalk_corrected_energy_awkward_slow(
         energies_test, rawid_test, matrix, True, threshold=1000
     )
 

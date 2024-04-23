@@ -113,6 +113,7 @@ def convert_matrix_det_names_to_rawid(matrix: dict) -> dict:
 
     return matrix_conv
 
+
 def xtalk_corrected_energy(
     energies: np.ndarray,
     matrix: np.ndarray,
@@ -139,29 +140,24 @@ def xtalk_corrected_energy(
     """
     # check input shapes and sizes
 
-    if (energies.ndim!=2):
+    if energies.ndim != 2:
         raise ValueError("energies must be a 2D array")
 
-    if (matrix.ndim!=2):
+    if matrix.ndim != 2:
         raise ValueError("xtalk matrix must be a 2D array")
 
-    if (matrix_rawids.ndim!=1):
-        raise ValueError("matrix_rawids must be a 1D array")
+    if matrix.shape[0] != energies.shape[1]:
+        raise ValueError(
+            "the energy vector must have the smae size as the cross talk matrix"
+        )
 
-    if (matrix.shape[0]!=energies.shape[1]):
-        raise ValueError("the energy vector must have the smae size as the cross talk matrix")
+    energies_threshold = energies * (energies > threshold)
 
-    energies_threshold = energies*(energies>threshold)
-
-    energies_correction=np.matmul( energies_threshold,matrix.T).T
-
-    return energies+energies_correction
+    energies_correction = np.matmul(matrix,energies_threshold.T).T
+    return energies + energies_correction
 
 
-
-
-
-def xtalk_corrected_energy_awkard_slow(
+def xtalk_corrected_energy_awkward_slow(
     energies: ak.Array,
     rawids: ak.Array,
     matrix: dict,
