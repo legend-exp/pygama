@@ -5,15 +5,10 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
-from legendmeta import LegendMetadata
 from lgdo import types
 
 from .. import utils
 from . import xtalk
-from legendmeta import LegendMetadata
-
-
-
 
 
 def apply_xtalk_correction(
@@ -62,11 +57,12 @@ def apply_xtalk_correction(
         with open(xtalk_matrix_filename) as file:
             xtalk_matrix = json.load(file)
     except FileNotFoundError:
-         raise ValueError(f"path to x-talk matrix {xtalk_matrix_filename} does not exist")
-    
-    
-    positive_xtalk_matrix=None
-    if (positive_xtalk_matrix_filename is not None):
+        raise ValueError(
+            f"path to x-talk matrix {xtalk_matrix_filename} does not exist"
+        )
+
+    positive_xtalk_matrix = None
+    if positive_xtalk_matrix_filename is not None:
         try:
             with open(xtalk_matrix_filename) as file:
                 positive_xtalk_matrix = json.load(file)
@@ -75,7 +71,9 @@ def apply_xtalk_correction(
                 f"path to x-talk matrix {positive_xtalk_matrix_filename} does not exist"
             )
 
-    xtalk_matrix=xtalk.manipulate_xtalk_matrix(xtalk_matrix,positive_xtalk_matrix,det_names)
+    xtalk_matrix = xtalk.manipulate_xtalk_matrix(
+        xtalk_matrix, positive_xtalk_matrix, det_names
+    )
 
     # do the correction
     energies_corr = xtalk.xtalk_corrected_energy_awkard_slow(
