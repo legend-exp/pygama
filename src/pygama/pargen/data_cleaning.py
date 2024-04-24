@@ -791,8 +791,8 @@ def generate_cut_classifiers(
             output_dict[out_par] = {"expression": cut_string, "parameters": par_dict}
             if display > 0:
                 fig = plt.figure()
-                low = -10 if cut_left > -10 else cut_left
-                hi = 10 if cut_right < 10 else cut_right
+                low = -10 if cut_left is None or cut_left > -10 else cut_left
+                hi = 10 if cut_right is None or cut_right < 10 else cut_right
                 hist, _, _ = plt.hist(
                     norm_par_array,
                     bins=np.arange(low, hi, 0.1),
