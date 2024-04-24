@@ -5,6 +5,7 @@
 - hpge_fit_energy_peaks (fits the energy peals)
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
+
 from __future__ import annotations
 
 import inspect
@@ -30,7 +31,6 @@ log = logging.getLogger(__name__)
 
 
 class HPGeCalibration:
-
     """
     Calibrate HPGe data to a set of known peaks. Class stores the calibration parameters
     as well as the peaks locations and energies used. Each function called updates a results

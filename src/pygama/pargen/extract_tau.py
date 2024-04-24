@@ -49,7 +49,7 @@ class ExtractTau:
 
         mode, stdev = get_mode_stdev(slopes)
         tau = round(-1 / (mode), 1)
-        err = round((-1 / (mode + (stdev / np.sqrt(len(slopes))))) -tau, 1) 
+        err = round((-1 / (mode + (stdev / np.sqrt(len(slopes))))) - tau, 1)
 
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]

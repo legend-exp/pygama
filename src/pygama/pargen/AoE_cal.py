@@ -1127,12 +1127,12 @@ class CalAoE:
                 self.alpha = 0
 
             else:
-                aoe_grp1 = self.dt_res_dict[
-                    "aoe_grp1"
-                ] = f"{self.dt_param}>{mus[0] - 2 * sigmas[0]} & {self.dt_param}<{mus[0] + 2 * sigmas[0]}"
-                aoe_grp2 = self.dt_res_dict[
-                    "aoe_grp2"
-                ] = f"{self.dt_param}>{mus[1] - 2 * sigmas[1]} & {self.dt_param}<{mus[1] + 2 * sigmas[1]}"
+                aoe_grp1 = self.dt_res_dict["aoe_grp1"] = (
+                    f"{self.dt_param}>{mus[0] - 2 * sigmas[0]} & {self.dt_param}<{mus[0] + 2 * sigmas[0]}"
+                )
+                aoe_grp2 = self.dt_res_dict["aoe_grp2"] = (
+                    f"{self.dt_param}>{mus[1] - 2 * sigmas[1]} & {self.dt_param}<{mus[1] + 2 * sigmas[1]}"
+                )
 
                 aoe_pars, aoe_errs, _ = unbinned_aoe_fit(
                     final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
@@ -1587,9 +1587,11 @@ class CalAoE:
                         cut_range=cut_range,
                         n_samples=n_samples,
                         mode=mode,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     sfs = pd.concat(
                         [
@@ -1614,9 +1616,11 @@ class CalAoE:
                         cut_range=cut_range,
                         n_samples=n_samples,
                         mode=mode,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                         debug_mode=self.debug_mode,
                     )
 
@@ -1668,9 +1672,11 @@ class CalAoE:
                         self.low_cut_val,
                         self.high_cut_val,
                         mode=mode,
-                        dt_mask=peak_df[self.dt_cut_param].to_numpy()
-                        if self.dt_cut_param is not None
-                        else None,
+                        dt_mask=(
+                            peak_df[self.dt_cut_param].to_numpy()
+                            if self.dt_cut_param is not None
+                            else None
+                        ),
                     )
                     sf = sf_dict["sf"]
                     sf_err = sf_dict["sf_err"]
