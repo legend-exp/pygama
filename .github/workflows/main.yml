@@ -14,7 +14,7 @@ concurrency:
 
 env:
   FORCE_COLOR: 3
-  TQDM_MININTERVAL: 100
+  TQDM_DISABLE: yes_please
 
 jobs:
   build-and-test:
