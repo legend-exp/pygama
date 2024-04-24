@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import os
-from collections.abc import MutableMapping
-from typing import Any, Iterator
-
 import json
 import logging
+import os
+from collections.abc import MutableMapping
 from pathlib import Path
+from typing import Any, Iterator
 
 import yaml
 
 log = logging.getLogger(__name__)
-
 
 
 def getenv_bool(name: str, default: bool = False) -> bool:

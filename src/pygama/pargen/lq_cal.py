@@ -209,7 +209,6 @@ def fit_time_means(tstamps, means, reses):
 
 
 class LQCal:
-
     """A class for calibrating the LQ parameter and determining the LQ cut value"""
 
     def __init__(

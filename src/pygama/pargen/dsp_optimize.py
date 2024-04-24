@@ -291,7 +291,6 @@ OptimiserDimension = namedtuple(
 
 
 class BayesianOptimizer:
-
     """
     Bayesian optimiser uses Gaussian Process Regressor from sklearn to fit kernel
     to data, takes in a series of init samples for this fit and then calculates
