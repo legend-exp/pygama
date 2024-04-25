@@ -54,23 +54,33 @@ def l200_test_stat(relative_t0, amp):
     """
     # convert to integer number of pes
     n_pes = pulse_amp_round(amp)
+
+    # compute total number of pes in event
     n_pe_tot = np.sum(n_pes, axis=-1)
+    # if no pes in the event, use nan instead of zero (because of division later)
     n_pe_tot = np.where(n_pe_tot == 0, np.nan, n_pe_tot)
 
-    ts_time = -ak.sum(ak.transform(_ak_l200_time_term, relative_t0, amp), axis=-1)
-    ts_amp = [l200_rc_amp_logpdf(n) for n in n_pe_tot]
+    # calculate the test statistic term related to the time distribution
+    ts_time = -ak.sum(
+        ak.transform(_ak_l200_test_stat_time_term, relative_t0, amp), axis=-1
+    )
+    # calculate the amplitude contribution
+    ts_amp = l200_rc_amp_logpdf(n_pe_tot)
 
+    # for events with no light, set the test statistic value to +inf
     t_stat = np.where(np.isnan(n_pe_tot), np.inf, ts_time / n_pe_tot + ts_amp)
+
     return t_stat
 
 
 # need to define this function and use it with ak.transform() because scipy
 # routines are not NumPy universal functions
-def _ak_l200_time_term(layouts, **kwargs):
+def _ak_l200_test_stat_time_term(layouts, **kwargs):
     """Awkward transform to compute the per-pulse terms of the test statistics.
 
-    The two arguments are the pulse times `t0` and their amplitude `amp`. The
-    function has to be invoked as ``ak.transform(_ak_l200_test_stat_terms, t0, amp,
+    The two arguments are the pulse times `t0` relative to the HPGe trigger and
+    their amplitude `amp`. The function has to be invoked as
+    ``ak.transform(_ak_l200_test_stat_terms, t0, amp,
     ...)``.
     """
     # sanity check
@@ -97,8 +107,7 @@ def _ak_l200_time_term(layouts, **kwargs):
 
 def pulse_amp_round(amp: float | ArrayLike):
     """Get the most likely (integer) number of photo-electrons."""
-    # promote all amps < 1 to 1. standard rounding to nearest for
-    # amps > 1
+    # promote all amps < 1 to 1. standard rounding to nearest for amps > 1
     return ak.where(amp < 1, np.ceil(amp), np.floor(amp + 0.5))
 
 
@@ -119,6 +128,10 @@ def l200_tc_time_pdf(
     (experimental effects) and summed to a uniform distribution (uncorrelated
     pulses).
 
+    This routine does not work with :class:`ak.Array`, since SciPy functions
+    are not universal. See :func:`_ak_l200_test_stat_time_term` for an example
+    Awkward transform that does the job.
+
     Parameters
     ----------
     t0
@@ -137,9 +150,9 @@ def l200_tc_time_pdf(
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution).
     """
-    # if not np.all(t0 <= domain_ns[1] and t0 >= domain_ns[0]):
-    #     msg = f"{t0=} out of bounds for {domain_ns=}"
-    #     raise ValueError(msg)
+    if np.any(t0 > domain_ns[1]) or np.any(t0 < domain_ns[0]):
+        msg = f"{t0=} out of bounds for {domain_ns=}"
+        raise ValueError(msg)
 
     return (
         # the triplet
