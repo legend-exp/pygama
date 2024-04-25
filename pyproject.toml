@@ -45,7 +45,7 @@ dependencies = [
     "scikit-learn",
     "scipy>=1.0.1",
     "tables",
-    "tqdm>=4.27",
+    "tqdm>=4.66",
 ]
 dynamic = [
     "version",
