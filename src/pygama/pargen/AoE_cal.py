@@ -250,7 +250,8 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    Args:
+    Parameters
+    ----------
     aoe: np.array
         A/E values
     pdf: PDF
@@ -258,7 +259,9 @@ def unbinned_aoe_fit(
     display: int
         Level of display
 
-    Returns: tuple(np.array, np.array)
+    Returns
+    -------
+    tuple(np.array, np.array)
         Tuple of fit values and errors
     """
     if not isinstance(aoe, np.ndarray):
