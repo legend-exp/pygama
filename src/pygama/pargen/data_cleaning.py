@@ -377,7 +377,7 @@ def generate_cuts(
     parameters : dict
         dictionary of the form:
         .. code-block:: json
-        
+
             {
                 "output_parameter_name": {
                     "cut_parameter": "parameter_to_cut_on",
@@ -389,7 +389,7 @@ def generate_cuts(
         or to only have a one sided cut only specify one of the low or high side
         e.g.
         .. code-block:: json
-        
+
             {
                 "output_parameter_name": {
                     "cut_parameter": "parameter_to_cut_on",
@@ -399,7 +399,7 @@ def generate_cuts(
             }
         alternatively can specify hit dict fields to just copy dict into output dict e.g.
         .. code-block:: json
-        
+
             {
                 "is_valid_t0":{
                     "expression":"(tp_0_est>a)&(tp_0_est<b)",
@@ -408,7 +408,7 @@ def generate_cuts(
             }
         or
         .. code-block:: json
-        
+
             {
                 "is_valid_cal":{
                     "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
@@ -577,7 +577,7 @@ def generate_cut_classifiers(
     parameters : dict
         dictionary of the form:
         .. code-block:: json
-        
+
             {
                 "output_parameter_name": {
                     "cut_parameter": "parameter_to_cut_on",
@@ -589,7 +589,7 @@ def generate_cut_classifiers(
         or to only have a one sided cut only specify one of the low or high side
         e.g.
         .. code-block:: json
-        
+
             {
                 "output_parameter_name": {
                     "cut_parameter": "parameter_to_cut_on",
@@ -599,7 +599,7 @@ def generate_cut_classifiers(
             }
         alternatively can specify hit dict fields to just copy dict into output dict e.g.
         .. code-block:: json
-        
+
             {
                 "is_valid_t0":{
                     "expression":"(tp_0_est>a)&(tp_0_est<b)",
@@ -608,7 +608,7 @@ def generate_cut_classifiers(
             }
         or
         .. code-block:: json
-        
+
             {
                 "is_valid_cal":{
                     "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
