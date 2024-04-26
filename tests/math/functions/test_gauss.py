@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm as scipy_gaussian
 
 from pygama.math.functions.gauss import gaussian
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def test_gaussian_pdf():
@@ -14,7 +14,7 @@ def test_gaussian_pdf():
     y_direct = gaussian.get_pdf(x, mu, sigma)
     scipy_y = scipy_gaussian.pdf(x, mu, sigma)
 
-    assert isinstance(gaussian, pygama_continuous)
+    assert isinstance(gaussian, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -41,7 +41,7 @@ def test_gaussian_cdf():
     y_direct = gaussian.get_cdf(x, mu, sigma)
     scipy_y = scipy_gaussian.cdf(x, mu, sigma)
 
-    assert isinstance(gaussian, pygama_continuous)
+    assert isinstance(gaussian, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

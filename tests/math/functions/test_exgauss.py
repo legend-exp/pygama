@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import exponnorm
 
 from pygama.math.functions.exgauss import exgauss
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def test_exgauss_pdf():
@@ -19,7 +19,7 @@ def test_exgauss_pdf():
         -1 * x, tau / sigma, -1 * mu, sigma
     )  # to be equivalent to the scipy version, x -> -x, mu -> -mu, k -> k/sigma
 
-    assert isinstance(exgauss, pygama_continuous)
+    assert isinstance(exgauss, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -53,7 +53,7 @@ def test_exgauss_cdf():
     )  # to be equivalent to the scipy version, x -> -x, mu -> -mu, k -> k/sigma
     y_direct = exgauss.get_cdf(x, *par_array)
 
-    assert isinstance(exgauss, pygama_continuous)
+    assert isinstance(exgauss, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

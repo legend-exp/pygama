@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 
 from pygama.math.functions.gauss_on_step import gauss_on_step
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def test_gauss_on_step_pdf():
@@ -45,7 +45,7 @@ def test_gauss_on_step_pdf():
     scipy_y_gauss = norm.pdf(x, mu, sigma)
     scipy_y = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
 
-    assert isinstance(gauss_on_step, sum_dists)
+    assert isinstance(gauss_on_step, SumDists)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
     y_sig, y_ext = gauss_on_step.pdf_ext(x, *pars)
@@ -106,7 +106,7 @@ def test_gauss_on_step_cdf():
     # for the cdf, we actually do not want to normalize by the sum of the areas, this is because iminuit takes a total unnormalized cdf for extended binned fits
     scipy_y = n_sig * scipy_y_gauss + n_bkg * scipy_y_step
 
-    assert isinstance(gauss_on_step, sum_dists)
+    assert isinstance(gauss_on_step, SumDists)
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
