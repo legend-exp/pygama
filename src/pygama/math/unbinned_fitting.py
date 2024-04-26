@@ -50,10 +50,16 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
 
         else:
             cost_func = cost.UnbinnedNLL(data, func)
-
-    m = Minuit(cost_func, *guess)
+    if isinstance(guess, dict):
+        m = Minuit(cost_func, **guess)
+    else:
+        m = Minuit(cost_func, *guess)
     if bounds is not None:
-        m.limits = bounds
+        if isinstance(bounds, dict):
+            for arg, key in bounds:
+                m.limits[arg] = key
+        else:
+            m.limits = bounds
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True
@@ -61,5 +67,5 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
         m.simplex().migrad()
     else:
         m.migrad()
-    m.minos()
+    m.hesse()
     return m.values, m.errors, m.covariance

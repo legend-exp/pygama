@@ -75,7 +75,7 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     if cov is None: return upper_hm - lower_hm
 
     #calculate uncertainty
-    #amp set to 1, mu to 0, hstep+bg set to 0
+    #nsig set to 1, mu to 0, hstep+nbkg set to 0
     pars = [1,0, sigma, htail, tau, 0,0]
     step_norm = 1
     gradmax = hpge_peak_parameter_gradient(Emax, pars, step_norm)
@@ -91,6 +91,95 @@ def hpge_peak_fwhm(sigma: float, htail: float, tau: float,  cov: Optional[float]
     fwfm_unc = np.sqrt(np.dot(grad2, np.dot(cov, grad2)))
 
     return upper_hm - lower_hm, fwfm_unc
+
+
+def hpge_peak_fwfm(sigma, htail, tau, frac_max = 0.5, cov = None):
+    """
+    Return the FWHM of the radford_peak function, ignoring background and step
+    components. If calculating error also need the normalisation for the step
+    function.
+    """
+    # optimize this to find max value
+    def neg_radford_peak_bgfree(E, sigma, htail, tau):
+        return -gauss_on_exgauss.get_pdf(np.array([E]), 0, sigma, htail, tau)[0]
+
+    if htail<0 or htail>1:
+        raise ValueError("htail outside allowed limits of 0 and 1")
+
+    res = minimize_scalar( neg_radford_peak_bgfree,
+                           args=(sigma, htail, tau),
+                           bounds=(-sigma-htail, sigma+htail) )
+    Emax = res.x
+    val_frac_max = -neg_radford_peak_bgfree(Emax, sigma, htail, tau)*frac_max
+
+    # root find this to find the half-max energies
+    def radford_peak_bgfree_fracmax(E, sigma, htail, tau, val_frac_max):
+        return gauss_on_exgauss.get_pdf(np.array([E]), 0, sigma, htail, tau)[0] - val_frac_max
+
+    try:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+                       -(2.5*sigma/2 + htail*tau), Emax,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        lower_hm = brentq( radford_peak_bgfree_fracmax,
+               -(5*sigma + htail*tau), Emax,
+               args = (sigma, htail, tau, val_frac_max) )
+    try:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                       Emax, 2.5*sigma/2,
+                       args = (sigma, htail, tau, val_frac_max) )
+    except:
+        upper_hm = brentq( radford_peak_bgfree_fracmax,
+                   Emax, 5*sigma,
+                   args = (sigma, htail, tau, val_frac_max) )
+
+    if cov is None: return upper_hm - lower_hm
+    #calculate uncertainty
+    #nsig set to 1, mu to 0, hstep+nbkg set to 0
+    pars = [1,0, sigma, htail, tau,0,0]
+
+    rng = np.random.default_rng(1)
+    par_b = rng.multivariate_normal(pars, cov, size=100)
+    y_b = np.zeros(len(par_b))
+    for p in par_b:
+        try:
+            y_b[i] = hpge_peak_fwfm(p[2],p[3],p[4], frac_max=frac_max)
+        except Exception:
+            y_b[i] = np.nan
+    yerr_boot = np.nanstd(y_b, axis=0)
+
+    return upper_hm - lower_hm, yerr_boot
+
+def hpge_peak_mode(mu, sigma, htail, tau, cov = None):
+        
+    if htail<0 or htail>1:
+        if cov is not None:
+            return np.nan, np.nan
+        else:
+            return np.nan
+
+    try:
+        mode = brentq(hpge_peak_peakshape_derivative,
+                        mu-2*sigma - htail*tau, mu+2*sigma + htail*tau,
+                        args = ([1,mu,sigma,htail,tau,0,0],1 ))
+    except ValueError:
+        try:
+             mode = brentq(hpge_peak_peakshape_derivative,
+                        mu-4*sigma - htail*tau, mu+4*sigma + htail*tau,
+                        args = ([1,mu,sigma,htail,tau,0,0],1 ))
+        except ValueError:
+            mode = np.nan
+
+    if cov is None: return mode 
+    else:
+        #nsig set to 1, hstep+nbkg set to 0
+        pars = np.array([1, mu, sigma, htail, tau,0,0])
+        rng = np.random.default_rng(1)
+        par_b = rng.multivariate_normal(pars, cov, size=10000)
+        modes = np.array([hpge_peak_mode(p[1],p[2],p[3],p[4]) for p in par_b])
+        mode_err_boot = np.nanstd(modes, axis=0)
+
+        return mode, mode_err_boot
 
 
 def hpge_peak_peakshape_derivative(E: np.ndarray, pars: np.ndarray, step_norm: float) -> np.ndarray:

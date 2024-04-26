@@ -1,6 +1,7 @@
 """
 pygama's command line interface utilities.
 """
+
 import argparse
 import logging
 import os

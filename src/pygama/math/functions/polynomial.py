@@ -6,7 +6,7 @@ from pygama.utils import numba_math_defaults as nb_defaults
 @nb.njit(**nb_defaults(parallel=False))
 def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     r"""
-    A polynomial function with pars following the polyfit convention. It computes:
+    A polynomial function with pars following the numpy polynomial convention. It computes:
 
 
     .. math::
@@ -21,7 +21,7 @@ def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     x
         Input data
     pars
-        Coefficients of the polynomial, in polyfit convention
+        Coefficients of the polynomial, in  numpy polynomial convention
 
     Returns 
     ------- 
@@ -30,13 +30,14 @@ def nb_poly(x: np.ndarray, pars: np.ndarray) -> np.ndarray:
     
     Notes
     -----
-    This follows the :func:`numpy.polyfit` convention of :math:`a_n x^n + ... + a_1 x + a_0`
+    This follows the :func:`numpy.polynomial` convention of :math:`a_0 + a_1 x +.... + a_n x^n`
     """
     
     result = x*0 # do x*0 to keep shape of x (scalar or array)
     if len(pars) == 0: return result
-    result += pars[-1]
+    result += pars[0]
+    y=x
     for i in nb.prange(1, len(pars)):
-        result += pars[-i-1]*x
-        x = x*x
+        result += pars[i]*x
+        x = x*y
     return result

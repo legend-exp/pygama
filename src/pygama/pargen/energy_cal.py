@@ -1,197 +1,1709 @@
 """routines for automatic calibration.
 
-- hpge_find_E_peaks (Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV)
-- hpge_get_E_peaks (Get uncalibrated E peaks at the energies of peaks_keV)
-- hpge_fit_E_peaks (fits the energy peals)
+- hpge_find_energy_peaks (Find uncalibrated E peaks whose E spacing matches the pattern in peaks_kev)
+- hpge_get_energy_peaks (Get uncalibrated E peaks at the energies of peaks_kev)
+- hpge_fit_energy_peaks (fits the energy peals)
 - hpge_E_calibration (main routine -- finds and fits peaks specified)
 """
-import logging
-import sys
 
-import matplotlib.gridspec as gs
+from __future__ import annotations
+
+import inspect
+import logging
+import string
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.stats
 from iminuit import Minuit, cost
-from scipy.signal import find_peaks_cwt, medfilt
+from iminuit.util import ValueView
+from numpy.polynomial.polynomial import Polynomial
+from scipy.stats import chi2
 
+import pygama.math.binned_fitting as pgb
+import pygama.math.distributions as pgf
 import pygama.math.histogram as pgh
-import pygama.math.peak_fitting as pgf
-import pygama.math.utils as pgu
-from pygama.pargen.utils import return_nans
+from pygama.math.histogram import get_i_local_maxima
+from pygama.math.least_squares import fit_simple_scaling
+from pygama.pargen.utils import convert_to_minuit, return_nans
 
 log = logging.getLogger(__name__)
 
 
-def hpge_find_E_peaks(
-    hist,
-    bins,
-    var,
-    peaks_keV,
-    n_sigma=5,
-    deg=0,
-    Etol_keV=None,
-    var_zero=1,
-    verbose=False,
-):
-    """Find uncalibrated E peaks whose E spacing matches the pattern in peaks_keV
-    Note: the specialization here to units "keV" in peaks and Etol is
-    unnecessary. However it is kept so that the default value for Etol_keV has
-    an unambiguous interpretation.
+class HPGeCalibration:
+    """
+    Calibrate HPGe data to a set of known peaks. Class stores the calibration parameters
+    as well as the peaks locations and energies used. Each function called updates a results
+    dictionary with any additional information which is stored in the class.
 
     Parameters
     ----------
-    hist, bins, var : array, array, array
-        Histogram of uncalibrated energies, see pgh.get_hist()
-        var cannot contain any zero entries.
-    peaks_keV : array
-        Energies of peaks to search for (in keV)
-    n_sigma : float
-        Threshold for detecting a peak in sigma (i.e. sqrt(var))
-    deg : int
-        deg arg to pass to poly_match
-    Etol_keV : float
-        absolute tolerance in energy for matching peaks
-    var_zero : float
-        number used to replace zeros of var to avoid divide-by-zero in
-        hist/sqrt(var). Default value is 1. Usually when var = 0 its because
-        hist = 0, and any value here is fine.
-    verbose : bool
-        print debug messages
+    e_uncal : array
+        uncalibrated energy data
+    glines : array
+        list of peak energies to be fit to. Each must be in the data
+    guess_kev : float
+        a rough initial guess at the conversion factor from e_uncal to kev. Must
+        be positive
+    deg : non-negative int
+        degree of the polynomial for the E_cal function E_kev = poly(e_uncal).
+        deg = 0 corresponds to a simple scaling E_kev = scale * e_uncal.
+        Otherwise follows the convention in np.polynomial.polynomial of
+        lowest order to highest order
+    uncal_is_int : bool
+        if True, attempts will be made to avoid picket-fencing when binning
+        e_uncal
+    fixed : dict
+        dictionary of fixed parameters for the calibration function
 
-    Returns
-    -------
-    detected_peak_locations : list
-        list of uncalibrated energies of detected peaks
-    detected_peak_energies : list
-        list of calibrated energies of detected peaks
-    pars : list of floats
-        the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
     """
-    # clean up var if necessary
-    if np.any(var == 0):
-        log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
-        var[np.where(var == 0)] = var_zero
-    peaks_keV = np.asarray(peaks_keV)
 
-    # Find all maxes with > n_sigma significance
-    imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
+    def __init__(
+        self,
+        energy_param,
+        glines,
+        guess_kev: float,
+        deg: int = 1,
+        uncal_is_int: bool = False,
+        fixed=None,
+        debug_mode: bool = False,
+    ):
+        self.energy_param = energy_param
 
-    # Now pattern match to peaks_keV within Etol_keV using poly_match
-    detected_max_locs = pgh.get_bin_centers(bins)[imaxes]
+        if deg < -1:
+            log.error(f"hpge_E_cal warning: invalid deg = {deg}")
+            return
+        self.deg = int(deg)
 
-    if Etol_keV is None:
-        # estimate Etol_keV
-        pt_pars, pt_covs = hpge_fit_E_peak_tops(
-            hist, bins, var, detected_max_locs, n_to_fit=15
-        )
-        if (
-            sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == np.inf
-            or sum(sum(sum(c) if (c != None).any() else 0 for c in pt_covs)) == 0
-        ):
-            log.debug(
-                "hpge_find_E_peaks: can safely ignore previous covariance warning, not used"
+        self.peaks_kev = np.asarray(sorted(glines))
+        self.peak_locs = []
+
+        if guess_kev <= 0:
+            log.error(f"hpge_E_cal warning: invalid guess_kev = {guess_kev}")
+        if deg == -1:
+            self.pars = np.zeros(2, dtype=float)
+            self.pars[0] = guess_kev
+            self.fixed = {1: 1}
+        elif deg == 0:
+            self.pars = np.zeros(2, dtype=float)
+            self.pars[1] = guess_kev
+            self.fixed = {0: 0}
+        else:
+            self.pars = np.zeros(self.deg + 1, dtype=float)
+            self.pars[1] = guess_kev
+            self.fixed = fixed
+        self.results = {}
+
+        self.uncal_is_int = uncal_is_int
+        self.debug_mode = debug_mode
+
+    def gen_pars_dict(self):
+        """
+        Generate a dictionary containing the expression and parameters used for energy calibration.
+
+        Returns:
+            dict: A dictionary with keys 'expression' and 'parameters'.
+                  'expression' is a string representing the energy calibration expression.
+                  'parameters' is a dictionary containing the parameter values used in the expression.
+        """
+        expression = ""
+        parameters = {}
+        for i, coeff in enumerate(self.pars):
+            parameter_name = string.ascii_lowercase[i]
+            if i == 0:
+                expression += f"{parameter_name}"
+            elif i == 1:
+                expression += f" + {parameter_name} * {self.energy_param}"
+            else:
+                expression += f" + {parameter_name} * {self.energy_param}**{i} "
+            parameters[parameter_name] = coeff
+        return {"expression": expression, "parameters": parameters}
+
+    def update_results_dict(self, results_dict):
+        name = inspect.stack()[1][3]
+        if name in self.results:
+            it = 0
+            for n in self.results:
+                if name in n:
+                    if name == n:
+                        pass
+                    else:
+                        new_it = int(n.split("_")[-1])
+                        if new_it > it:
+                            it = new_it
+            it += 1
+            name += f"_{it}"
+        self.results[name] = results_dict
+
+    def hpge_find_energy_peaks(
+        self,
+        e_uncal,
+        peaks_kev=None,
+        n_sigma=5,
+        etol_kev=None,
+        bin_width_kev=1,
+        erange=None,
+        var_zero=1,
+        update_cal_pars=True,
+    ):
+        """
+        Find uncalibrated energy peaks whose energy spacing matches the pattern in peaks_kev.
+
+        Parameters
+        ----------
+        e_uncal (array-like):
+            Uncalibrated energy values.
+        peaks_kev (array-like, optional):
+            Pattern of energy peaks to match. If not provided, the peaks from the object's attribute `peaks_kev` will be used.
+        n_sigma (float, optional):
+             Number of standard deviations above the mean to consider a peak significant. Default is 5.
+        etol_kev (float, optional):
+            Tolerance in energy units for matching peaks. If not provided, it will be estimated based on the peak widths.
+        bin_width_kev (float, optional):
+            Width of the energy bins for initial peak search. Default is 1 keV.
+        erange (tuple, optional):
+            Range of uncalibrated energy values to consider. If not provided, the range will be determined based on the peaks.
+        var_zero (float, optional):
+            Value to replace zero variance with. Default is 1.
+        update_cal_pars (bool, optional):
+            Whether to update the calibration parameters. Default is True.
+
+        Returns:
+            None
+
+        """
+
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
+        peaks_adc = [(Polynomial(self.pars) - ei).roots() for ei in peaks_kev]
+
+        # bin the histogram in ~1 kev bins for the initial rough peak search
+        if erange is None:
+            euc_min = np.nanmin(peaks_adc) * 0.6
+            euc_max = np.nanmax(peaks_adc) * 1.1
+
+        else:
+            euc_min, euc_max = erange
+        d_euc = bin_width_kev / self.pars[1]
+        if self.uncal_is_int:
+            euc_min, euc_max, d_euc = pgh.better_int_binning(
+                x_lo=euc_min, x_hi=euc_max, dx=d_euc
             )
-        pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
-        med_sigma_ratio = np.median(np.stack(pt_pars)[:, 1] / np.stack(pt_pars)[:, 0])
+        hist, bins, var = pgh.get_hist(e_uncal, range=(euc_min, euc_max), dx=d_euc)
 
-        Etol_keV = 5.0 * (med_sigma_ratio / 0.003)
-    pars, ixtup, iytup = poly_match(
-        detected_max_locs, peaks_keV, deg=deg, atol=Etol_keV
-    )
+        # clean up var if necessary
+        if np.any(var == 0):
+            log.debug(f"hpge_find_energy_peaks: replacing var zeros with {var_zero}")
+            var[np.where(var == 0)] = var_zero
+        peaks_kev = np.asarray(peaks_kev)
 
-    if len(ixtup) != len(peaks_keV):
-        log.info(
-            f"hpge_find_E_peaks: only found {len(ixtup)} of {len(peaks_keV)} expected peaks"
+        # Find all maxes with > n_sigma significance
+        imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
+
+        # Now pattern match to peaks_kev within etol_kev using poly_match
+        detected_max_locs = pgh.get_bin_centers(bins)[imaxes]
+
+        if etol_kev is None:
+            # estimate etol_kev
+            pt_pars, pt_covs = hpge_fit_energy_peak_tops(
+                hist, bins, var, detected_max_locs, n_to_fit=15
+            )
+            if (
+                sum(np.sum(c.flatten()) if c.ndim != 0 else 0 for c in pt_covs)
+                == np.inf
+                or sum(np.sum(c.flatten()) if c.ndim != 0 else 0 for c in pt_covs) == 0
+            ):
+                log.debug(
+                    "hpge_find_energy_peaks: can safely ignore previous covariance warning, not used"
+                )
+            pt_pars = pt_pars[np.array([x is not None for x in pt_pars])]
+            med_sigma_ratio = np.median(
+                np.stack(pt_pars)[:, 1] / np.stack(pt_pars)[:, 0]
+            )
+
+            etol_kev = 5.0 * (med_sigma_ratio / 0.003)
+        pars, ixtup, iytup = poly_match(
+            detected_max_locs, peaks_kev, deg=self.deg, atol=etol_kev, fixed=self.fixed
         )
-    return detected_max_locs[ixtup], peaks_keV[iytup], pars
+
+        if len(ixtup) != len(peaks_kev):
+            log.info(
+                f"hpge_find_energy_peaks: only found {len(ixtup)} of {len(peaks_kev)} expected peaks"
+            )
+
+        self.update_results_dict(
+            {
+                "input_peaks_kev": peaks_kev,
+                "found_peaks_kev": peaks_kev[iytup],
+                "found_peaks_locs": detected_max_locs[iytup],
+            }
+        )
+        log.info(f"{len(peaks_kev[iytup])} peaks found:")
+        log.info("\t   Energy   | Position  ")
+        for i, (li, ei) in enumerate(zip(detected_max_locs[ixtup], peaks_kev[iytup])):
+            log.info(f"\t{i}".ljust(4) + str(ei).ljust(9) + f"| {li:g}".ljust(5))
+
+        if update_cal_pars is False:
+            return
+
+        self.peak_locs = detected_max_locs[ixtup]
+        self.peaks_kev = peaks_kev[iytup]
+        self.pars = np.array(pars)
+
+    def hpge_get_energy_peaks(
+        self,
+        e_uncal,
+        peaks_kev=None,
+        n_sigma=3,
+        etol_kev=5,
+        var_zero=1,
+        bin_width_kev=0.2,
+        update_cal_pars=True,
+        erange=None,
+    ):
+        """Get uncalibrated E peaks at the energies of peaks_kev
+
+        Parameters
+        ----------
+        e_uncal : array
+            Uncalibrated energy values.
+        peaks_kev : array, optional
+            Energies of peaks to search for (in keV). If not provided, the peaks_kev
+            attribute of the object will be used.
+        n_sigma : float, optional
+            Threshold for detecting a peak in sigma (i.e. sqrt(var)). Default is 3.
+        etol_kev : float, optional
+            Absolute tolerance in energy for matching peaks. Default is 5.
+        var_zero : float, optional
+            Number used to replace zeros of var to avoid divide-by-zero in hist/sqrt(var).
+            Default is 1. Usually when var = 0, it's because hist = 0, and any value here is fine.
+        bin_width_kev : float, optional
+            Width of the energy bins for re-binning the histogram. Default is 0.2 keV.
+        update_cal_pars : bool, optional
+            Flag indicating whether to update the calibration parameters. Default is True.
+        erange : tuple, optional
+            Range of energy values to consider for peak search. If not provided, the range
+            will be determined automatically based on the peaks_kev values.
+
+        Returns
+        -------
+        None
+
+        Notes
+        -----
+        This method performs the following steps:
+        1. Re-bins the histogram in ~0.2 keV bins with updated energy scale parameters for peak-top fits.
+        2. Finds all local maxima in the histogram with significance greater than n_sigma.
+        3. Matches the calculated peak energies with the expected peak energies.
+        4. Removes duplicate peak matches.
+        5. Updates the input peaks, got peaks, and got peak locations in the results dictionary.
+        6. If update_cal_pars is True, calculates the updated calibration curve using the matched peak energies.
+
+        """
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
+        peaks_kev = np.asarray(peaks_kev)
+
+        # re-bin the histogram in ~0.2 kev bins with updated E scale par for peak-top fits
+        if erange is None:
+            euc_min, euc_max = (
+                (Polynomial(self.pars) - i).roots()
+                for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
+            )
+            euc_min = euc_min[0]
+            euc_max = euc_max[0]
+            if euc_min < 0:
+                euc_min = 0
+            if euc_max > np.nanmax(e_uncal) * 1.1:
+                euc_max = np.nanmax(e_uncal) * 1.1
+        else:
+            euc_min, euc_max = erange
+
+        d_euc = bin_width_kev / self.pars[1]
+
+        if self.uncal_is_int:
+            euc_min, euc_max, d_euc = pgh.better_int_binning(
+                x_lo=euc_min, x_hi=euc_max, dx=d_euc
+            )
+        hist, bins, var = pgh.get_hist(e_uncal, range=(euc_min, euc_max), dx=d_euc)
+
+        # clean up var if necessary
+        if np.any(var == 0):
+            log.debug(f"hpge_find_energy_peaks: replacing var zeros with {var_zero}")
+            var[np.where(var == 0)] = var_zero
+
+        # Find all maxes with > n_sigma significance
+        imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
+
+        # Keep maxes if they coincide with expected peaks
+        test_peaks_kev = np.asarray([pgf.nb_poly(i, self.pars) for i in bins[imaxes]])
+        imatch = [abs(peaks_kev - i).min() < etol_kev for i in test_peaks_kev]
+
+        got_peak_locations = bins[imaxes[imatch]]
+        got_peak_energies = test_peaks_kev[imatch]
+
+        # Match calculated and true peak energies
+        matched_energies = peaks_kev[
+            [np.argmin(abs(peaks_kev - i)) for i in got_peak_energies]
+        ]
+        while not all([list(matched_energies).count(x) == 1 for x in matched_energies]):
+            for i in range(len(matched_energies)):
+                if matched_energies[i + 1] == matched_energies[i]:
+                    # remove duplicates
+                    if np.argmin(
+                        abs(got_peak_energies[i : i + 2] - matched_energies[i])
+                    ):  # i+1 is best match
+                        got_peak_locations = np.delete(got_peak_locations, i)
+                        got_peak_energies = np.delete(got_peak_energies, i)
+                    else:  # i is best match
+                        got_peak_locations = np.delete(got_peak_locations, i + 1)
+                        got_peak_energies = np.delete(got_peak_energies, i + 1)
+                    matched_energies = np.delete(matched_energies, i)
+                    break
+                i += 1
+
+        input_peaks = peaks_kev.copy()
+
+        self.update_results_dict(
+            {
+                "input_peaks_kev": input_peaks,
+                "got_peaks_kev": matched_energies,
+                "got_peaks_locs": got_peak_locations,
+            }
+        )
+
+        if update_cal_pars is False:
+            return
+
+        self.peak_locs = got_peak_locations
+        self.peaks_kev = matched_energies
+
+        # Calculate updated calibration curve
+        if self.deg == 0:
+            scale, _ = fit_simple_scaling(got_peak_locations, matched_energies)
+            poly_pars = np.array([0, scale])
+        else:
+            # Calculate updated calibration curve
+            poly_pars = (
+                Polynomial.fit(got_peak_locations, matched_energies, len(self.pars) - 1)
+                .convert()
+                .coef
+            )
+        c = cost.LeastSquares(
+            matched_energies,
+            got_peak_locations,
+            np.full_like(got_peak_locations, 1),
+            poly_wrapper,
+        )
+        if self.fixed is not None:
+            for idx, val in self.fixed.items():
+                if val is True or val is None:
+                    pass
+                else:
+                    poly_pars[idx] = val
+        m = Minuit(c, *poly_pars)
+        if self.fixed is not None:
+            for idx in list(self.fixed):
+                m.fixed[idx] = True
+
+        self.pars = np.array(m.values)
+
+        log.info(f"{len(self.peak_locs)} peaks obtained:")
+        log.info("\t   Energy   | Position  ")
+        for i, (li, ei) in enumerate(zip(self.peak_locs, self.peaks_kev)):
+            log.info(f"\t{i}".ljust(4) + str(ei).ljust(9) + f"| {li:g}".ljust(5))
+
+    def hpge_cal_energy_peak_tops(
+        self,
+        e_uncal,
+        n_sigmas=1.2,
+        peaks_kev=None,
+        default_n_bins=50,
+        n_events=None,
+        allowed_p_val=0.01,
+        update_cal_pars=True,
+    ):
+        """
+        Perform energy calibration for HPGe detector using peak fitting.
+
+        Args:
+            e_uncal (array-like):
+                Uncalibrated energy values.
+            n_sigmas (float, optional):
+                Number of standard deviations to use for peak fitting range. Defaults to 1.2.
+            peaks_kev (array-like, optional):
+                Known peak positions in keV. If not provided, uses self.peaks_kev. Defaults to None.
+            default_n_bins (int, optional):
+                    Number of bins for histogram. Defaults to 50.
+            n_events (int, optional):
+                Number of events to consider for calibration. Defaults to None which uses all events.
+            allowed_p_val (float, optional):
+                Maximum p-value for a fit to be considered valid. Defaults to 0.05.
+            update_cal_pars (bool, optional):
+                Whether to update the calibration parameters. Defaults to True.
+        """
+
+        results_dict = {}
+
+        # check no peaks in self.peaks_kev missing from peak_pars
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
+        peak_pars = [(peak, None, pgf.gauss_on_uniform) for peak in peaks_kev]
+
+        # convert peak pars to array of tuples
+        tmp = np.empty(len(peak_pars), dtype=object)
+        tmp[:] = peak_pars
+        peak_pars = tmp
+
+        peak_pars_lines = [i[0] for i in peak_pars]
+        peaks_mask = np.array(
+            [True if peak in peaks_kev else False for peak in peak_pars_lines],
+            dtype=bool,
+        )
+        peak_pars = peak_pars[peaks_mask]
+
+        fit_peaks_mask = np.array(
+            [True for i in peak_pars if i[2] is not None],
+            dtype=bool,
+        )
+        peak_pars = peak_pars[fit_peaks_mask]
+
+        # First calculate range around peaks to fit
+
+        euc_min, euc_max = (
+            (Polynomial(self.pars) - i).roots()
+            for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
+        )
+        euc_min = euc_min[0]
+        euc_max = euc_max[0]
+
+        if euc_min < 0:
+            euc_min = 0
+        if euc_max > np.nanmax(e_uncal) * 1.1:
+            euc_max = np.nanmax(e_uncal) * 1.1
+
+        d_euc = 0.5 / self.pars[1]
+        if self.uncal_is_int:
+            euc_min, euc_max, d_euc = pgh.better_int_binning(
+                x_lo=euc_min, x_hi=euc_max, dx=d_euc
+            )
+
+        hist, bins, var = pgh.get_hist(e_uncal, range=(euc_min, euc_max), dx=d_euc)
+
+        uncal_peak_pars = []
+        for pars in peak_pars:
+            peak, fit_range, func = pars
+
+            if peak in self.peaks_kev:
+                loc = self.peak_locs[np.where(peak == self.peaks_kev)][0]
+            else:
+                loc = (Polynomial(self.pars) - peak).roots()[0]
+
+            # Need to do initial fit
+            pt_pars, _ = hpge_fit_energy_peak_tops(hist, bins, var, [loc], n_to_fit=7)
+            # Drop failed fits
+            if pt_pars[0] is not None:
+                range_uncal = (float(pt_pars[0][1]) * 20, float(pt_pars[0][1]) * 20)
+                n_bins = default_n_bins
+            else:
+                range_uncal = None
+            if range_uncal is not None:
+                uncal_peak_pars.append((peak, loc, range_uncal, n_bins, func))
+
+        fit_dict = {}
+
+        for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
+            try:
+                peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
+                wleft_i, wright_i = wwidth_i
+                euc_min = mode_guess - wleft_i
+                euc_max = mode_guess + wright_i
+
+                if self.uncal_is_int is True:
+                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                    )
+
+                energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
+                binw_1 = (euc_max - euc_min) / n_bins_i
+
+                x0 = get_hpge_energy_peak_par_guess(
+                    energies,
+                    func_i,
+                    (euc_min, euc_max),
+                    bin_width=binw_1,
+                    mode_guess=mode_guess,
+                )
+
+                euc_min = x0["mu"] - n_sigmas * x0["sigma"]
+                euc_max = x0["mu"] + n_sigmas * x0["sigma"]
+
+                bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
+                n_bins_i = int((euc_max - euc_min) / bin_width)
+
+                if self.uncal_is_int is True:
+                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                    )
+
+                hist, bins, var = pgh.get_hist(
+                    energies, bins=n_bins_i, range=(euc_min, euc_max)
+                )
+
+                x0["x_lo"] = euc_min
+                x0["x_hi"] = euc_max
+
+                fixed, mask = get_hpge_energy_fixed(func_i)
+                fixed.append("n_bkg")
+                mask[np.where(np.array(func_i.required_args()) == "n_bkg")[0]] = True
+                bounds = get_hpge_energy_bounds(func_i, x0)
+
+                pars_i, errs_i, cov_i = pgb.fit_binned(
+                    func_i.cdf_ext,
+                    hist,
+                    bins,
+                    var=var,
+                    guess=x0,
+                    cost_func="LL",
+                    Extended=True,
+                    fixed=fixed,
+                    bounds=bounds,
+                )
+                valid_fit = True
+
+                csqr = pgb.goodness_of_fit(
+                    hist,
+                    bins,
+                    None,
+                    func_i.get_pdf,
+                    pars_i,
+                    method="Pearson",
+                    scale_bins=True,
+                )
+                csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
+
+                if np.isnan(pars_i).any():
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
+                    )
+                    raise RuntimeError
+
+                p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
+
+                if (
+                    cov_i is None
+                    or cov_i.ndim == 0
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == np.inf
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == 0
+                    or np.isnan(sum(sum(c) for c in cov_i[mask, :][:, mask]))
+                ):
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif valid_fit is False:
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif (
+                    errs_i is None
+                    or pars_i is None
+                    or np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
+                ).any() or np.isnan(np.array(errs_i)[mask]).any():
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
+                    )
+                    valid_pk = False
+
+                elif p_val < allowed_p_val or np.isnan(p_val):
+                    log.debug(
+                        f"hpge_cal_energy_peak_tops: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
+                    )
+                    valid_pk = False
+                else:
+                    valid_pk = True
+
+                mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+
+            except BaseException as e:
+                if e == KeyboardInterrupt:
+                    raise (e)
+                elif self.debug_mode:
+                    raise (e)
+                log.debug(
+                    f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
+                )
+                valid_pk = False
+                pars_i, errs_i, cov_i = return_nans(func_i)
+                p_val = 0
+                mu = np.nan
+                mu_err = np.nan
+
+            fit_dict[peak_kev] = {
+                "function": func_i,
+                "validity": valid_pk,
+                "parameters": pars_i,
+                "uncertainties": errs_i,
+                "covariance": cov_i,
+                "nbins": binw_1,
+                "range": [euc_min, euc_max],
+                "p_value": p_val,
+                "position": mu,
+                "position_uncertainty": mu_err,
+            }
+
+        results_dict["peak_parameters"] = fit_dict
+
+        fitted_peaks_kev = np.array(
+            [peak for peak in fit_dict if fit_dict[peak]["validity"]]
+        )
+
+        log.info(f"{len(fitted_peaks_kev)} peaks fitted:")
+        for peak, peak_dict in fit_dict.items():
+            if peak_dict["validity"] is True:
+                varnames = peak_dict["function"].required_args()
+                pars = np.asarray(peak_dict["parameters"], dtype=float)
+                errors = np.asarray(peak_dict["uncertainties"], dtype=float)
+                log.info(f"\tEnergy: {str(peak)}")
+                log.info("\t\tParameter  |    Value +/- Sigma  ")
+                for vari, pari, errorsi in zip(varnames, pars, errors):
+                    log.info(
+                        f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
+                    )
+
+        if len(fitted_peaks_kev) == 0:
+            log.error("hpge_fit_energy_peaks: no peaks fitted")
+            self.update_results_dict(results_dict)
+            return
+
+        mus = [
+            fit_dict[peak]["position"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        mu_vars = [
+            fit_dict[peak]["position_uncertainty"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+
+        mus = results_dict["pk_pos"] = np.asarray(mus)
+        mu_vars = results_dict["pk_pos_uncertainties"] = np.asarray(mu_vars) ** 2
+
+        if update_cal_pars is False:
+            self.update_results_dict(results_dict)
+            return
+
+        self.peaks_kev = np.asarray(fitted_peaks_kev)
+        self.peak_locs = np.asarray(mus)
+
+        # Now fit the E scale
+        try:
+            pars, errs, cov = hpge_fit_energy_scale(
+                mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
+            )
+
+            results_dict["pk_cal_pars"] = pars
+            results_dict["pk_cal_errs"] = errs
+            results_dict["pk_cal_cov"] = cov
+
+            # Invert the E scale fit to get a calibration function
+            pars, errs, cov = hpge_fit_energy_cal_func(
+                mus,
+                mu_vars,
+                fitted_peaks_kev,
+                pars,
+                deg=self.deg,
+                fixed=self.fixed,
+            )
+            self.pars = np.array(pars)
+
+        except ValueError:
+            log.error("Failed to fit enough peaks to get accurate calibration")
+
+        self.update_results_dict(results_dict)
+
+    def hpge_fit_energy_peaks(
+        self,
+        e_uncal,
+        peak_pars=None,
+        peaks_kev=None,
+        bin_width_kev=1,
+        peak_param="mode",
+        method="unbinned",
+        n_events=None,
+        allowed_p_val=0.01,
+        tail_weight=0,
+        update_cal_pars=True,
+        use_bin_width_in_fit=True,
+    ):
+        """
+        Fit the energy peaks specified using the given function.
+
+        Parameters
+        ----------
+        e_uncal : array
+            Unbinned energy data to be fit.
+        peaks_kev : array, optional
+            Array of energy values for the peaks to fit. If not provided, it uses the peaks_kev attribute of the class.
+        peak_pars : list of tuples, optional
+            List containing tuples of the form (peak, range, func) where peak is the energy of the peak to fit,
+            range is the range in keV to fit, and func is the function to fit.
+        bin_width_kev : int, optional
+            Default binwidth to use for the fit window histogramming. Default is 1 keV.
+        peak_param : str, optional
+            Parameter to use for peak fitting. Default is "mode".
+        method : str, optional
+            Method to use for fitting. Default is "unbinned". Can specify to use binned fit method instead.
+        n_events : int, optional
+            Number of events to use for unbinned fit.
+        allowed_p_val : float, optional
+            Lower limit on p-value of fit.
+        tail_weight : int, optional
+            Weight to apply to the tail of the fit.
+        update_cal_pars : bool, optional
+            Whether to update the calibration parameters. Default is True.
+
+        Returns
+        -------
+        results_dict : dict
+            Dictionary containing the fit results for each peak.
+
+        Raises
+        ------
+        RuntimeError
+            If the fit fails.
+
+        Notes
+        -----
+        This function fits the energy peaks specified using the given function. It calculates the range around each peak to fit,
+        performs the fitting using either unbinned or binned method, and returns the fit results in a dictionary.
+
+        """
+
+        results_dict = {}
+        # check no peaks in self.peaks_kev missing from peak_pars
+
+        if peaks_kev is None:
+            peaks_kev = self.peaks_kev
+
+        if peak_pars is None:
+            peak_pars = [(peak, None, pgf.gauss_on_step) for peak in peaks_kev]
+
+        # convert peak pars to array of tuples
+        tmp = np.empty(len(peak_pars), dtype=object)
+        tmp[:] = peak_pars
+        peak_pars = tmp
+
+        peak_pars_lines = [i[0] for i in peak_pars]
+        peaks_mask = np.array(
+            [True if peak in peaks_kev else False for peak in peak_pars_lines],
+            dtype=bool,
+        )
+        peak_pars = peak_pars[peaks_mask]
+
+        fit_peaks_mask = np.array(
+            [True for i in peak_pars if i[1] is not None and i[2] is not None],
+            dtype=bool,
+        )
+        peak_pars = peak_pars[fit_peaks_mask]
+
+        # First calculate range around peaks to fit
+
+        uncal_peak_pars = []
+        derco = Polynomial(self.pars).deriv().coef
+        for pars in peak_pars:
+            peak, fit_range, func = pars
+
+            if peak in self.peaks_kev:
+                loc = self.peak_locs[np.where(peak == self.peaks_kev)][0]
+            else:
+                loc = (Polynomial(self.pars) - peak).roots()[0]
+
+            if fit_range is None:
+                euc_min, euc_max = (
+                    (Polynomial(self.pars) - i).roots()
+                    for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
+                )
+                euc_min = euc_min[0]
+                euc_max = euc_max[0]
+                if euc_min < 0:
+                    euc_min = 0
+                if euc_max > np.nanmax(e_uncal) * 1.1:
+                    euc_max = np.nanmax(e_uncal) * 1.1
+                d_euc = 0.5 / self.pars[1]
+                if self.uncal_is_int:
+                    euc_min, euc_max, d_euc = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, dx=d_euc
+                    )
+                hist, bins, var = pgh.get_hist(
+                    e_uncal, range=(euc_min, euc_max), dx=d_euc
+                )
+                # Need to do initial fit
+                pt_pars, _ = hpge_fit_energy_peak_tops(
+                    hist, bins, var, [loc], n_to_fit=7
+                )
+                # Drop failed fits
+                if pt_pars[0] is not None:
+                    range_uncal = (float(pt_pars[0][1]) * 20, float(pt_pars[0][1]) * 20)
+                    n_bins = int(range_uncal / bin_width_kev)
+                else:
+                    range_uncal = None
+            elif isinstance(fit_range, tuple):
+                der = pgf.nb_poly(peak, derco)
+                range_uncal = (fit_range[0] / der, fit_range[1] / der)
+                n_bins = int(sum(fit_range) / (der * bin_width_kev))
+
+            if range_uncal is not None:
+                uncal_peak_pars.append((peak, loc, range_uncal, n_bins, func))
+
+        fit_dict = {}
+
+        for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
+            peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
+            wleft_i, wright_i = wwidth_i
+            try:
+                euc_min = mode_guess - wleft_i
+                euc_max = mode_guess + wright_i
+
+                if self.uncal_is_int is True:
+                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                    )
+                energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
+                binw_1 = (euc_max - euc_min) / n_bins_i
+                if method == "unbinned":
+                    (
+                        pars_i,
+                        errs_i,
+                        cov_i,
+                        csqr_i,
+                        func_i,
+                        mask,
+                        valid_fit,
+                        _,
+                    ) = unbinned_staged_energy_fit(
+                        energies,
+                        func=func_i,
+                        fit_range=(euc_min, euc_max),
+                        guess_func=get_hpge_energy_peak_par_guess,
+                        bounds_func=get_hpge_energy_bounds,
+                        fixed_func=get_hpge_energy_fixed,
+                        allow_tail_drop=True,
+                        tail_weight=tail_weight,
+                        bin_width=binw_1 if use_bin_width_in_fit is True else None,
+                        guess_kwargs={"mode_guess": mode_guess},
+                    )
+                    if pars_i["n_sig"] < 100:
+                        valid_fit = False
+                    csqr = csqr_i
+
+                else:
+                    hist, bins, var = pgh.get_hist(
+                        energies, bins=n_bins_i, range=(euc_min, euc_max)
+                    )
+                    binw_1 = (bins[-1] - bins[0]) / (len(bins) - 1)
+                    par_guesses = get_hpge_energy_peak_par_guess(
+                        hist, bins, var, func_i, mode_guess=mode_guess
+                    )
+                    bounds = get_hpge_energy_bounds(func_i, par_guesses)
+                    fixed, mask = get_hpge_energy_fixed(func_i)
+
+                    x0 = get_hpge_energy_peak_par_guess(
+                        energies, func_i, (euc_min, euc_max), bin_width=binw_1
+                    )
+                    fixed, mask = get_hpge_energy_fixed(func_i)
+                    bounds = get_hpge_energy_bounds(func_i, x0)
+
+                    pars_i, errs_i, cov_i = pgb.fit_binned(
+                        func_i.get_pdf,
+                        hist,
+                        bins,
+                        var=var,
+                        guess=x0,
+                        cost_func=method,
+                        Extended=True,
+                        fixed=fixed,
+                        bounds=bounds,
+                    )
+                    valid_fit = True
+
+                    csqr = pgb.goodness_of_fit(
+                        hist,
+                        bins,
+                        None,
+                        func_i.get_pdf,
+                        pars_i,
+                        method="Pearson",
+                        scale_bins=True,
+                    )
+                    csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
+
+                if np.isnan(pars_i).any():
+                    log.debug(
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, par is nan : {pars_i}"
+                    )
+                    raise RuntimeError
+
+                p_val = scipy.stats.chi2.sf(csqr[0], csqr[1])
+
+                total_events = func_i.get_total_events(pars_i, errors=errs_i)
+                if (
+                    cov_i is None
+                    or cov_i.ndim == 0
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == np.inf
+                    or sum(sum(c) for c in cov_i[mask, :][:, mask]) == 0
+                    or np.isnan(sum(sum(c) for c in cov_i[mask, :][:, mask]))
+                ):
+                    log.debug(
+                        f"hpge_fit_energy_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif valid_fit is False:
+                    log.debug(
+                        f"hpge_fit_energy_peaks: peak fitting failed for i_peak={i_peak} at loc {mode_guess:g}"
+                    )
+                    valid_pk = False
+
+                elif (
+                    errs_i is None
+                    or pars_i is None
+                    or np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
+                ).any() or np.isnan(np.array(errs_i)[mask]).any():
+                    log.debug(
+                        f"hpge_fit_energy_peaks: failed for i_peak={i_peak} at loc {mode_guess:g}, parameter error too low"
+                    )
+                    valid_pk = False
+
+                elif np.abs(total_events[0] - len(energies)) / len(energies) > 0.1:
+                    log.debug(
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak} at loc {mode_guess:g}, total_events is outside limit"
+                    )
+                    valid_pk = False
+
+                elif p_val < allowed_p_val or np.isnan(p_val):
+                    log.debug(
+                        f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
+                    )
+                    valid_pk = False
+                else:
+                    valid_pk = True
+
+                if peak_param == "mu":
+                    mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+
+                elif peak_param == "mode":
+                    mu, mu_err = func_i.get_mode(pars_i, cov=cov_i)
+                else:
+                    log.error(
+                        f"hpge_fit_energy_peaks: mode {self.peak_param} not recognized"
+                    )
+                    raise RuntimeError
+
+            except BaseException as e:
+                if e == KeyboardInterrupt:
+                    raise (e)
+                elif self.debug_mode:
+                    raise (e)
+                log.debug(
+                    f"hpge_fit_energy_peaks: fit failed for i_peak={i_peak}, unknown error"
+                )
+                valid_pk = False
+                pars_i, errs_i, cov_i = return_nans(func_i)
+                p_val = 0
+                mu = np.nan
+                mu_err = np.nan
+
+            fit_dict[peak_kev] = {
+                "function": func_i,
+                "validity": valid_pk,
+                "parameters": pars_i,
+                "uncertainties": errs_i,
+                "covariance": cov_i,
+                "nbins": binw_1,
+                "range": [euc_min, euc_max],
+                "p_value": p_val,
+                "position": mu,
+                "position_uncertainty": mu_err,
+            }
+
+        results_dict["peak_parameters"] = fit_dict
+
+        fitted_peaks_kev = np.array(
+            [peak for peak in fit_dict if fit_dict[peak]["validity"]]
+        )
+
+        log.info(f"{len(fitted_peaks_kev)} peaks fitted:")
+        for peak, peak_dict in fit_dict.items():
+            if peak_dict["validity"] is True:
+                varnames = peak_dict["function"].required_args()
+                pars = np.asarray(peak_dict["parameters"], dtype=float)
+                errors = np.asarray(peak_dict["uncertainties"], dtype=float)
+                log.info(f"\tEnergy: {str(peak)}")
+                log.info("\t\tParameter  |    Value +/- Sigma  ")
+                for vari, pari, errorsi in zip(varnames, pars, errors):
+                    log.info(
+                        f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
+                    )
+
+        if len(fitted_peaks_kev) == 0:
+            log.error("hpge_fit_energy_peaks: no peaks fitted")
+            self.update_results_dict(results_dict)
+            return
+
+        mus = [
+            fit_dict[peak]["position"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+        mu_vars = [
+            fit_dict[peak]["position_uncertainty"]
+            for peak in fit_dict
+            if fit_dict[peak]["validity"]
+        ]
+
+        results_dict["peak_param"] = peak_param
+        mus = results_dict["pk_pos"] = np.asarray(mus)
+        mu_vars = results_dict["pk_pos_uncertainties"] = np.asarray(mu_vars) ** 2
+
+        if update_cal_pars is False:
+            self.update_results_dict(results_dict)
+            return
+
+        self.peaks_kev = np.asarray(fitted_peaks_kev)
+        self.peak_locs = np.asarray(mus)
+
+        # Now fit the E scale
+        try:
+            pars, errs, cov = hpge_fit_energy_scale(
+                mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
+            )
+
+            results_dict["pk_cal_pars"] = pars
+            results_dict["pk_cal_errs"] = errs
+            results_dict["pk_cal_cov"] = cov
+
+            # Invert the E scale fit to get a calibration function
+            pars, errs, cov = hpge_fit_energy_cal_func(
+                mus,
+                mu_vars,
+                fitted_peaks_kev,
+                pars,
+                deg=self.deg,
+                fixed=self.fixed,
+            )
+            self.pars = np.array(pars)
+
+        except ValueError:
+            log.error("Failed to fit enough peaks to get accurate calibration")
+
+        self.update_results_dict(results_dict)
+
+    def get_fwhms(self):
+        """
+        Updates last results dictionary with fwhms in kev
+        """
+
+        peak_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+
+        if peak_parameters is None:
+            log.error("No peak parameters found")
+            return
+
+        cal_fwhms = []
+        cal_fwhm_errs = []
+        for peak, peak_dict in peak_parameters.items():
+            # Calculate the uncalibrated fwhm
+            if peak_dict["validity"] is True:
+                uncal_fwhm, uncal_fwhm_err = peak_dict["function"].get_fwhm(
+                    peak_dict["parameters"],
+                    cov=peak_dict["covariance"],
+                )
+            else:
+                uncal_fwhm, uncal_fwhm_err = (np.nan, np.nan)
+
+            # Apply calibration
+
+            derco = Polynomial(self.pars).deriv().coef
+            der = pgf.nb_poly(peak, derco)
+            cal_fwhm = uncal_fwhm * der
+            cal_fwhm_err = uncal_fwhm_err * der
+
+            peak_dict.update({"fwhm_in_kev": cal_fwhm, "fwhm_err_in_kev": cal_fwhm_err})
+
+            if peak_dict["validity"] is True:
+                cal_fwhms.append(cal_fwhm)
+                cal_fwhm_errs.append(cal_fwhm_err)
+
+        cal_fwhms = np.array(cal_fwhms)
+        cal_fwhm_errs = np.array(cal_fwhm_errs)
+        fitted_peaks_kev = np.array(
+            [
+                peak
+                for peak, peak_dict in peak_parameters.items()
+                if peak_dict["validity"]
+            ]
+        )
+
+        log.info(f"{len(cal_fwhms)} FWHMs found:")
+        log.info("\t   Energy   | FWHM  ")
+        for i, (ei, fwhm, fwhme) in enumerate(
+            zip(fitted_peaks_kev, cal_fwhms, cal_fwhm_errs)
+        ):
+            log.info(
+                f"\t{i}".ljust(4)
+                + str(ei).ljust(9)
+                + f"| {fwhm:.2f}+-{fwhme:.2f} kev".ljust(5)
+            )
+
+    @staticmethod
+    def fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms):
+        try:
+            if len(fwhm_peaks) == 0:
+                raise RuntimeError
+            c_lin = cost.LeastSquares(fwhm_peaks, fwhms, dfwhms, fwhm_func.func)
+            # c_lin.loss = "soft_l1"
+            m = Minuit(c_lin, *fwhm_func.guess(fwhm_peaks, fwhms, dfwhms))
+            bounds = fwhm_func.bounds(fwhms)
+            for arg, val in enumerate(bounds):
+                m.limits[arg] = val
+            m.simplex()
+            m.migrad()
+            m.hesse()
+
+            p_val = scipy.stats.chi2.sf(m.fval, len(fwhm_peaks) - len(m.values))
+
+            results = {
+                "function": fwhm_func,
+                "module": fwhm_func.__module__,
+                "expression": fwhm_func.string_func("x"),
+                "parameters": m.values,
+                "uncertainties": m.errors,
+                "cov": m.covariance,
+                "csqr": (m.fval, len(fwhm_peaks) - len(m.values)),
+                "p_val": p_val,
+            }
+
+            log.info(f'FWHM fit: {results["parameters"].to_dict()}')
+            log.info("FWHM fit values:")
+            log.info("\t   Energy   | FWHM (kev)  | Predicted (kev)")
+            for i, (peak, fwhm, fwhme) in enumerate(zip(fwhm_peaks, fwhms, dfwhms)):
+                log.info(
+                    f"\t{i}".ljust(4)
+                    + str(peak).ljust(9)
+                    + f"| {fwhm:.2f}+-{fwhme:.2f}  ".ljust(5)
+                    + f"| {fwhm_func.func(peak, *results['parameters']):.2f}".ljust(5)
+                )
+        except RuntimeError:
+            pars, errs, cov = return_nans(fwhm_func.func)
+            results = {
+                "function": fwhm_func,
+                "module": fwhm_func.__module__,
+                "expression": fwhm_func.string_func("x"),
+                "parameters": pars,
+                "uncertainties": errs,
+                "cov": cov,
+                "csqr": (np.nan, np.nan),
+                "p_val": 0,
+            }
+            log.error("FWHM fit failed to converge")
+        return results
+
+    @staticmethod
+    def interpolate_energy_res(
+        fwhm_func, fwhm_peaks, fwhm_results, interp_energy_kev=None, debug_mode=False
+    ):
+        if interp_energy_kev is not None:
+            for key, energy in interp_energy_kev.items():
+                try:
+                    if energy > np.nanmax(fwhm_peaks) or energy < np.nanmin(fwhm_peaks):
+                        raise RuntimeError(
+                            "Interpolating energy out of range of fitted peaks"
+                        )
+                    rng = np.random.default_rng(1)
+                    pars_b = rng.multivariate_normal(
+                        fwhm_results["parameters"], fwhm_results["cov"], size=1000
+                    )
+                    interp_vals = np.array(
+                        [fwhm_func.func(energy, *par_b) for par_b in pars_b]
+                    )
+                    interp_err = np.nanstd(interp_vals)
+                    interp_fwhm = fwhm_func.func(energy, *fwhm_results["parameters"])
+                except BaseException as e:
+                    if debug_mode:
+                        raise (e)
+                    interp_fwhm = np.nan
+                    interp_err = np.nan
+                fwhm_results.update(
+                    {
+                        "interp_energy_in_kev": energy,
+                        f"{key}_fwhm_in_kev": interp_fwhm,
+                        f"{key}_fwhm_err_in_kev": interp_err,
+                    }
+                )
+                log.info(
+                    f"FWHM {key} energy resolution at {energy} : {interp_fwhm:1.2f} +- {interp_err:1.2f} kev"
+                )
+        return fwhm_results
+
+    def get_energy_res_curve(self, fwhm_func, interp_energy_kev=None):
+        peak_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+        if peak_parameters is None:
+            log.error("No peak parameters found")
+            return
+        fitted_peaks_kev = np.array(
+            [
+                peak
+                for peak, peak_dict in peak_parameters.items()
+                if peak_dict["validity"]
+            ]
+        )
+        if len(fitted_peaks_kev) == 0:
+            return
+        if "fwhm_in_kev" not in peak_parameters[fitted_peaks_kev[0]]:
+            self.get_fwhms()
+            peak_parameters = self.results[list(self.results)[-1]].get(
+                "peak_parameters", None
+            )
+
+        fwhm_peaks = np.array([], dtype=np.float32)
+        fwhms = np.array([], dtype=np.float32)
+        dfwhms = np.array([], dtype=np.float32)
+        all_peaks = np.array([], dtype=np.float32)
+        #####
+        # Remove the Doppler Broadened peaks from calibration if found
+        for peak, peak_dict in peak_parameters.items():
+            all_peaks = np.append(all_peaks, peak)
+            if np.abs(peak - 2103.5) < 1:
+                log.info("Tl SEP removed from fwhm fitting")
+            elif np.abs(peak - 1592.53) < 1:
+                log.info("Tl DEP removed from fwhm fitting")
+            elif np.abs(peak - 511.0) < 1:
+                log.info("e annihilation removed from fwhm fitting")
+            elif np.isnan(peak_dict["fwhm_in_kev"]) or np.isnan(
+                peak_dict["fwhm_err_in_kev"]
+            ):
+                log.info(f"{peak} failed, removed from fwhm fitting")
+            else:
+                fwhm_peaks = np.append(fwhm_peaks, peak)
+                fwhms = np.append(fwhms, peak_dict["fwhm_in_kev"])
+                dfwhms = np.append(dfwhms, peak_dict["fwhm_err_in_kev"])
+
+        log.info(f"Running FWHM fit for : {fwhm_func.__name__}")
+
+        results = self.fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms)
+        if interp_energy_kev is not None:
+            results = self.interpolate_energy_res(
+                fwhm_func,
+                fwhm_peaks,
+                results,
+                interp_energy_kev,
+                debug_mode=self.debug_mode,
+            )
+        self.results[list(self.results)[-1]].update({fwhm_func.__name__: results})
+
+    def full_calibration(
+        self,
+        e_uncal,
+        peak_pars,
+        allowed_p_val=10**-20,
+        tail_weight=0,
+        peak_param="mode",
+        n_events=None,
+    ):
+        log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
+        log.debug(f"Guess is {self.pars[1]:.3f}")
+        self.hpge_find_energy_peaks(e_uncal)
+        self.hpge_get_energy_peaks(e_uncal)
+
+        got_peaks_kev = self.peaks_kev.copy()
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peak_pars=peak_pars,
+            allowed_p_val=allowed_p_val,
+            tail_weight=tail_weight,
+            peak_param=peak_param,
+            n_events=n_events,
+        )
+        if len(self.peaks_kev) != len(got_peaks_kev):
+            for i, peak in enumerate(got_peaks_kev):
+                if peak not in self.peaks_kev:
+                    for i, peak_par in enumerate(peak_pars):
+                        if peak_par[0] == peak:
+                            new_kev_ranges = (peak_par[1][0] - 5, peak_par[1][1] - 5)
+                            peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
+            for i, peak in enumerate(self.peaks_kev):
+                try:
+                    if (
+                        self.results["pk_fwhms"][:, 1][i]
+                        / self.results["pk_fwhms"][:, 0][i]
+                        > 0.05
+                    ):
+                        for i, peak_par in enumerate(peak_pars):
+                            if peak_par[0] == peak:
+                                new_kev_ranges = (
+                                    peak_par[1][0] - 5,
+                                    peak_par[1][1] - 5,
+                                )
+                                peak_pars[i] = (peak, new_kev_ranges, peak_par[2])
+                except BaseException as e:
+                    if self.debug_mode:
+                        raise (e)
+
+            self.hpge_fit_energy_peaks(
+                e_uncal,
+                peaks=got_peaks_kev,
+                peak_pars=peak_pars,
+                allowed_p_val=allowed_p_val,
+                tail_weight=tail_weight,
+                peak_param=peak_param,
+                n_events=n_events,
+            )
+
+            if self.pars is None:
+                if self.deg < 1:
+                    self.pars = np.full(2, np.nan)
+                else:
+                    self.pars = np.full(self.deg + 1, np.nan)
+
+                log.error(f"Calibration failed completely for {self.energy_param}")
+                return
+
+        log.debug("Calibrated found")
+        log.info(f"Calibration pars are {self.pars}")
+
+        self.get_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.get_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+
+    def fit_calibrated_peaks(self, e_uncal, peak_pars):
+        log.debug(f"Fitting {self.energy_param}")
+        self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
+        self.hpge_fit_energy_peaks(e_uncal, peak_pars=peak_pars, update_cal_pars=False)
+        self.get_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.get_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+
+    def calibrate_prominent_peak(
+        self,
+        e_uncal,
+        peak,
+        peak_pars,
+        allowed_p_val=10**-20,
+        tail_weight=0,
+        peak_param="mode",
+        n_events=None,
+    ):
+        log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
+        log.debug(f"Guess is {self.pars[1]:.3f}")
+        if self.deg != 0:
+            log.error("deg must be 0 for calibrate_prominent_peak")
+            return
+        self.hpge_find_energy_peaks(e_uncal)
+        self.hpge_get_energy_peaks(e_uncal)
+
+        got_peaks_kev = self.peaks_kev.copy()
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peaks_kev=[peak],
+            peak_pars=peak_pars,
+            allowed_p_val=allowed_p_val,
+            tail_weight=tail_weight,
+            peak_param=peak_param,
+            n_events=n_events,
+        )
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peaks_kev=got_peaks_kev,
+            peak_pars=peak_pars,
+            allowed_p_val=allowed_p_val,
+            tail_weight=tail_weight,
+            peak_param=peak_param,
+            n_events=n_events,
+            update_cal_pars=False,
+        )
+        self.get_energy_res_curve(
+            FWHMLinear,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+        self.get_energy_res_curve(
+            FWHMQuadratic,
+            interp_energy_kev={"Qbb": 2039.0},
+        )
+
+    def plot_cal_fit(self, data, figsize=(12, 8), fontsize=12, erange=(200, 2700)):
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figsize=figsize
+        )
+
+        cal_bins = np.linspace(0, np.nanmax(self.peak_locs) * 1.1, 20)
+
+        ax1.scatter(self.peaks_kev, self.peak_locs, marker="x", c="b")
+
+        ax1.plot(pgf.nb_poly(cal_bins, self.pars), cal_bins, lw=1, c="g")
+
+        ax1.grid()
+        ax1.set_xlim([erange[0], erange[1]])
+        ax1.set_ylabel("Energy (ADC)", fontsize=fontsize)
+        ax2.scatter(
+            self.peaks_kev,
+            pgf.nb_poly(np.array(self.peak_locs), self.pars) - self.peaks_kev,
+            marker="x",
+            c="b",
+        )
+        ax2.grid()
+        ax2.set_xlabel("Energy (keV)", fontsize=fontsize)
+        ax2.set_ylabel("Residuals (keV)", fontsize=fontsize)
+        plt.close()
+        return fig
+
+    def plot_fits(
+        self, energies, figsize=(12, 8), fontsize=12, ncols=3, nrows=3, binning_kev=5
+    ):
+        plt.rcParams["font.size"] = fontsize
+
+        pk_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+
+        fig = plt.figure(figsize=figsize)
+        derco = Polynomial(self.pars).deriv().coef
+        der = [pgf.nb_poly(5, derco) for _ in list(pk_parameters)]
+        for i, peak in enumerate(pk_parameters):
+            range_adu = 5 / der[i]
+            plt.subplot(nrows, ncols, i + 1)
+            pk_dict = pk_parameters[peak]
+            pk_pars = pk_dict["parameters"]
+            pk_ranges = pk_dict["range"]
+            pk_func = pk_dict["function"]
+            mu = pk_func.get_mu(pk_pars) if pk_pars is not None else np.nan
+
+            try:
+                binning = np.arange(pk_ranges[0], pk_ranges[1], 0.1 / der[i])
+                bin_cs = (binning[1:] + binning[:-1]) / 2
+
+                counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
+                if pk_pars is not None:
+                    fit_vals = pk_func.get_pdf(bin_cs, *pk_pars, 0) * np.diff(bs)[0]
+                    plt.plot(bin_cs, fit_vals)
+                    plt.step(
+                        bin_cs,
+                        [
+                            (fval - count) / count if count != 0 else (fval - count)
+                            for count, fval in zip(counts, fit_vals)
+                        ],
+                        where="mid",
+                    )
+
+                    plt.annotate(
+                        f"{peak:.1f} keV", (0.02, 0.8), xycoords="axes fraction"
+                    )
+                    plt.annotate(
+                        f"p-value : {pk_dict['p_value']:.4f}",
+                        (0.02, 0.7),
+                        xycoords="axes fraction",
+                    )
+                    plt.xlabel("Energy (keV)")
+                    plt.ylabel("Counts")
+                    plt.legend(loc="upper left", frameon=False)
+
+                    plt.xlim([mu - range_adu, mu + range_adu])
+                    locs, labels = plt.xticks()
+
+                    def get_peak_labels(
+                        labels: list[str], pars: list[float]
+                    ) -> tuple(list[float], list[float]):
+                        out = []
+                        out_labels = []
+                        for i, label in enumerate(labels):
+                            if i % 2 == 1:
+                                continue
+                            else:
+                                out.append(f"{pgf.nb_poly(label, pars):.1f}")
+                                out_labels.append(label)
+                        return out_labels, out
+
+                    new_locs, new_labels = get_peak_labels(locs, self.pars)
+                    plt.xticks(ticks=new_locs, labels=new_labels)
+
+            except BaseException as e:
+                if self.debug_mode:
+                    raise (e)
+
+        plt.tight_layout()
+        plt.close()
+        return fig
+
+    def plot_eres_fit(self, data, erange=(200, 2700), figsize=(12, 8), fontsize=12):
+        plt.rcParams["font.size"] = fontsize
+
+        pk_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+
+        if pk_parameters is None:
+            fig = plt.figure()
+            return fig
+
+        #####
+        # Remove the Tl SEP and DEP from calibration if found
+        fwhm_peaks = np.array([], dtype=np.float32)
+        fwhms = np.array([], dtype=np.float32)
+        dfwhms = np.array([], dtype=np.float32)
+
+        for peak, pk_dict in pk_parameters.items():
+            if peak == 2103.53:
+                pass
+            elif peak == 1592.53:
+                pass
+            elif peak == 511.0:
+                pass
+            elif pk_dict["validity"] is False:
+                pass
+            elif np.isnan(pk_dict["fwhm_err_in_kev"]):
+                pass
+            else:
+                fwhm_peaks = np.append(fwhm_peaks, peak)
+                fwhms = np.append(fwhms, pk_dict["fwhm_in_kev"])
+                dfwhms = np.append(dfwhms, pk_dict["fwhm_err_in_kev"])
+
+        fwhm_dicts = {}
+        interp_energy = None
+        interp_fwhm_name = None
+        for name, item in self.results[list(self.results)[-1]].items():
+            if "FWHM" in name:
+                fwhm_dicts[name] = item
+                if "interp_energy_in_kev" in item:
+                    interp_energy = item["interp_energy_in_kev"]
+                    for field in item:
+                        if "_fwhm_in_kev" in field:
+                            interp_fwhm_name = field.replace("_fwhm_in_kev", "")
+
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figsize=figsize
+        )
+        if len(np.where((~np.isnan(fwhms)) & (~np.isnan(dfwhms)))[0]) > 0:
+            ax1.errorbar(fwhm_peaks, fwhms, yerr=dfwhms, marker="x", ls=" ", c="black")
+
+            fwhm_slope_bins = np.arange(erange[0], erange[1], 10)
+
+            if interp_energy is not None:
+                qbb_line_vx = [interp_energy, interp_energy]
+                qbb_line_hx = [erange[0], interp_energy]
+                for name, fwhm_dict in fwhm_dicts.items():
+                    qbb_line_vy = [np.inf, -np.inf]
+                    low_lim = 0.9 * np.nanmin(
+                        fwhm_dict["function"].func(
+                            fwhm_slope_bins, *fwhm_dict["parameters"]
+                        )
+                    )
+                    up_lim = fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"]
+                    if low_lim < qbb_line_vy[0]:
+                        qbb_line_vy[0] = low_lim
+                    if up_lim > qbb_line_vy[1]:
+                        qbb_line_vy[1] = up_lim
+                    ax1.plot(
+                        qbb_line_hx,
+                        [
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"],
+                            fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"],
+                        ],
+                        lw=1,
+                        c="r",
+                        ls="--",
+                    )
+                    ax1.plot(
+                        fwhm_slope_bins,
+                        fwhm_dict["function"].func(
+                            fwhm_slope_bins, *fwhm_dict["parameters"]
+                        ),
+                        lw=1,
+                        label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_kev"]:1.2f} keV',
+                    )
+                    ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
+
+            ax1.set_xlim(erange)
+            ax1.set_ylim([low_lim, None])
+            ax1.set_ylabel("FWHM energy resolution (keV)")
+            for _, fwhm_dict in fwhm_dicts.items():
+                ax2.plot(
+                    fwhm_peaks,
+                    (
+                        fwhms
+                        - fwhm_dict["function"].func(
+                            fwhm_peaks, *fwhm_dict["parameters"]
+                        )
+                    )
+                    / dfwhms,
+                    lw=0,
+                    marker="x",
+                )
+            ax2.plot(erange, [0, 0], color="black", lw=0.5)
+            ax2.set_xlabel("Energy (keV)")
+            ax2.set_ylabel("Normalised Residuals")
+        plt.tight_layout()
+        plt.close()
+        return fig
 
 
-def hpge_get_E_peaks(
-    hist,
-    bins,
-    var,
-    cal_pars,
-    peaks_keV,
-    n_sigma=3,
-    Etol_keV=5,
-    var_zero=1,
-    verbose=False,
-):
-    """Get uncalibrated E peaks at the energies of peaks_keV
+class FWHMLinear:
+    @staticmethod
+    def func(x, a, b):
+        return np.sqrt(a + b * x)
 
-    Parameters
-    ----------
-    hist, bins, var : array, array, array
-        Histogram of uncalibrated energies, see pgh.get_hist()
-        var cannot contain any zero entries.
-    cal_pars : array
-        Estimated energy calibration parameters used to search for peaks
-    peaks_keV : array
-        Energies of peaks to search for (in keV)
-    n_sigma : float
-        Threshold for detecting a peak in sigma (i.e. sqrt(var))
-    Etol_keV : float
-        absolute tolerance in energy for matching peaks
-    var_zero : float
-        number used to replace zeros of var to avoid divide-by-zero in
-        hist/sqrt(var). Default value is 1. Usually when var = 0 its because
-        hist = 0, and any value here is fine.
-    verbose : bool
-        print debug messages
+    @staticmethod
+    def string_func(input_param):
+        return f"(a+b*{input_param})**(0.5)"
 
-    Returns
-    -------
-    got_peak_locations : list
-        list of uncalibrated energies of found peaks
-    got_peak_energies : list
-        list of calibrated energies of found peaks
-    pars : list of floats
-        the parameters for poly(peaks_uncal) = peaks_keV (polyfit convention)
-    """
-    # clean up var if necessary
-    if np.any(var == 0):
-        log.debug(f"hpge_find_E_peaks: replacing var zeros with {var_zero}")
-        var[np.where(var == 0)] = var_zero
-    peaks_keV = np.asarray(peaks_keV)
+    @staticmethod
+    def guess(xs, ys, y_errs):
+        return [np.nanmin(ys), 10**-3]
 
-    # Find all maxes with > n_sigma significance
-    imaxes = get_i_local_maxima(hist / np.sqrt(var), n_sigma)
-
-    # Keep maxes if they coincide with expected peaks
-    test_peaks_keV = np.asarray([pgf.poly(i, cal_pars) for i in bins[imaxes]])
-    imatch = [abs(peaks_keV - i).min() < Etol_keV for i in test_peaks_keV]
-
-    got_peak_locations = bins[imaxes[imatch]]
-    got_peak_energies = test_peaks_keV[imatch]
-
-    # Match calculated and true peak energies
-    matched_energies = peaks_keV[
-        [np.argmin(abs(peaks_keV - i)) for i in got_peak_energies]
-    ]
-    while not all([list(matched_energies).count(x) == 1 for x in matched_energies]):
-        for i in range(len(matched_energies)):
-            if matched_energies[i + 1] == matched_energies[i]:
-                # remove duplicates
-                if np.argmin(
-                    abs(got_peak_energies[i : i + 2] - matched_energies[i])
-                ):  # i+1 is best match
-                    got_peak_locations = np.delete(got_peak_locations, i)
-                    got_peak_energies = np.delete(got_peak_energies, i)
-                else:  # i is best match
-                    got_peak_locations = np.delete(got_peak_locations, i + 1)
-                    got_peak_energies = np.delete(got_peak_energies, i + 1)
-                matched_energies = np.delete(matched_energies, i)
-                break
-            i += 1
-
-    # Calculate updated calibration curve
-    pars = np.polyfit(got_peak_locations, matched_energies, len(cal_pars))
-
-    return got_peak_locations, matched_energies, pars
+    @staticmethod
+    def bounds(ys):
+        return [(0, None), (0, None)]
 
 
-def hpge_fit_E_peak_tops(
+class FWHMQuadratic:
+    @staticmethod
+    def func(x, a, b, c):
+        return np.sqrt(a + b * x + c * x**2)
+
+    @staticmethod
+    def string_func(input_param):
+        return f"(a+b*{input_param}+c*{input_param}**2)**(0.5)"
+
+    @staticmethod
+    def guess(xs, ys, y_errs):
+        return [np.nanmin(ys), 2 * 10**-3, 10**-8]
+
+    @staticmethod
+    def bounds(ys):
+        return [(0, np.nanmin(ys) ** 2), (10**-3, None), (0, None)]
+
+
+def hpge_fit_energy_peak_tops(
     hist,
     bins,
     var,
@@ -200,6 +1712,7 @@ def hpge_fit_E_peak_tops(
     cost_func="Least Squares",
     inflate_errors=False,
     gof_method="var",
+    debug_mode=False,
 ):
     """Fit gaussians to the tops of peaks
 
@@ -227,19 +1740,23 @@ def hpge_fit_E_peak_tops(
     """
     pars_list = []
     cov_list = []
-    for E_peak in peak_locs:
+    for e_peak in peak_locs:
         try:
-            pars, cov = pgf.gauss_mode_width_max(
+            pars, cov = pgb.gauss_mode_width_max(
                 hist,
                 bins,
                 var,
-                mode_guess=E_peak,
+                mode_guess=e_peak,
                 n_bins=n_to_fit,
                 cost_func=cost_func,
                 inflate_errors=inflate_errors,
                 gof_method=gof_method,
             )
-        except:
+        except BaseException as e:
+            if e == KeyboardInterrupt:
+                raise (e)
+            elif debug_mode:
+                raise (e)
             pars, cov = None, None
 
         pars_list.append(pars)
@@ -247,38 +1764,114 @@ def hpge_fit_E_peak_tops(
     return np.array(pars_list, dtype=object), np.array(cov_list, dtype=object)
 
 
-def get_hpge_E_peak_par_guess(hist, bins, var, func, mode_guess):
-    """Get parameter guesses for func fit to peak in hist
+def get_hpge_energy_peak_par_guess(
+    energy, func, fit_range=None, bin_width=None, mode_guess=None
+):
+    """
+    Get parameter guesses for func fit to peak in hist
 
     Parameters
     ----------
-    hist, bins, var : array, array, array
-        Histogram of uncalibrated energies, see pgh.get_hist(). Should be
-        windowed around the peak.
+    energy : array
+        An array of energy values in the range around the peak for guessing.
     func : function
-        The function to be fit to the peak in the (windowed) hist
+        The function to be fit to the peak in the histogram.
+    fit_range : tuple, optional
+        A tuple specifying the range around the peak to perform the fit. If not provided, the entire range of energy values will be used.
+    bin_width : float, optional
+        The width of the bins in the histogram. Default is 1.
+    mode_guess : float, optional
+        A guess for the mode (mu) parameter of the function. If not provided, it will be estimated from the data.
+
+    Returns
+    -------
+    ValueView
+        A ValueView object from iminuit containing the parameter guesses for the function fit.
+
+    Notes
+    -----
+    This function calculates parameter guesses for fitting a function to a peak in a histogram. It uses various methods to estimate the parameters based on the provided energy values and the selected function.
+
+    If the function is 'gauss_on_step', the following parameters will be estimated:
+    - n_sig: Number of signal events in the peak.
+    - mu: Mean of the peak.
+    - sigma: Standard deviation of the peak.
+    - n_bkg: Number of background events.
+    - hstep: Height of the step between the peak and the background.
+    - x_lo: Lower bound of the fit range.
+    - x_hi: Upper bound of the fit range.
+
+    If the function is 'hpge_peak', the following parameters will be estimated:
+    - n_sig: Number of signal events in the peak.
+    - mu: Mean of the peak.
+    - sigma: Standard deviation of the peak.
+    - htail: Height of the tail component.
+    - tau: Decay constant of the tail component.
+    - n_bkg: Number of background events.
+    - hstep: Height of the step between the peak and the background.
+    - x_lo: Lower bound of the fit range.
+    - x_hi: Upper bound of the fit range.
+
+    If the provided function is not implemented, an error will be raised.
+
+    Examples
+    --------
+    >>> energy = [1, 2, 3, 4, 5]
+    >>> func = pgf.gauss_on_step
+    >>> fit_range = (2, 4)
+    >>> bin_width = 0.5
+    >>> mode_guess = 3.5
+    >>> get_hpge_energy_peak_par_guess(energy, func, fit_range, bin_width, mode_guess)
+    {'n_sig': 3, 'mu': 3.5, 'sigma': 0.5, 'n_bkg': 2, 'hstep': 0.5, 'x_lo': 2, 'x_hi': 4}
     """
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+
+    energy = energy[(energy >= fit_range[0]) & (energy <= fit_range[1])]
+    if bin_width is None:
+        init_bin_width = (
+            2
+            * (np.nanpercentile(energy, 75) - np.nanpercentile(energy, 25))
+            * len(energy) ** (-1 / 3)
+        )
+        init_hist, init_bins, _ = pgh.get_hist(
+            energy, dx=init_bin_width, range=fit_range
+        )
+        try:
+            _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+        except IndexError:
+            init_hist, init_bins, _ = pgh.get_hist(
+                energy, dx=init_bin_width / 2, range=fit_range
+            )
+            try:
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+            except IndexError:
+                init_sigma = np.nanstd(energy)
+        bin_width = 2 * (init_sigma) * len(energy) ** (-1 / 3)
+
+    hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
+
     if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
+        func == pgf.gauss_on_step
+        or func == pgf.hpge_peak
+        or func == pgf.gauss_on_uniform
     ):
         # get mu and height from a gauss fit, also sigma as fallback
-        pars, cov = pgf.gauss_mode_width_max(
-            hist, bins, var, mode_guess=mode_guess, n_bins=10
+        pars, cov = pgb.gauss_mode_width_max(
+            hist, bins, var, mode_guess=mode_guess, n_bins=5
         )
+
         bin_centres = pgh.get_bin_centers(bins)
         if pars is None:
-            log.info("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
+            log.info("get_hpge_energy_peak_par_guess: gauss_mode_width_max failed")
             i_0 = np.argmax(hist)
             mu = bin_centres[i_0]
             height = hist[i_0]
             sigma_guess = None
         else:
-            mu = mode_guess
+            mu = mode_guess if mode_guess is not None else pars[0]
             sigma_guess = pars[1]
             height = pars[2]
-
         # get bg and step from edges of hist
         bg = np.mean(hist[-10:])
         step = bg - np.mean(hist[:10])
@@ -293,191 +1886,145 @@ def get_hpge_E_peak_par_guess(hist, bins, var, func, mode_guess):
                 bl=bg - step / 2,
                 method="interpolate",
             )[0]
-            if sigma == 0:
+            if sigma <= 0:
                 raise ValueError
-        except:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg - step / 2,
-                method="fit_slopes",
-            )[0]
-            if sigma == 0:
-                log.info("get_hpge_E_peak_par_guess: sigma estimation failed")
-                if sigma_guess is not None:
+        except ValueError:
+            try:
+                sigma = pgh.get_fwfm(
+                    0.6065,
+                    hist,
+                    bins,
+                    var,
+                    mx=height,
+                    bl=bg - step / 2,
+                    method="fit_slopes",
+                )[0]
+            except RuntimeError:
+                sigma = -1
+            if sigma <= 0 or sigma > 1000:
+                if sigma_guess is not None and sigma_guess > 0 and sigma_guess < 1000:
                     sigma = sigma_guess
                 else:
-                    return []
-
+                    (_, sigma, _) = pgh.get_gaussian_guess(hist, bins)
+                    if sigma is not None and sigma_guess > 0 and sigma_guess < 1000:
+                        pass
+                    else:
+                        log.info(
+                            "get_hpge_energy_peak_par_guess: sigma estimation failed"
+                        )
+                        return {}
         # now compute amp and return
         n_sig = np.sum(
             hist[(bin_centres > mu - 3 * sigma) & (bin_centres < mu + 3 * sigma)]
         )
         n_bkg = np.sum(hist) - n_sig
 
-        hstep = step / (bg + np.mean(hist[:10]))
+        parguess = {
+            "n_sig": n_sig,
+            "mu": mu,
+            "sigma": sigma,
+            "n_bkg": n_bkg,
+            "x_lo": bins[0],
+            "x_hi": bins[-1],
+        }
 
-        parguess = [n_sig, mu, sigma / 2, n_bkg, hstep, bins[0], bins[-1], 0]
-        for i, guess in enumerate(parguess):
+        if func == pgf.gauss_on_step or func == pgf.hpge_peak:
+            hstep = step / (bg + np.mean(hist[:10]))
+            parguess["hstep"] = hstep
+
+        if func == pgf.hpge_peak:
+            sigma = sigma * 0.8  # roughly remove some amount due to tail
+            # for now hard-coded
+            htail = 1.0 / 5
+            tau = sigma / 2
+            parguess["sigma"] = sigma
+            parguess["htail"] = htail
+            parguess["tau"] = tau
+
+        for name, guess in parguess.items():
             if np.isnan(guess):
-                parguess[i] = 0
-
-        return parguess
-
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
-        # guess mu, height
-        pars, cov = pgf.gauss_mode_width_max(
-            hist, bins, var, mode_guess=mode_guess, n_bins=10
-        )
-        bin_centres = pgh.get_bin_centers(bins)
-        if pars is None:
-            log.info("get_hpge_E_peak_par_guess: gauss_mode_width_max failed")
-            sigma_guess = None
-
-        else:
-            sigma_guess = pars[1]
-            # mu=pars[0]
-            # height=pars[2]
-        i_0 = np.argmax(hist)
-        mu = bin_centres[i_0]
-        height = hist[i_0]
-
-        # get bg and step from edges of hist
-        bg0 = np.mean(hist[-10:])
-        step = bg0 - np.mean(hist[:10])
-
-        # get sigma from fwfm with f = 1/sqrt(e)
-        try:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg0 + step / 2,
-                method="interpolate",
-            )[0]
-            if sigma == 0:
-                raise ValueError
-        except:
-            sigma = pgh.get_fwfm(
-                0.6065,
-                hist,
-                bins,
-                var,
-                mx=height,
-                bl=bg0 + step / 2,
-                method="fit_slopes",
-            )[0]
-            if sigma == 0:
-                log.info("get_hpge_E_peak_par_guess: sigma estimation failed")
-                if sigma_guess is not None:
-                    sigma = sigma_guess
-                else:
-                    return []
-        sigma = sigma * 0.8  # roughly remove some amount due to tail
-
-        # for now hard-coded
-        htail = 1.0 / 5
-        tau = 0.5 * sigma
-
-        hstep = step / (bg0 + np.mean(hist[:10]))
-
-        n_sig = np.sum(
-            hist[(bin_centres > mu - 3 * sigma) & (bin_centres < mu + 3 * sigma)]
-        )
-        n_bkg = np.sum(hist) - n_sig
-
-        parguess = [n_sig, mu, sigma, htail, tau, n_bkg, hstep, bins[0], bins[-1], 0]
-
-        for i, guess in enumerate(parguess):
-            if np.isnan(guess):
-                parguess[i] = 0
-
-        return parguess
+                parguess[name] = 0
 
     else:
-        log.error(f"get_hpge_E_peak_par_guess not implemented for {func.__name__}")
-        return []
+        log.error(f"get_hpge_energy_peak_par_guess not implemented for {func.__name__}")
+        return return_nans(func)
+
+    return convert_to_minuit(parguess, func).values
 
 
-def get_hpge_E_fixed(func):
+def get_hpge_energy_fixed(func):
     """
-    Returns: Sequence list of fixed indexes for fitting and mask for parameters
+    Get the fixed indexes for fitting and mask for parameters based on the given function.
+
+    Parameters
+    ----------
+    func : function
+        The function for which the fixed indexes and mask are to be determined.
+
+    Returns
+    -------
+    fixed : list
+        A sequence list of fixed indexes for fitting.
+    mask : ndarray
+        A boolean mask indicating which parameters are fixed (False) and which are not fixed (True).
     """
 
     if (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
+        func == pgf.gauss_on_step
+        or func == pgf.hpge_peak
+        or func == pgf.gauss_on_uniform
     ):
         # pars are: n_sig, mu, sigma, n_bkg, hstep, components
-        return [5, 6, 7], np.array([True, True, True, True, True, False, False, False])
-
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
-        # pars are: n_sig, mu, sigma, htail,tau, n_bkg, hstep, components
-        return [7, 8, 9], np.array(
-            [True, True, True, True, True, True, True, False, False, False]
-        )
+        fixed = ["x_lo", "x_hi"]
 
     else:
-        log.error(f"get_hpge_E_fixed not implemented for {func.__name__}")
+        log.error(f"get_hpge_energy_fixed not implemented for {func.__name__}")
         return None
-    return None
+    mask = ~np.in1d(func.required_args(), fixed)
+    return fixed, mask
 
 
-def get_hpge_E_bounds(func, parguess):
-    if (
-        func == pgf.radford_cdf
-        or func == pgf.radford_pdf
-        or func == pgf.extended_radford_pdf
-    ):
-        return [
-            (0, None),
-            (parguess[-3], parguess[-2]),
-            (0, None),
-            (0, 1),
-            (None, None),
-            (0, None),
-            (-1, 1),
-            (None, None),
-            (None, None),
-            (None, None),
-        ]
+def get_hpge_energy_bounds(func, parguess):
+    if func == pgf.gauss_on_step:
+        return {
+            "n_sig": (0, None),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
+            "sigma": (0, None),
+            "n_bkg": (0, None),
+            "hstep": (-1, 1),
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+        }
 
-    elif (
-        func == pgf.gauss_step_cdf
-        or func == pgf.gauss_step_pdf
-        or func == pgf.extended_gauss_step_pdf
-    ):
-        return [
-            (0, None),
-            (parguess[-3], parguess[-2]),
-            (0, None),
-            (0, None),
-            (-1, 1),
-            (None, None),
-            (None, None),
-            (None, None),
-        ]
+    elif func == pgf.hpge_peak:
+        return {
+            "n_sig": (0, None),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
+            "sigma": (0, None),
+            "htail": (0, 0.5),
+            "tau": (0.1 * parguess["sigma"], 10 * parguess["sigma"]),
+            "n_bkg": (0, None),
+            "hstep": (-1, 1),
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+        }
+
+    if func == pgf.gauss_on_uniform:
+        return {
+            "n_sig": (0, None),
+            "mu": (parguess["x_lo"], parguess["x_hi"]),
+            "sigma": (0, None),
+            "n_bkg": (0, None),
+            "x_lo": (None, None),
+            "x_hi": (None, None),
+        }
 
     else:
-        log.error(f"get_hpge_E_bounds not implemented for {func.__name__}")
+        log.error(f"get_hpge_energy_bounds not implemented for {func.__name__}")
         return []
 
 
-class tail_prior:
+class TailPrior:
     """
     Generic least-squares cost function with error.
     """
@@ -485,7 +2032,7 @@ class tail_prior:
     verbose = 0
     errordef = Minuit.LIKELIHOOD  # for Minuit to compute errors correctly
 
-    def __init__(self, data, model, tail_weight=100):
+    def __init__(self, data, model, tail_weight=0):
         self.model = model  # model predicts y for given x
         self.data = data
         self.tail_weight = tail_weight
@@ -493,8 +2040,13 @@ class tail_prior:
     def _call(self, *pars):
         return self.__call__(*pars[0])
 
+    def _value(self, *pars):
+        return self.__call__(*pars[0])
+
     def __call__(
         self,
+        x_lo,
+        x_hi,
         n_sig,
         mu,
         sigma,
@@ -502,349 +2054,339 @@ class tail_prior:
         tau,
         n_bkg,
         hstep,
-        lower_range,
-        upper_range,
-        components,
     ):
         return self.tail_weight * np.log(htail + 0.1)  # len(self.data)/
 
 
-def staged_fit(
-    energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess, tail_weight=100
+def unbinned_staged_energy_fit(
+    energy,
+    func,
+    gof_range=None,
+    fit_range=None,
+    guess=None,
+    guess_func=get_hpge_energy_peak_par_guess,
+    bounds_func=get_hpge_energy_bounds,
+    fixed_func=get_hpge_energy_fixed,
+    guess_kwargs=None,
+    bounds_kwargs=None,
+    fixed_kwargs=None,
+    tol=None,
+    tail_weight=0,
+    allow_tail_drop=True,
+    bin_width=None,
+    lock_guess=False,
+    display=0,
 ):
-    par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i, mode_guess)
-    bounds = get_hpge_E_bounds(func_i, par_guesses)
-    fixed, mask = get_hpge_E_fixed(func_i)
+    """
+    Unbinned fit to energy. This is different to the default fitting as
+    it will try different fitting methods and choose the best. This is necessary for the lower statistics.
+    """
 
-    if func_i == pgf.extended_radford_pdf or func_i == pgf.radford_pdf:
-        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i) + tail_prior(
-            energies, func_i, tail_weight=tail_weight
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+
+    if gof_range is None:
+        gof_range = fit_range
+
+    if bin_width is None:
+        init_bin_width = (
+            2
+            * (np.nanpercentile(energy, 75) - np.nanpercentile(energy, 25))
+            * len(energy) ** (-1 / 3)
         )
-        m = Minuit(cost_func, *par_guesses)
-        m.limits = bounds
-        for fix in fixed:
-            m.fixed[fix] = True
-
-        m.values["htail"] = 0
-        m.values["tau"] = 0
-        m.fixed["htail"] = True
-        m.fixed["tau"] = True
-        if simplex == True:
-            m.simplex().migrad()
-        else:
-            m.migrad()
+        init_hist, init_bins, _ = pgh.get_hist(
+            energy, dx=init_bin_width, range=fit_range
+        )
         try:
-            # set htail to guess
-            m.values["htail"] = par_guesses[3]
-            m.values["tau"] = par_guesses[4]
-            m.fixed = False
-            for fix in fixed:
-                m.fixed[fix] = True
+            _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+        except IndexError:
+            init_hist, init_bins, _ = pgh.get_hist(
+                energy, dx=init_bin_width / 2, range=fit_range
+            )
+            try:
+                _, init_sigma, _ = pgh.get_gaussian_guess(init_hist, init_bins)
+            except IndexError:
+                init_sigma = np.nanstd(energy)
+        bin_width = 2 * (init_sigma) * len(energy) ** (-1 / 3)
 
-            if simplex == True:
-                m.simplex().migrad()
+    gof_hist, gof_bins, gof_var = pgh.get_hist(energy, range=gof_range, dx=bin_width)
+
+    if guess is not None:
+        if not isinstance(guess, ValueView):
+            x0 = convert_to_minuit(guess, func)
+        if lock_guess is True:
+            x0 = guess
+            x0["x_lo"] = fit_range[0]
+            x0["x_hi"] = fit_range[1]
+        else:
+            x0["x_lo"] = fit_range[0]
+            x0["x_hi"] = fit_range[1]
+            x1 = guess_func(
+                energy,
+                func,
+                fit_range,
+                bin_width=bin_width,
+                **guess_kwargs if guess_kwargs is not None else {},
+            )
+            for arg, val in x1.items():
+                if arg not in x0:
+                    x0[arg] = val
+            if len(x0) == len(x1):
+                cs, _ = pgb.goodness_of_fit(
+                    gof_hist, gof_bins, None, func.pdf_norm, x0, method="Pearson"
+                )
+                cs2, _ = pgb.goodness_of_fit(
+                    gof_hist, gof_bins, None, func.pdf_norm, x1, method="Pearson"
+                )
+                if cs >= cs2:
+                    x0 = x1
             else:
-                m.migrad()
+                x0 = x1
+    else:
+        if func == pgf.hpge_peak:
+            x0_notail = guess_func(
+                energy,
+                pgf.gauss_on_step,
+                fit_range,
+                bin_width=bin_width,
+                **guess_kwargs if guess_kwargs is not None else {},
+            )
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.gauss_on_step.pdf_ext)
+            m = Minuit(c, *x0_notail)
+            bounds = bounds_func(
+                pgf.gauss_on_step,
+                x0_notail,
+                **bounds_kwargs if bounds_kwargs is not None else {},
+            )
+            for arg, val in bounds.items():
+                m.limits[arg] = val
+            fixed, mask = fixed_func(
+                pgf.gauss_on_step,
+                **fixed_kwargs if fixed_kwargs is not None else {},
+            )
+            m.fixed[fixed] = True
+            m.simplex().migrad()
             m.hesse()
-            pars_i = m.values
-            errs_i = m.errors
-            cov_i = m.covariance
-            valid_fit = m.valid
-            if valid_fit == False:
-                raise RuntimeError
-        except:
-            func_i = pgf.extended_gauss_step_pdf
-            gof_func_i = pgf.gauss_step_pdf
-            pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(
-                energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess
+            x0 = guess_func(
+                energy,
+                func,
+                fit_range,
+                bin_width=bin_width,
+                **guess_kwargs if guess_kwargs is not None else {},
+            )
+            if m.valid:
+                for arg in x0_notail.to_dict():
+                    x0[arg] = x0_notail[arg]
+
+        else:
+            x0 = guess_func(
+                energy,
+                func,
+                fit_range,
+                bin_width=bin_width,
+                **guess_kwargs if guess_kwargs is not None else {},
             )
 
-        # check htail
-        if (
-            m.values["htail"] < 0.01
-            or m.values["htail"] < 2 * m.errors["htail"]
-            or np.isnan(m.values).any()
-        ):  # switch to stat test
-            func_i = pgf.extended_gauss_step_pdf
-            gof_func_i = pgf.gauss_step_pdf
-            pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit = staged_fit(
-                energies, hist, bins, var, func_i, gof_func_i, simplex, mode_guess
-            )
+    if (func == pgf.hpge_peak) and allow_tail_drop is True:
+        fit_no_tail = unbinned_staged_energy_fit(
+            energy,
+            func=pgf.gauss_on_step,
+            gof_range=gof_range,
+            fit_range=fit_range,
+            guess=None,
+            guess_func=guess_func,
+            bounds_func=bounds_func,
+            fixed_func=fixed_func,
+            guess_kwargs=guess_kwargs,
+            bounds_kwargs=bounds_kwargs,
+            fixed_kwargs=fixed_kwargs,
+            tol=tol,
+            tail_weight=None,
+            allow_tail_drop=False,
+            bin_width=bin_width,
+        )
+
+        c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext) + TailPrior(
+            energy, func, tail_weight=tail_weight
+        )
+    else:
+        c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext)
+
+    fixed, mask = fixed_func(func, **fixed_kwargs if fixed_kwargs is not None else {})
+    bounds = bounds_func(func, x0, **bounds_kwargs if bounds_kwargs is not None else {})
+
+    # try without simplex
+    m = Minuit(c, *x0)
+    if tol is not None:
+        m.tol = tol
+    m.fixed[fixed] = True
+    for arg, val in bounds.items():
+        m.limits[arg] = val
+    m.migrad()
+    m.hesse()
+
+    valid1 = (
+        m.valid
+        & (~np.isnan(np.array(m.errors)[mask]).any())
+        & (~(np.array(m.errors)[mask] == 0).all())
+    )
+
+    cs = pgb.goodness_of_fit(
+        gof_hist,
+        gof_bins,
+        gof_var,
+        func.get_pdf,
+        m.values,
+        method="Pearson",
+        scale_bins=True,
+    )
+    cs = (cs[0], cs[1] + len(np.where(mask)[0]))
+
+    fit1 = (m.values, m.errors, m.covariance, cs, func, mask, valid1, m)
+
+    # Now try with simplex
+    m2 = Minuit(c, *x0)
+    if tol is not None:
+        m2.tol = tol
+    m2.fixed[fixed] = True
+    for arg, val in bounds.items():
+        m2.limits[arg] = val
+    m2.simplex().migrad()
+    m2.hesse()
+
+    valid2 = (
+        m2.valid
+        & (~np.isnan(np.array(m2.errors)[mask]).any())
+        & (~(np.array(m2.errors)[mask] == 0).all())
+    )
+
+    cs2 = pgb.goodness_of_fit(
+        gof_hist,
+        gof_bins,
+        gof_var,
+        func.get_pdf,
+        m2.values,
+        method="Pearson",
+        scale_bins=True,
+    )
+    cs2 = (cs2[0], cs2[1] + len(np.where(mask)[0]))
+
+    fit2 = (m2.values, m2.errors, m2.covariance, cs2, func, mask, valid2, m2)
+
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[mask] / np.array(m.values)[mask]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
+
+    if display > 1:
+        hist, bins, _ = pgh.get_hist(energy, range=fit_range, dx=bin_width)
+        bin_cs = (bins[:-1] + bins[1:]) / 2
+
+        m_fit = func.get_pdf(bin_cs, *m.values) * np.diff(bin_cs)[0]
+        m2_fit = func.get_pdf(bin_cs, *m2.values) * np.diff(bin_cs)[0]
+        guess_fit = func.get_pdf(bin_cs, *x0) * np.diff(bin_cs)[0]
+        plt.figure()
+        plt.step(bin_cs, hist, label="hist")
+        plt.plot(bin_cs, guess_fit, label="Guess")
+        plt.plot(bin_cs, m_fit, label=f"Fit 1: {cs}")
+        plt.plot(bin_cs, m2_fit, label=f"Fit 2: {cs2}")
+        plt.legend()
+        plt.show()
+
+    if valid1 is False and valid2 is False:
+        log.debug("Extra simplex needed")
+        m = Minuit(c, *x0)
+        if tol is not None:
+            m.tol = tol
+        m.fixed[fixed] = True
+        for arg, val in bounds.items():
+            m.limits[arg] = val
+        m.simplex().simplex().migrad()
+        m.hesse()
+        cs = pgb.goodness_of_fit(
+            gof_hist,
+            gof_bins,
+            gof_var,
+            func.get_pdf,
+            m.values,
+            method="Pearson",
+            scale_bins=True,
+        )
+        cs = (cs[0], cs[1] + len(np.where(mask)[0]))
+        valid3 = (
+            m.valid
+            & (~np.isnan(np.array(m.errors)[mask]).any())
+            & (~(np.array(m.errors)[mask] == 0).all())
+        )
+        if valid3 is False:
+            try:
+                m.minos()
+                valid3 = (
+                    m.valid
+                    & (~np.isnan(np.array(m.errors)[mask]).any())
+                    & (~(np.array(m.errors)[mask] == 0).all())
+                )
+            except Exception:
+                raise RuntimeError
+
+        fit = (m.values, m.errors, m.covariance, cs, func, mask, valid3, m)
+
+    elif valid2 is False:
+        fit = fit1
+
+    elif valid1 is False:
+        fit = fit2
+
+    elif cs[0] * 1.05 < cs2[0]:
+        fit = fit1
+
+    elif cs2[0] * 1.05 < cs[0]:
+        fit = fit2
+
+    elif frac_errors1 < frac_errors2:
+        fit = fit1
+
+    elif frac_errors1 > frac_errors2:
+        fit = fit2
 
     else:
-        cost_func = cost.ExtendedUnbinnedNLL(energies, func_i)
-        m = Minuit(cost_func, *par_guesses)
-        m.limits = bounds
-        for fix in fixed:
-            m.fixed[fix] = True
-        if simplex == True:
-            m.simplex().migrad()
-        else:
-            m.migrad()
+        raise RuntimeError
 
-        m.hesse()
+    if (func == pgf.hpge_peak) and allow_tail_drop is True:
+        p_val = chi2.sf(fit[3][0], fit[3][1])
+        p_val_no_tail = chi2.sf(fit_no_tail[3][0], fit_no_tail[3][1])
+        if fit[0]["htail"] < fit[1]["htail"] or p_val_no_tail > p_val:
+            debug_string = f'dropping tail tail val : {fit[0]["htail"]} tail err : {fit[1]["htail"]} '
+            debug_string += f"p_val no tail: : {p_val_no_tail} p_val with tail: {p_val}"
+            log.debug(debug_string)
 
-        pars_i = m.values
-        errs_i = m.errors
-        cov_i = m.covariance
-
-        valid_fit = m.valid
-
-    return pars_i, errs_i, cov_i, func_i, gof_func_i, mask, valid_fit
-
-
-def hpge_fit_E_peaks(
-    E_uncal,
-    mode_guesses,
-    wwidths,
-    n_bins=50,
-    funcs=pgf.gauss_step_cdf,
-    method="unbinned",
-    gof_funcs=None,
-    n_events=None,
-    allowed_p_val=0.05,
-    uncal_is_int=False,
-    simplex=False,
-    tail_weight=100,
-):
-    """Fit the Energy peaks specified using the function given
-
-    Parameters
-    ----------
-    E_uncal : array
-        unbinned energy data to be fit
-    mode_guesses : array
-        array of guesses for modes of each peak
-    wwidths : float or array of float
-        array of widths to use for the fit windows (in units of E_uncal),
-        typically on the order of 10 sigma where sigma is the peak width
-    n_bins : int or array of ints
-        array of number of bins to use for the fit window histogramming
-    funcs : function or array of functions
-        funcs to be used to fit each region
-    method : str
-        default is unbinned fit can specify to use binned fit method instead
-    gof_funcs : function or array of functions
-        functions to use for calculation goodness of fit if unspecified will use same func as fit
-    uncal_is_int : bool
-        if True, attempts will be made to avoid picket-fencing when binning
-        E_uncal
-    simplex : bool determining whether to do a round of simpson minimisation before gradient minimisation
-    n_events : int number of events to use for unbinned fit
-    allowed_p_val : lower limit on p_val of fit
-
-    Returns
-    -------
-    pars : list of array
-        a list of best-fit parameters for each peak fit
-    covs : list of 2D arrays
-        a list of covariance matrices for each pars
-    binwidths : list
-        a list of bin widths used for each peak fit
-    ranges: list of array
-        a list of [Euc_min, Euc_max] used for each peak fit
-    """
-    pars = np.zeros(len(mode_guesses), dtype="object")
-    errors = np.zeros(len(mode_guesses), dtype="object")
-    covs = np.zeros(len(mode_guesses), dtype="object")
-    binws = np.zeros(len(mode_guesses))
-    ranges = np.zeros(len(mode_guesses), dtype="object")
-    p_vals = np.zeros(len(mode_guesses))
-    valid_pks = np.zeros(len(mode_guesses), dtype=bool)
-    out_funcs = np.zeros(len(mode_guesses), dtype="object")
-
-    for i_peak, mode_guess in enumerate(mode_guesses):
-        # get args for this peak
-        wwidth_i = wwidths if not isinstance(wwidths, list) else wwidths[i_peak]
-        n_bins_i = n_bins if np.isscalar(n_bins) else n_bins[i_peak]
-        func_i = funcs[i_peak] if hasattr(funcs, "__len__") else funcs
-        wleft_i = wwidth_i / 2 if np.isscalar(wwidth_i) else wwidth_i[0]
-        wright_i = wwidth_i / 2 if np.isscalar(wwidth_i) else wwidth_i[1]
-        if gof_funcs is not None:
-            gof_func_i = (
-                gof_funcs[i_peak] if hasattr(gof_funcs, "__len__") else gof_funcs
-            )
-        else:
-            gof_func_i = func_i
-
-        try:
-            # bin a histogram
-            Euc_min = mode_guesses[i_peak] - wleft_i
-            Euc_max = mode_guesses[i_peak] + wright_i
-            if uncal_is_int == True:
-                Euc_min, Euc_max, n_bins_i = pgh.better_int_binning(
-                    x_lo=Euc_min, x_hi=Euc_max, n_bins=n_bins_i
+            if display > 0:
+                m_fit = pgf.gauss_on_step.get_pdf(bin_cs, *fit_no_tail[0])
+                m_fit_tail = pgf.hpge_peak.get_pdf(bin_cs, *fit[0])
+                plt.figure()
+                plt.step(bin_cs, hist, where="mid", label="hist")
+                plt.plot(
+                    bin_cs,
+                    m_fit * np.diff(bin_cs)[0],
+                    label=f"Drop tail: {p_val_no_tail}",
                 )
-
-            if method == "unbinned":
-                energies = E_uncal[(E_uncal > Euc_min) & (E_uncal < Euc_max)][:n_events]
-                hist, bins, var = pgh.get_hist(
-                    energies, bins=n_bins_i, range=(Euc_min, Euc_max)
+                plt.plot(
+                    bin_cs,
+                    m_fit_tail * np.diff(bin_cs)[0],
+                    label=f"Drop tail: {p_val}",
                 )
-                if func_i == pgf.extended_radford_pdf or pgf.extended_gauss_step_pdf:
-                    (
-                        pars_i,
-                        errs_i,
-                        cov_i,
-                        func_i,
-                        gof_func_i,
-                        mask,
-                        valid_fit,
-                    ) = staged_fit(
-                        energies,
-                        hist,
-                        bins,
-                        var,
-                        func_i,
-                        gof_func_i,
-                        simplex,
-                        mode_guess,
-                        tail_weight=tail_weight,
-                    )
-                    if pars_i["n_sig"] < 100:
-                        valid_fit = False
-                else:
-                    par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
-                    bounds = get_hpge_E_bounds(func_i, par_guesses)
-                    fixed, mask = get_hpge_E_fixed(func_i)
+                plt.legend()
+                plt.show()
 
-                    cost_func = cost.ExtendedUnbinnedNLL(energies, func_i)
-                    m = Minuit(cost_func, *par_guesses)
-                    m.limits = bounds
-                    for fix in fixed:
-                        m.fixed[fix] = True
-                    if simplex == True:
-                        m.simplex().migrad()
-                    else:
-                        m.migrad()
-                    m.hesse()
-
-                    pars_i = m.values
-                    errs_i = m.errors
-                    cov_i = m.covariance
-                    valid_fit = m.valid
-
-                csqr = pgf.goodness_of_fit(
-                    hist,
-                    bins,
-                    None,
-                    gof_func_i,
-                    pars_i,
-                    method="Pearson",
-                    scale_bins=True,
-                )
-
-            else:
-                hist, bins, var = pgh.get_hist(
-                    E_uncal, bins=n_bins_i, range=(Euc_min, Euc_max)
-                )
-                par_guesses = get_hpge_E_peak_par_guess(hist, bins, var, func_i)
-                bounds = get_hpge_E_bounds(func_i, par_guesses)
-                fixed, mask = get_hpge_E_fixed(func_i)
-                pars_i, errs_i, cov_i = pgf.fit_binned(
-                    func_i,
-                    hist,
-                    bins,
-                    var=var,
-                    guess=par_guesses,
-                    cost_func=method,
-                    Extended=True,
-                    fixed=fixed,
-                    simplex=simplex,
-                    bounds=bounds,
-                )
-                valid_fit = True
-
-                csqr = pgf.goodness_of_fit(
-                    hist,
-                    bins,
-                    None,
-                    gof_func_i,
-                    pars_i,
-                    method="Pearson",
-                    scale_bins=False,
-                )
-
-            if np.isnan(pars_i).any():
-                log.debug(
-                    f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, par is nan : {pars_i}"
-                )
-                raise RuntimeError
-
-            p_val = scipy.stats.chi2.sf(csqr[0], csqr[1] + len(np.where(mask)[0]))
-
-            total_events = pgf.get_total_events_func(func_i, pars_i, errors=errs_i)
-            if (
-                sum(sum(c) if c is not None else 0 for c in cov_i[mask, :][:, mask])
-                == np.inf
-                or sum(sum(c) if c is not None else 0 for c in cov_i[mask, :][:, mask])
-                == 0
-                or np.isnan(
-                    sum(sum(c) if c is not None else 0 for c in cov_i[mask, :][:, mask])
-                )
-            ):
-                log.debug(
-                    f"hpge_fit_E_peaks: cov estimation failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}"
-                )
-                valid_pks[i_peak] = False
-
-            elif valid_fit == False:
-                log.debug(
-                    f"hpge_fit_E_peaks: peak fitting failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}"
-                )
-                valid_pks[i_peak] = False
-
-            elif (
-                np.abs(np.array(errs_i)[mask] / np.array(pars_i)[mask]) < 1e-7
-            ).any() or np.isnan(np.array(errs_i)[mask]).any():
-                log.debug(
-                    f"hpge_fit_E_peaks: failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, parameter error too low"
-                )
-                valid_pks[i_peak] = False
-
-            elif np.abs(total_events[0] - np.sum(hist)) / np.sum(hist) > 0.1:
-                log.debug(
-                    f"hpge_fit_E_peaks: fit failed for i_peak={i_peak} at loc {mode_guesses[i_peak]:g}, total_events is outside limit"
-                )
-                valid_pks[i_peak] = False
-
-            elif p_val < allowed_p_val or np.isnan(p_val):
-                log.debug(
-                    f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, p-value too low: {p_val}"
-                )
-                valid_pks[i_peak] = False
-            else:
-                valid_pks[i_peak] = True
-
-        except:
-            log.debug(
-                f"hpge_fit_E_peaks: fit failed for i_peak={i_peak}, unknown error"
-            )
-            valid_pks[i_peak] = False
-            pars_i, errs_i, cov_i = return_nans(func_i)
-            p_val = 0
-
-        # get binning
-        binw_1 = (bins[-1] - bins[0]) / (len(bins) - 1)
-
-        pars[i_peak] = pars_i
-        errors[i_peak] = errs_i
-        covs[i_peak] = cov_i
-        binws[i_peak] = binw_1
-        ranges[i_peak] = [Euc_min, Euc_max]
-        p_vals[i_peak] = p_val
-        out_funcs[i_peak] = func_i
-
-    return (pars, errors, covs, binws, ranges, p_vals, valid_pks, out_funcs)
+            fit = fit_no_tail
+    return fit
 
 
 def poly_wrapper(x, *pars):
-    return pgf.poly(x, pars)
+    return pgf.nb_poly(x, np.array(pars))
 
 
-def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
+def hpge_fit_energy_scale(mus, mu_vars, energies_kev, deg=0, fixed=None):
     """Find best fit of poly(E) = mus +/- sqrt(mu_vars)
-    Compare to hpge_fit_E_cal_func which fits for E = poly(mu)
+    Compare to hpge_fit_energy_cal_func which fits for E = poly(mu)
 
     Parameters
     ----------
@@ -852,8 +2394,8 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
         uncalibrated energies
     mu_vars : array
         variances in the mus
-    Es_keV : array
-        energies to fit to, in keV
+    energies_kev : array
+        energies to fit to, in kev
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
         mu = scale * E. Otherwise deg follows the definition in np.polyfit
@@ -868,13 +2410,17 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
         covariance matrix for the best fit parameters.
     """
     if deg == 0:
-        scale, scale_cov = pgu.fit_simple_scaling(Es_keV, mus, var=mu_vars)
-        pars = np.array([scale, 0])
-        cov = np.array([[scale_cov, 0], [0, 0]])
+        scale, scale_cov = fit_simple_scaling(energies_kev, mus, var=mu_vars)
+        pars = np.array([0, scale])
+        cov = np.array([[0, 0], [0, scale_cov]])
         errs = np.diag(np.sqrt(cov))
     else:
-        poly_pars = np.polyfit(Es_keV, mus, deg=deg, w=1 / np.sqrt(mu_vars))
-        c = cost.LeastSquares(Es_keV, mus, np.sqrt(mu_vars), poly_wrapper)
+        poly_pars = (
+            Polynomial.fit(energies_kev, mus, deg=deg, w=1 / np.sqrt(mu_vars))
+            .convert()
+            .coef
+        )
+        c = cost.LeastSquares(energies_kev, mus, np.sqrt(mu_vars), poly_wrapper)
         if fixed is not None:
             for idx, val in fixed.items():
                 if val is True or val is None:
@@ -894,9 +2440,11 @@ def hpge_fit_E_scale(mus, mu_vars, Es_keV, deg=0, fixed=None):
     return pars, errs, cov
 
 
-def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
+def hpge_fit_energy_cal_func(
+    mus, mu_vars, energies_kev, energy_scale_pars, deg=0, fixed=None
+):
     """Find best fit of E = poly(mus +/- sqrt(mu_vars))
-    This is an inversion of hpge_fit_E_scale.
+    This is an inversion of hpge_fit_energy_scale.
     E uncertainties are computed from mu_vars / dmu/dE where mu = poly(E) is the
     E_scale function
 
@@ -906,10 +2454,10 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
         uncalibrated energies
     mu_vars : array
         variances in the mus
-    Es_keV : array
-        energies to fit to, in keV
-    E_scale_pars : array
-        Parameters from the escale fit (keV to ADC) used for calculating
+    energies_kev : array
+        energies to fit to, in kev
+    energy_scale_pars : array
+        Parameters from the escale fit (kev to ADC) used for calculating
         uncertainties
     deg : int
         degree for energy scale fit. deg=0 corresponds to a simple scaling
@@ -926,24 +2474,26 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
         covariance matrix for the best fit parameters.
     """
     if deg == 0:
-        E_vars = mu_vars / E_scale_pars[0] ** 2
-        scale, scale_cov = pgu.fit_simple_scaling(mus, Es_keV, var=E_vars)
-        pars = np.array([scale, 0])
-        cov = np.array([[scale_cov, 0], [0, 0]])
+        e_vars = mu_vars / energy_scale_pars[1] ** 2
+        scale, scale_cov = fit_simple_scaling(mus, energies_kev, var=e_vars)
+        pars = np.array([0, scale])
+        cov = np.array([[0, 0], [0, scale_cov]])
         errs = np.diag(np.sqrt(cov))
     else:
-        dmudEs = np.zeros(len(mus))
-        for n in range(len(E_scale_pars) - 1):
-            dmudEs += E_scale_pars[n] * mus ** (len(E_scale_pars) - 2 - n)
-        E_weights = dmudEs * mu_vars
-        poly_pars = np.polyfit(mus, Es_keV, deg=deg, w=1 / E_weights)
+        d_mu_d_es = np.zeros(len(mus))
+        for n in range(len(energy_scale_pars) - 1):
+            d_mu_d_es += energy_scale_pars[n + 1] * mus ** (n + 1)
+        e_weights = np.sqrt(d_mu_d_es * mu_vars)
+        poly_pars = (
+            Polynomial.fit(mus, energies_kev, deg=deg, w=1 / e_weights).convert().coef
+        )
         if fixed is not None:
             for idx, val in fixed.items():
                 if val is True or val is None:
                     pass
                 else:
                     poly_pars[idx] = val
-        c = cost.LeastSquares(mus, Es_keV, E_weights, poly_wrapper)
+        c = cost.LeastSquares(mus, energies_kev, e_weights, poly_wrapper)
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
@@ -957,322 +2507,7 @@ def hpge_fit_E_cal_func(mus, mu_vars, Es_keV, E_scale_pars, deg=0, fixed=None):
     return pars, errs, cov
 
 
-def hpge_E_calibration(
-    E_uncal,
-    peaks_keV,
-    guess_keV,
-    deg=0,
-    uncal_is_int=False,
-    range_keV=None,
-    funcs=pgf.gauss_step_cdf,
-    gof_funcs=None,
-    method="unbinned",
-    gof_func=None,
-    n_events=None,
-    simplex=False,
-    allowed_p_val=0.05,
-    tail_weight=100,
-    verbose=True,
-):
-    """Calibrate HPGe data to a set of known peaks
-
-    Parameters
-    ----------
-    E_uncal : array
-        unbinned energy data to be calibrated
-    peaks_keV : array
-        list of peak energies to be fit to. Each must be in the data
-    guess_keV : float
-        a rough initial guess at the conversion factor from E_uncal to keV. Must
-        be positive
-    deg : non-negative int
-        degree of the polynomial for the E_cal function E_keV = poly(E_uncal).
-        deg = 0 corresponds to a simple scaling E_keV = scale * E_uncal.
-        Otherwise follows the convention in np.polyfit
-    uncal_is_int : bool
-        if True, attempts will be made to avoid picket-fencing when binning
-        E_uncal
-    range_keV : float, tuple, array of floats, or array of tuples of floats
-        ranges around which the peak fitting is performed
-        if tuple(s) are supplied, they provide the left and right ranges
-    funcs
-        DOCME
-    gof_funcs : function or array of functions
-        functions to use for calculation goodness of fit if unspecified will use same func as fit
-    method : str
-        default is unbinned fit can specify to use binned fit method instead
-    gof_func
-        DOCME
-    n_events : int
-        number of events to use for unbinned fit
-    simplex : bool
-        DOCME
-    allowed_p_val
-        lower limit on p_val of fit
-    verbose : bool
-        print debug statements
-
-    Returns
-    -------
-    pars, cov : array, 2D array
-        array of calibration function parameters and their covariances. The form
-        of the function is E_keV = poly(E_uncal). Assumes poly() is
-        overwhelmingly dominated by the linear term. pars follows convention in
-        np.polyfit unless deg=0, in which case it is the (lone) scale factor
-    results : dict with the following elements
-        'detected_peaks_locs', 'detected_peaks_keV' : array, array
-            array of rough uncalibrated/calibrated energies at which the fit peaks were
-            found in the initial peak search
-        'pt_pars', 'pt_cov' : list of (array), list of (2D array)
-            arrays of gaussian parameters / covariances fit to the peak tops in
-            the first refinement
-        'pt_cal_pars', 'pt_cal_cov' : array, 2D array
-            array of calibration parameters E_uncal = poly(E_keV) for fit to
-            means of gausses fit to tops of each peak
-        'pk_pars', 'pk_cov', 'pk_binws', 'pk_ranges' : list of (array), list of (2D array), list, list of (array)
-            the best fit parameters, covariances, bin width and energy range for the local fit to each peak
-        'pk_cal_pars', 'pk_cal_cov' : array, 2D array
-            array of calibration parameters E_uncal = poly(E_keV) for fit to
-            means from full peak fits
-        'fwhms', 'dfwhms' : array, array
-            the numeric fwhms and their uncertainties for each peak.
-    """
-    results = {}
-
-    if not isinstance(range_keV, list):
-        range_keV = [range_keV for peak in peaks_keV]
-
-    if not hasattr(funcs, "__len__"):
-        funcs = [funcs for peak in peaks_keV]
-
-    # sanity checks
-    E_uncal = np.asarray(E_uncal)
-    peaks_keV = np.asarray(peaks_keV)  # peaks_keV = np.sort(peaks_keV)
-    deg = int(deg)
-    if guess_keV <= 0:
-        log.error(f"hpge_E_cal warning: invalid guess_keV = {guess_keV}")
-        return None, None, results
-    if deg < 0:
-        log.error(f"hpge_E_cal warning: invalid deg = {deg}")
-        return None, None, results
-
-    # bin the histogram in ~1 keV bins for the initial rough peak search
-    Euc_min = peaks_keV[0] / guess_keV * 0.6
-    Euc_max = peaks_keV[-1] / guess_keV * 1.1
-    dEuc = 1 / guess_keV
-    if uncal_is_int:
-        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
-            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
-        )
-    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
-
-    # Run the initial rough peak search
-    detected_peaks_locs, detected_peaks_keV, roughpars = hpge_find_E_peaks(
-        hist, bins, var, peaks_keV, n_sigma=5, deg=deg
-    )
-    log.info(f"{len(detected_peaks_locs)} peaks found:")
-    log.info(f"\t   Energy   | Position  ")
-    for i, (Li, Ei) in enumerate(zip(detected_peaks_locs, detected_peaks_keV)):
-        log.info(f"\t{i}".ljust(4) + str(Ei).ljust(9) + f"| {Li:g}".ljust(5))
-
-    # re-bin the histogram in ~0.2 keV bins with updated E scale par for peak-top fits
-    Euc_min, Euc_max = (
-        (np.poly1d(roughpars) - i).roots
-        for i in (peaks_keV[0] * 0.9, peaks_keV[-1] * 1.1)
-    )
-    Euc_min = Euc_min[np.logical_and(Euc_min >= 0, Euc_min <= max(Euc_max))][0]
-    Euc_max = Euc_max[
-        np.logical_and(Euc_max >= Euc_min, Euc_max <= np.nanmax(E_uncal) * 1.1)
-    ][0]
-    dEuc = 0.2 / roughpars[-2]
-
-    if uncal_is_int:
-        Euc_min, Euc_max, dEuc = pgh.better_int_binning(
-            x_lo=Euc_min, x_hi=Euc_max, dx=dEuc
-        )
-    hist, bins, var = pgh.get_hist(E_uncal, range=(Euc_min, Euc_max), dx=dEuc)
-
-    # run peak getter after rebinning
-    got_peaks_locs, got_peaks_keV, roughpars = hpge_get_E_peaks(
-        hist, bins, var, roughpars, peaks_keV, n_sigma=3
-    )
-    results["got_peaks_locs"] = got_peaks_locs
-    results["got_peaks_keV"] = got_peaks_keV
-
-    log.info(f"{len(got_peaks_locs)} peaks obtained:")
-    log.info(f"\t   Energy   | Position  ")
-    for i, (Li, Ei) in enumerate(zip(got_peaks_locs, got_peaks_keV)):
-        log.info(f"\t{i}".ljust(4) + str(Ei).ljust(9) + f"| {Li:g}".ljust(5))
-
-    # Drop non-gotten peaks
-    idx = [i for i, E in enumerate(peaks_keV) if E in got_peaks_keV]
-    range_keV = [range_keV[i] for i in idx]
-    funcs = [funcs[i] for i in idx]
-    gof_funcs = [gof_funcs[i] for i in idx]
-
-    # Drop peaks to not be fitted
-    tmp = zip(
-        *[
-            a
-            for a in zip(got_peaks_locs, got_peaks_keV, range_keV, funcs)
-            if a[2] and a[3]
-        ]
-    )
-    got_peaks_locs, got_peaks_keV, range_keV, funcs = list(map(list, tmp))
-    got_peaks_locs = np.asarray(got_peaks_locs)
-    got_peaks_keV = np.asarray(got_peaks_keV)
-
-    # Now do a series of full fits to the peak shapes
-
-    # First calculate range around peaks to fit
-    if range_keV is None:
-        # Need to do initial fit
-        pt_pars, pt_covs = hpge_fit_E_peak_tops(
-            hist, bins, var, got_peaks_locs, n_to_fit=7
-        )
-        # Drop failed fits
-        fitidx = [i is not None for i in pt_pars]
-        results["got_peaks_locs"] = got_peaks_locs = got_peaks_locs[fitidx]
-        results["got_peaks_keV"] = got_peaks_keV = got_peaks_keV[fitidx]
-        pt_pars = np.asarray(pt_pars)[fitidx]
-        pt_covs = np.asarray(pt_covs)[fitidx]
-        range_uncal = np.stack(pt_pars)[:, 1].astype(float) * 20
-        n_bins = 50
-    elif np.isscalar(range_keV):
-        derco = np.polyder(np.poly1d(roughpars)).coefficients
-        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
-        range_uncal = [float(range_keV) / d for d in der]
-        n_bins = [int(range_keV / 0.5 / d) for d in der]
-    elif isinstance(range_keV, tuple):
-        rangeleft_keV, rangeright_keV = range_keV
-        derco = np.polyder(np.poly1d(roughpars)).coefficients
-        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
-        range_uncal = [(rangeleft_keV / d, rangeright_keV / d) for d in der]
-        n_bins = [int(sum(range_keV) / 0.5 / d) for d in der]
-    elif isinstance(range_keV, list):
-        derco = np.polyder(np.poly1d(roughpars)).coefficients
-        der = [pgf.poly(Ei, derco) for Ei in got_peaks_keV]
-        range_uncal = [
-            (r[0] / d, r[1] / d) if isinstance(r, tuple) else r / d
-            for r, d in zip(range_keV, der)
-        ]
-        n_bins = [
-            int(sum(r) / 0.5 / d) if isinstance(r, tuple) else int(r / 0.2 / d)
-            for r, d in zip(range_keV, der)
-        ]
-
-    (
-        pk_pars,
-        pk_errors,
-        pk_covs,
-        pk_binws,
-        pk_ranges,
-        pk_pvals,
-        valid_pks,
-        pk_funcs,
-    ) = hpge_fit_E_peaks(
-        E_uncal,
-        got_peaks_locs,
-        range_uncal,
-        n_bins=n_bins,
-        funcs=funcs,
-        method=method,
-        gof_funcs=gof_funcs,
-        n_events=n_events,
-        uncal_is_int=False,
-        simplex=simplex,
-        allowed_p_val=allowed_p_val,
-        tail_weight=tail_weight,
-    )
-    results["pk_pars"] = pk_pars
-    results["pk_errors"] = pk_errors
-    results["pk_covs"] = pk_covs
-    results["pk_binws"] = pk_binws
-    results["pk_ranges"] = pk_ranges
-    results["pk_pvals"] = pk_pvals
-    results["pk_validities"] = valid_pks
-    results["pk_funcs"] = pk_funcs
-    # Drop failed fits
-    fitidx = [i == True for i in valid_pks]
-    fitted_peaks_keV = results["fitted_keV"] = got_peaks_keV[fitidx]
-    funcs = [f for i, f in zip(fitidx, funcs) if i]
-    pk_pars = np.asarray(pk_pars, dtype=object)[fitidx]  # ragged
-    pk_errors = np.asarray(pk_errors, dtype=object)[fitidx]
-    pk_covs = np.asarray(pk_covs, dtype=object)[fitidx]
-    pk_binws = np.asarray(pk_binws)[fitidx]
-    pk_ranges = np.asarray(pk_ranges)[fitidx]
-    pk_pvals = np.asarray(pk_pvals)[fitidx]
-    pk_funcs = np.asarray(pk_funcs)[fitidx]
-    log.info(f"{sum(fitidx)} peaks fitted:")
-    for i, (Ei, parsi, errorsi, covsi, func_i) in enumerate(
-        zip(fitted_peaks_keV, pk_pars, pk_errors, pk_covs, pk_funcs)
-    ):
-        varnames = func_i.__code__.co_varnames[1 : len(pk_pars[-1]) + 1]
-        parsi = np.asarray(parsi, dtype=float)
-        errorsi = np.asarray(errorsi, dtype=float)
-        covsi = np.asarray(covsi, dtype=float)
-        # parsigsi = np.sqrt(covsi.diagonal())
-        log.info(f"\tEnergy: {str(Ei)}")
-        log.info(f"\t\tParameter  |    Value +/- Sigma  ")
-        for vari, pari, errorsi in zip(varnames, parsi, errorsi):
-            log.info(
-                f'\t\t{str(vari).ljust(10)} | {("%4.2f" % pari).rjust(8)} +/- {("%4.2f" % errorsi).ljust(8)}'
-            )
-            # fwhm??
-
-    # Do a second calibration to the results of the full peak fits
-    mus = [
-        pgf.get_mu_func(func_i, pars_i, errors=errors_i)
-        for func_i, pars_i, errors_i in zip(pk_funcs, pk_pars, pk_errors)
-    ]
-    mus, mu_vars = zip(*mus)
-    mus = np.asarray(mus)
-    mu_vars = np.asarray(mu_vars) ** 2
-
-    try:
-        pars, errs, cov = hpge_fit_E_scale(mus, mu_vars, fitted_peaks_keV, deg=deg)
-        results["pk_cal_pars"] = pars
-        results["pk_cal_errs"] = errs
-        results["pk_cal_cov"] = cov
-    except ValueError:
-        log.error("Failed to fit enough peaks to get accurate calibration")
-        return None, None, None, results
-
-    # Invert the E scale fit to get a calibration function
-    pars, errs, cov = hpge_fit_E_cal_func(mus, mu_vars, fitted_peaks_keV, pars, deg=deg)
-
-    # Finally, calculate fwhms in keV
-    uncal_fwhms = [
-        pgf.get_fwhm_func(func_i, pars_i, cov=covs_i)
-        for func_i, pars_i, covs_i in zip(pk_funcs, pk_pars, pk_covs)
-    ]
-    uncal_fwhms, uncal_fwhm_errs = zip(*uncal_fwhms)
-    uncal_fwhms = np.asarray(uncal_fwhms)
-    uncal_fwhm_errs = np.asarray(uncal_fwhm_errs)
-    derco = np.polyder(np.poly1d(pars)).coefficients
-    der = [pgf.poly(Ei, derco) for Ei in fitted_peaks_keV]
-
-    cal_fwhms = uncal_fwhms * der
-    cal_fwhms_errs = uncal_fwhm_errs * der
-    results["pk_fwhms"] = np.asarray(
-        [(u * d, e * d) for u, e, d in zip(uncal_fwhms, uncal_fwhm_errs, der)]
-    )
-
-    log.info(f"{len(cal_fwhms)} FWHMs found:")
-    log.info(f"\t   Energy   | FWHM  ")
-    for i, (Ei, fwhm, fwhme) in enumerate(
-        zip(fitted_peaks_keV, cal_fwhms, cal_fwhms_errs)
-    ):
-        log.info(
-            f"\t{i}".ljust(4)
-            + str(Ei).ljust(9)
-            + f"| {fwhm:.2f}+-{fwhme:.2f} keV".ljust(5)
-        )
-
-    return pars, cov, results
-
-
-def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
+def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
     """Find the polynomial function best matching pol(xx) = yy
 
     Finds the poly fit of xx to yy that obtains the most matches between pol(xx)
@@ -1343,20 +2578,31 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
 
         # simple shift
         if deg == -1:
-            pars_i = np.array([1, (np.sum(yy_i) - np.sum(xx_i)) / len(yy_i)])
-            polxx = xx_i + pars_i[1]
+            pars_i = np.array([(np.sum(yy_i) - np.sum(xx_i)) / len(yy_i), 1])
+            polxx = xx_i + pars_i[0]
 
         # simple scaling
         elif deg == 0:
-            pars_i = np.array([np.sum(yy_i * xx_i) / np.sum(xx_i * xx_i), 0])
-            polxx = pars_i[0] * xx_i
+            pars_i = np.array([0, np.sum(yy_i * xx_i) / np.sum(xx_i * xx_i)])
+            polxx = pars_i[1] * xx_i
 
         # generic poly of degree >= 1
         else:
-            pars_i = np.polyfit(xx_i, yy_i, deg)
+            poly_pars = Polynomial.fit(xx_i, yy_i, deg=deg).convert().coef
+            c = cost.LeastSquares(xx_i, yy_i, np.full_like(yy_i, 1), poly_wrapper)
+            if fixed is not None:
+                for idx, val in fixed.items():
+                    if val is True or val is None:
+                        pass
+                    else:
+                        poly_pars[idx] = val
+            m = Minuit(c, *poly_pars)
+            if fixed is not None:
+                for idx in list(fixed):
+                    m.fixed[idx] = True
+            pars_i = np.array(m.values)
             polxx = np.zeros(len(yy_i))
-            xxn = np.ones(len(yy_i))
-            polxx = pgf.poly(xx_i, pars_i)
+            polxx = pgf.nb_poly(xx_i, pars_i)
 
         # by here we have the best polxx. Search for matches and store pars_i if
         # its the best so far
@@ -1418,371 +2664,3 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8):
         gof = np.inf
 
     return pars, best_ixtup, best_iytup
-
-
-def get_i_local_extrema(data, delta):
-    """Get lists of indices of the local maxima and minima of data
-
-    The "local" extrema are those maxima / minima that have heights / depths of
-    at least delta.
-    Converted from MATLAB script at: http://billauer.co.il/peakdet.html
-
-    Parameters
-    ----------
-    data : array-like
-        the array of data within which extrema will be found
-    delta : scalar
-        the absolute level by which data must vary (in one direction) about an
-        extremum in order for it to be tagged
-
-    Returns
-    -------
-    imaxes, imins : 2-tuple ( array, array )
-        A 2-tuple containing arrays of variable length that hold the indices of
-        the identified local maxima (first tuple element) and minima (second
-        tuple element)
-    """
-
-    # prepare output
-    imaxes, imins = [], []
-
-    # sanity checks
-    data = np.asarray(data)
-    if not np.isscalar(delta):
-        log.error("get_i_local_extrema: Input argument delta must be a scalar")
-        return np.array(imaxes), np.array(imins)
-    if delta <= 0:
-        log.error(f"get_i_local_extrema: delta ({delta}) must be positive")
-        return np.array(imaxes), np.array(imins)
-
-    # now loop over data
-    imax, imin = 0, 0
-    find_max = True
-    for i in range(len(data)):
-        if data[i] > data[imax]:
-            imax = i
-        if data[i] < data[imin]:
-            imin = i
-
-        if find_max:
-            # if the sample is less than the current max by more than delta,
-            # declare the previous one a maximum, then set this as the new "min"
-            if data[i] < data[imax] - delta:
-                imaxes.append(imax)
-                imin = i
-                find_max = False
-        else:
-            # if the sample is more than the current min by more than delta,
-            # declare the previous one a minimum, then set this as the new "max"
-            if data[i] > data[imin] + delta:
-                imins.append(imin)
-                imax = i
-                find_max = True
-
-    return np.array(imaxes), np.array(imins)
-
-
-def get_i_local_maxima(data, delta):
-    return get_i_local_extrema(data, delta)[0]
-
-
-def get_i_local_minima(data, delta):
-    return get_i_local_extrema(data, delta)[1]
-
-
-def get_most_prominent_peaks(
-    energySeries, xlo, xhi, xpb, max_num_peaks=np.inf, test=False
-):
-    """find the most prominent peaks in a spectrum by looking for spikes in
-    derivative of spectrum energySeries: array of measured energies
-    max_num_peaks = maximum number of most prominent peaks to find return a
-    histogram around the most prominent peak in a spectrum of a given
-    percentage of width
-    """
-    nb = int((xhi - xlo) / xpb)
-    hist, bin_edges = np.histogram(energySeries, range=(xlo, xhi), bins=nb)
-    bin_centers = pgh.get_bin_centers(bin_edges)
-
-    # median filter along the spectrum, do this as a "baseline subtraction"
-    hist_med = medfilt(hist, 21)
-    hist = hist - hist_med
-
-    # identify peaks with a scipy function (could be improved ...)
-    peak_idxs = find_peaks_cwt(hist, np.arange(1, 6, 0.1), min_snr=5)
-    peak_energies = bin_centers[peak_idxs]
-
-    # pick the num_peaks most prominent peaks
-    if max_num_peaks < len(peak_energies):
-        peak_vals = hist[peak_idxs]
-        sort_idxs = np.argsort(peak_vals)
-        peak_idxs_max = peak_idxs[sort_idxs[-max_num_peaks:]]
-        peak_energies = np.sort(bin_centers[peak_idxs_max])
-
-    if test:
-        plt.plot(bin_centers, hist, ls="steps", lw=1, c="b")
-        for e in peak_energies:
-            plt.axvline(e, color="r", lw=1, alpha=0.6)
-        plt.xlabel("Energy [uncal]", ha="right", x=1)
-        plt.ylabel("Filtered Spectrum", ha="right", y=1)
-        plt.tight_layout()
-        plt.show()
-        exit()
-
-    return peak_energies
-
-
-def match_peaks(data_pks, cal_pks):
-    """
-    Match uncalibrated peaks with literature energy values.
-    """
-    from itertools import combinations
-
-    from scipy.stats import linregress
-
-    n_pks = len(cal_pks) if len(cal_pks) < len(data_pks) else len(data_pks)
-
-    cal_sets = combinations(range(len(cal_pks)), n_pks)
-    data_sets = combinations(range(len(data_pks)), n_pks)
-
-    best_err, best_m, best_b = np.inf, None, None
-    for i, cal_set in enumerate(cal_sets):
-        cal = cal_pks[list(cal_set)]  # lit energies for this set
-
-        for data_set in data_sets:
-            data = data_pks[list(data_set)]  # uncal energies for this set
-
-            m, b, _, _, _ = linregress(data, y=cal)
-            err = np.sum((cal - (m * data + b)) ** 2)
-
-            if err < best_err:
-                best_err, best_m, best_b = err, m, b
-
-    print(i, best_err)
-    print("cal:", cal)
-    print("data:", data)
-    plt.scatter(data, cal, label=f"min.err:{err:.2e}")
-    xs = np.linspace(data[0], data[-1], 10)
-    plt.plot(
-        xs, best_m * xs + best_b, c="r", label=f"y = {best_m:.2f} x + {best_b:.2f}"
-    )
-    plt.xlabel("Energy (uncal)", ha="right", x=1)
-    plt.ylabel("Energy (keV)", ha="right", y=1)
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
-    exit()
-
-    return best_m, best_b
-
-
-def calibrate_tl208(energy_series, cal_peaks=None, plotFigure=None):
-    """
-    energy_series: array of energies we want to calibrate
-    cal_peaks: array of peaks to fit
-    1.) we find the 2614 peak by looking for the tallest peak at >0.1 the max adc value
-    2.) fit that peak to get a rough guess at a calibration to find other peaks with
-    3.) fit each peak in peak_energies
-    4.) do a linear fit to the peak centroids to find a calibration
-    """
-
-    if cal_peaks is None:
-        cal_peaks = np.array(
-            [238.632, 510.770, 583.191, 727.330, 860.564, 2614.553]
-        )  # get_calibration_energies(peak_energies)
-    else:
-        cal_peaks = np.array(cal_peaks)
-
-    if len(energy_series) < 100:
-        return 1, 0
-
-    # get 10 most prominent ~high e peaks
-    max_adc = np.amax(energy_series)
-    energy_hi = energy_series  # [ (energy_series > np.percentile(energy_series, 20)) & (energy_series < np.percentile(energy_series, 99.9))]
-
-    peak_energies, peak_e_err = get_most_prominent_peaks(
-        energy_hi,
-    )
-    rough_kev_per_adc, rough_kev_offset = match_peaks(peak_energies, cal_peaks)
-    e_cal_rough = rough_kev_per_adc * energy_series + rough_kev_offset
-
-    # return rough_kev_per_adc, rough_kev_offset
-    # print(energy_series)
-    # plt.ion()
-    # plt.figure()
-    # # for peak in cal_peaks:
-    # #     plt.axvline(peak, c="r", ls=":")
-    # # energy_series.hist()
-    # # for peak in peak_energies:
-    # #      plt.axvline(peak, c="r", ls=":")
-    # #
-    # plt.hist(energy_series)
-    # # plt.hist(e_cal_rough[e_cal_rough>100], bins=2700)
-    # val = input("do i exist?")
-    # exit()
-
-    ###############################################
-    # Do a real fit to every peak in peak_energies
-    ###############################################
-    max_adc = np.amax(energy_series)
-
-    peak_num = len(cal_peaks)
-    centers = np.zeros(peak_num)
-    fit_result_map = {}
-    bin_size = 0.2  # keV
-
-    if plotFigure is not None:
-        plot_map = {}
-
-    for i, energy in enumerate(cal_peaks):
-        window_width = 10  # keV
-        window_width_in_adc = (window_width) / rough_kev_per_adc
-        energy_in_adc = (energy - rough_kev_offset) / rough_kev_per_adc
-        bin_size_adc = (bin_size) / rough_kev_per_adc
-
-        peak_vals = energy_series[
-            (energy_series > energy_in_adc - window_width_in_adc)
-            & (energy_series < energy_in_adc + window_width_in_adc)
-        ]
-
-        peak_hist, bins = np.histogram(
-            peak_vals,
-            bins=np.arange(
-                energy_in_adc - window_width_in_adc,
-                energy_in_adc + window_width_in_adc + bin_size_adc,
-                bin_size_adc,
-            ),
-        )
-        bin_centers = pgh.get_bin_centers(bins)
-        # plt.ion()
-        # plt.figure()
-        # plt.plot(bin_centers,peak_hist,  color="k", ls="steps")
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        try:
-            guess_e, guess_sigma, guess_area = get_gaussian_guess(
-                peak_hist, bin_centers
-            )
-        except IndexError:
-            print(f"\n\nIt looks like there may not be a peak at {energy} keV")
-            print("Here is a plot of the area I'm searching for a peak...")
-            plt.ion()
-            plt.figure(figsize=(12, 6))
-            plt.subplot(121)
-            plt.plot(bin_centers, peak_hist, color="k", ls="steps")
-            plt.subplot(122)
-            plt.hist(e_cal_rough, bins=2700, histtype="step")
-            input("-->press any key to continue...")
-            sys.exit()
-
-        plt.plot(
-            bin_centers, gauss(bin_centers, guess_e, guess_sigma, guess_area), color="b"
-        )
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        bounds = (
-            [0.9 * guess_e, 0.5 * guess_sigma, 0, 0, 0, 0, 0],
-            [
-                1.1 * guess_e,
-                2 * guess_sigma,
-                0.1,
-                0.75,
-                window_width_in_adc,
-                10,
-                5 * guess_area,
-            ],
-        )
-        params = fit_binned(
-            radford_peak,
-            peak_hist,
-            bin_centers,
-            [guess_e, guess_sigma, 1e-3, 0.7, 5, 0, guess_area],
-        )  # bounds=bounds)
-
-        plt.plot(bin_centers, radford_peak(bin_centers, *params), color="r")
-
-        # inp = input("q to quit...")
-        # if inp == "q": exit()
-
-        fit_result_map[energy] = params
-        centers[i] = params[0]
-
-        if plotFigure is not None:
-            plot_map[energy] = (bin_centers, peak_hist)
-
-    # Do a linear fit to find the calibration
-    linear_cal = np.polyfit(centers, cal_peaks, deg=1)
-
-    if plotFigure is not None:
-        plt.figure(plotFigure.number)
-        plt.clf()
-
-        grid = gs.GridSpec(peak_num, 3)
-        ax_line = plt.subplot(grid[:, 1])
-        ax_spec = plt.subplot(grid[:, 2])
-
-        for i, energy in enumerate(cal_peaks):
-            ax_peak = plt.subplot(grid[i, 0])
-            bin_centers, peak_hist = plot_map[energy]
-            params = fit_result_map[energy]
-            ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset,
-                peak_hist,
-                ls="steps-mid",
-                color="k",
-            )
-            fit = radford_peak(bin_centers, *params)
-            ax_peak.plot(
-                bin_centers * rough_kev_per_adc + rough_kev_offset, fit, color="b"
-            )
-
-        ax_peak.set_xlabel("Energy [keV]")
-
-        ax_line.scatter(
-            centers,
-            cal_peaks,
-        )
-
-        x = np.arange(0, max_adc, 1)
-        ax_line.plot(x, linear_cal[0] * x + linear_cal[1])
-        ax_line.set_xlabel("ADC")
-        ax_line.set_ylabel("Energy [keV]")
-
-        energies_cal = energy_series * linear_cal[0] + linear_cal[1]
-        peak_hist, bins = np.histogram(energies_cal, bins=np.arange(0, 2700))
-        ax_spec.semilogy(pgh.get_bin_centers(bins), peak_hist, ls="steps-mid")
-        ax_spec.set_xlabel("Energy [keV]")
-
-    return linear_cal
-
-
-def get_calibration_energies(cal_type):
-    if cal_type == "th228":
-        return np.array(
-            [
-                238,
-                277,
-                300,
-                452,
-                510.77,
-                583.191,
-                727,
-                763,
-                785,
-                860.564,
-                1620,
-                2614.533,
-            ],
-            dtype="double",
-        )
-
-    elif cal_type == "uwmjlab":
-        # return np.array([239, 295, 351, 510, 583, 609, 911, 969, 1120,
-        #                  1258, 1378, 1401, 1460, 1588, 1764, 2204, 2615],
-        #                 dtype="double")
-        return np.array([239, 911, 1460, 1764, 2615], dtype="double")
-    else:
-        raise ValueError

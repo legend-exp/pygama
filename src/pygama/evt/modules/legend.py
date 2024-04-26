@@ -1,6 +1,7 @@
 """
 Module provides LEGEND internal functions
 """
+
 from importlib import import_module
 
 from lgdo.lh5 import utils
