@@ -153,15 +153,19 @@ def get_mode_stdev(par_array):
 
             counts, bins, var = pgh.get_hist(
                 par_array,
-                dx=np.nanpercentile(par_array, 51) - np.nanpercentile(par_array, 50),
+                dx=np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50),
                 range=(lower_bound, upper_bound),
             )
 
             bin_centres = pgh.get_bin_centers(bins)
 
-            fwhm = pgh.get_fwhm(counts, bins)[0]
-            mean = float(bin_centres[np.argmax(counts)])
-            std = fwhm / 2.355
+            try:
+                fwhm = pgh.get_fwhm(counts, bins)[0]
+                mean = float(bin_centres[np.argmax(counts)])
+                std = fwhm / 2.355
+            except Exception:
+                mean = float(bin_centres[np.argmax(counts)])
+                std = np.nanstd(par_array)
     return mean, std
 
 
