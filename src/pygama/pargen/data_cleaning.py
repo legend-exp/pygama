@@ -376,36 +376,44 @@ def generate_cuts(
         data to calculate cuts on
     parameters : dict
         dictionary of the form:
-        {
-            "output_parameter_name": {
-                "cut_parameter": "parameter_to_cut_on",
-                "cut_level": number_of_sigmas,
-                "mode": "inclusive" or "exclusive"
+        .. code-block:: json
+        
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": number_of_sigmas,
+                    "mode": "inclusive" or "exclusive"
+                }
             }
-        }
         number of sigmas can instead be a dictionary to specify different cut levels for low and high side
         or to only have a one sided cut only specify one of the low or high side
         e.g.
-        {
-            "output_parameter_name": {
-                "cut_parameter": "parameter_to_cut_on",
-                "cut_level": {"low_side": 3, "high_side": 2},
-                "mode": "inclusive" or "exclusive"
+        .. code-block:: json
+        
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": {"low_side": 3, "high_side": 2},
+                    "mode": "inclusive" or "exclusive"
+                }
             }
-        }
         alternatively can specify hit dict fields to just copy dict into output dict e.g.
-        {
-            "is_valid_t0":{
-                "expression":"(tp_0_est>a)&(tp_0_est<b)",
-                "parameters":{"a":46000, "b":52000}
+        .. code-block:: json
+        
+            {
+                "is_valid_t0":{
+                    "expression":"(tp_0_est>a)&(tp_0_est<b)",
+                    "parameters":{"a":46000, "b":52000}
+                }
             }
-        }
         or
-        {
-            "is_valid_cal":{
-                "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
+        .. code-block:: json
+        
+            {
+                "is_valid_cal":{
+                    "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
+                }
             }
-        }
     rounding : int
         number of decimal places to round to
     display : int
@@ -568,36 +576,44 @@ def generate_cut_classifiers(
         data to calculate cuts on
     parameters : dict
         dictionary of the form:
-        {
-            "output_parameter_name": {
-                "cut_parameter": "parameter_to_cut_on",
-                "cut_level": number_of_sigmas,
-                 "mode": "inclusive" or "exclusive"
+        .. code-block:: json
+        
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": number_of_sigmas,
+                     "mode": "inclusive" or "exclusive"
+                }
             }
-        }
         number of sigmas can instead be a dictionary to specify different cut levels for low and high side
         or to only have a one sided cut only specify one of the low or high side
         e.g.
-        {
-            "output_parameter_name": {
-                "cut_parameter": "parameter_to_cut_on",
-                "cut_level": {"low_side": 3, "high_side": 2},
-                "mode": "inclusive" or "exclusive"
+        .. code-block:: json
+        
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": {"low_side": 3, "high_side": 2},
+                    "mode": "inclusive" or "exclusive"
+                }
             }
-        }
         alternatively can specify hit dict fields to just copy dict into output dict e.g.
-        {
-            "is_valid_t0":{
-                "expression":"(tp_0_est>a)&(tp_0_est<b)",
-                "parameters":{"a":46000, "b":52000}
+        .. code-block:: json
+        
+            {
+                "is_valid_t0":{
+                    "expression":"(tp_0_est>a)&(tp_0_est<b)",
+                    "parameters":{"a":46000, "b":52000}
+                }
             }
-        }
         or
-        {
-            "is_valid_cal":{
-                "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
+        .. code-block:: json
+        
+            {
+                "is_valid_cal":{
+                    "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
+                }
             }
-        }
     rounding : int
         number of decimal places to round to
     display : int
