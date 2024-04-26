@@ -29,14 +29,14 @@ from pygama.math.distributions import (
     nb_erfc,
 )
 from pygama.math.functions.hpge_peak import hpge_get_fwfm, hpge_get_fwhm, hpge_get_mode
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 from pygama.pargen.utils import convert_to_minuit, return_nans
 
 log = logging.getLogger(__name__)
 
 (x_lo, x_hi, n_sig, mu, sigma, n_bkg, tau) = range(7)
 par_array = [(gaussian, [mu, sigma]), (exgauss, [mu, sigma, tau])]
-aoe_peak = sum_dists(
+aoe_peak = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",
@@ -50,7 +50,7 @@ par_array = [
     (gauss_on_exgauss, [mu, sigma, frac1, tau]),
     (exgauss, [mu, sigma, tau_bkg]),
 ]
-aoe_peak_with_high_tail = sum_dists(
+aoe_peak_with_high_tail = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",

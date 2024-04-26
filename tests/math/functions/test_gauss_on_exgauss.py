@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import exponnorm, norm
 
 from pygama.math.functions.gauss_on_exgauss import gauss_on_exgauss
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def test_gauss_on_exgauss_pdf():
@@ -14,7 +14,7 @@ def test_gauss_on_exgauss_pdf():
 
     pars = np.array([mu, sigma, h_tail, tau], dtype=float)
 
-    assert isinstance(gauss_on_exgauss, sum_dists)
+    assert isinstance(gauss_on_exgauss, SumDists)
 
     y_direct = gauss_on_exgauss.get_pdf(x, *pars)
     scipy_exgauss = h_tail * exponnorm.pdf(
@@ -45,7 +45,7 @@ def test_gauss_on_exgauss_cdf():
 
     pars = np.array([mu, sigma, h_tail, tau], dtype=float)
 
-    assert isinstance(gauss_on_exgauss, sum_dists)
+    assert isinstance(gauss_on_exgauss, SumDists)
 
     y_direct = gauss_on_exgauss.get_cdf(x, *pars)
 

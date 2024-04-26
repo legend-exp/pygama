@@ -17,15 +17,22 @@ mu_exp, sigma_exp
 Returns
 -------
 gauss_on_exponential
-    A subclass of :class:`sum_dists` and :class:`rv_continuous`, has methods of :func:`pdf`, :func:`cdf`, etc.
+    A subclass of :class:`SumDists` and :class:`rv_continuous`, has methods of :func:`pdf`, :func:`cdf`, etc.
 """
-from pygama.math.functions.sum_dists import sum_dists
 
-
-from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.exponential import exponential
+from pygama.math.functions.gauss import gaussian
+from pygama.math.functions.sum_dists import SumDists
 
-(n_sig, mu, sigma, n_bkg, lamb, mu_exp, sigma_exp)= range(7) # the sum_dist array we will pass will be n_sig, mu, sigma, lambda, n_bkg, mu_exp, sigma_exp
-par_array = [(gaussian, [mu, sigma]), (exponential, [mu_exp, sigma_exp, lamb])] 
+(n_sig, mu, sigma, n_bkg, lamb, mu_exp, sigma_exp) = range(
+    7
+)  # the sum_dist array we will pass will be n_sig, mu, sigma, lambda, n_bkg, mu_exp, sigma_exp
+par_array = [(gaussian, [mu, sigma]), (exponential, [mu_exp, sigma_exp, lamb])]
 
-gauss_on_exponential = sum_dists(par_array, [n_sig, n_bkg], "areas", parameter_names = ["n_sig", "mu", "sigma", "n_bkg", "lambd", "mu_exp", "sigma_exp"], name="gauss_on_exponential")
+gauss_on_exponential = SumDists(
+    par_array,
+    [n_sig, n_bkg],
+    "areas",
+    parameter_names=["n_sig", "mu", "sigma", "n_bkg", "lambd", "mu_exp", "sigma_exp"],
+    name="gauss_on_exponential",
+)

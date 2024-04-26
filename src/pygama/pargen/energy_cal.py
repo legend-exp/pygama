@@ -568,7 +568,7 @@ class HPGeCalibration:
                     var=var,
                     guess=x0,
                     cost_func="LL",
-                    Extended=True,
+                    extended=True,
                     fixed=fixed,
                     bounds=bounds,
                 )
@@ -928,7 +928,7 @@ class HPGeCalibration:
                         var=var,
                         guess=x0,
                         cost_func=method,
-                        Extended=True,
+                        extended=True,
                         fixed=fixed,
                         bounds=bounds,
                     )

@@ -18,7 +18,7 @@ def test_fit_unbinned():
     from pygama.math.functions.gauss import gaussian
 
     fit, fit_error, fit_cov = pgubf.fit_unbinned(
-        gaussian.get_pdf, xdata, guess=[0, 0.9], cost_func="LL", Extended=False
+        gaussian.get_pdf, xdata, guess=[0, 0.9], cost_func="LL", extended=False
     )
     assert fit["mu"] == approx(mu, rel=1e-2)
     assert fit["sigma"] == approx(sigma, rel=1e-1)

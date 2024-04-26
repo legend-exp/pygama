@@ -1,20 +1,28 @@
 """
 pygama convenience functions for fitting ubinned data
 """
+
 import logging
-import numpy as np
 from typing import Callable
 
+import numpy as np
 from iminuit import Minuit, cost
 
 log = logging.getLogger(__name__)
 
 
-def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
-             Extended: bool = True, cost_func:str = 'LL', simplex: bool = False,
-             bounds: list[tuple[float, float], ...]=None, fixed: list[bool, ...]=None) -> tuple[np.ndarray, ...]:
+def fit_unbinned(
+    func: Callable,
+    data: np.ndarray,
+    guess: np.ndarray = None,
+    extended: bool = True,  # noqa: N803
+    cost_func: str = "LL",
+    simplex: bool = False,
+    bounds: list[tuple[float, float], ...] = None,
+    fixed: list[bool, ...] = None,
+) -> tuple[np.ndarray, ...]:
     """Do a unbinned fit to data.
-    Default is Extended Log Likelihood fit, with option for other cost functions.
+    Default is extended Log Likelihood fit, with option for other cost functions.
 
     Parameters
     ----------
@@ -24,7 +32,7 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
         the data values to be fit
     guess
         initial guess parameters
-    Extended
+    extended
         run extended or non extended fit
     cost_func
         cost function to use. LL is ExtendedUnbinnedNLL, None is for just UnbinnedNLL
@@ -42,10 +50,12 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
         the best-fit parameters and their errors / covariance
     """
     if guess is None:
-        raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
+        raise NotImplementedError(
+            "auto-guessing not yet implemented, you must supply a guess."
+        )
 
-    if cost_func =='LL':
-        if Extended == True:
+    if cost_func == "LL":
+        if extended is True:
             cost_func = cost.ExtendedUnbinnedNLL(data, func)
 
         else:
@@ -63,7 +73,7 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True
-    if simplex == True:
+    if simplex is True:
         m.simplex().migrad()
     else:
         m.migrad()

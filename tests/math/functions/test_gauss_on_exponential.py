@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import expon, norm
 
 from pygama.math.functions.gauss_on_exponential import gauss_on_exponential
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def test_gauss_on_exponential_pdf():
@@ -17,7 +17,7 @@ def test_gauss_on_exponential_pdf():
 
     pars = np.array([n_sig, mu, sigma, n_bkg, lamb, mu_exp, sigma_exp], dtype=float)
 
-    assert isinstance(gauss_on_exponential, sum_dists)
+    assert isinstance(gauss_on_exponential, SumDists)
 
     y_direct = gauss_on_exponential.get_pdf(x, *pars)
     scipy_exponential = n_bkg * expon.pdf(x, mu_exp, sigma_exp / lamb)
@@ -51,7 +51,7 @@ def test_gauss_on_exponential_cdf():
 
     pars = np.array([n_sig, mu, sigma, n_bkg, lamb, mu_exp, sigma_exp], dtype=float)
 
-    assert isinstance(gauss_on_exponential, sum_dists)
+    assert isinstance(gauss_on_exponential, SumDists)
 
     y_direct = gauss_on_exponential.get_cdf(x, *pars)
 

@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 
 from pygama.math.functions.gauss import gaussian
-from pygama.math.functions.pygama_continuous import numba_frozen
+from pygama.math.functions.pygama_continuous import NumbaFrozen
 
 
 def test_numba_frozen():
@@ -10,7 +10,7 @@ def test_numba_frozen():
     mu = 2
     sigma = 3
     gauss = gaussian(mu, sigma)
-    assert isinstance(gauss, numba_frozen)
+    assert isinstance(gauss, NumbaFrozen)
 
     numba_pdf = gauss.pdf(x)
     scipy_pdf = norm.pdf(x, mu, sigma)

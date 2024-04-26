@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import expon
 
 from pygama.math.functions.exponential import exponential
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def test_exponential_pdf():
@@ -17,7 +17,7 @@ def test_exponential_pdf():
     y_direct = exponential.get_pdf(x, *par_array)
     scipy_y = expon.pdf(x, mu, sigma / lamb)
 
-    assert isinstance(exponential, pygama_continuous)
+    assert isinstance(exponential, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -46,7 +46,7 @@ def test_exponential_cdf():
     y_direct = exponential.get_cdf(x, *par_array)
     scipy_y = expon.cdf(x, mu, sigma / lamb)
 
-    assert isinstance(exponential, pygama_continuous)
+    assert isinstance(exponential, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

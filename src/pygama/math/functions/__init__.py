@@ -1,5 +1,5 @@
 r"""
-Statistical distributions for the Pygama pacakge. 
+Statistical distributions for the Pygama package.
 
 Each distribution requires the definition of four vectorized numbafied functions that take an array as an input:
 
@@ -13,11 +13,11 @@ Returns the CDF derived from the PDF that is normalized on the support
 Returns area*nb_dist_prd
 
 4. :func:`nb_dist_scaled_cdf(x, area, mu, sigma, shape)`
-Returns area*nb_dist_cdf 
+Returns area*nb_dist_cdf
 
 NOTE: The order of the arguments of these functions follows the ordering convention from left to right (for whichever are present): x, x_lo, x_hi, area, mu, sigma, shapes
 
-Then these four functions are pacakged into a class that subclasses our own pygama_continuous. This distribution class then has 9 required methods. 
+Then these four functions are packaged into a class that subclasses our own PygamaContinuous. This distribution class then has 9 required methods.
 
 1. :func:`_pdf(x, mu, sigma, shape)`
 An overloading of the scipy rv_continuous base class' method, this is slow, but it enables access to other scipy rv_continuous methods like _rvs
@@ -48,12 +48,12 @@ A tuple of the required shape, mu, and sigma parameters
 
 NOTE: the order of the arguments to these functions must follow the convention for whichever are present: x, x_lo, x_hi,, area, mu, sigma, shape
 
-pygama_continuous subclasses scipy's rv_continuous and overloads the class instantiation so that is calls numba_frozen. numba_frozen is
+PygamaContinuous subclasses scipy's rv_continuous and overloads the class instantiation so that is calls numba_frozen. numba_frozen is
 a subclass of rv_continuous, and acts exactly like scipy's rv_continuous_frozen, except that this class also has methods for
 pygama specific get_pdf, get_cdf, pdf_ext, and cdf_ext. This subclassing is necessary so that we can instantiate frozen distributions that
-have access to our required pygama class methods. 
+have access to our required pygama class methods.
 
-In addition, the class sum_dists subclasses rv_continuous. This is so that distributions created out of the sum of distributions also have 
-access to scipy rv_continuous methods, such as random sampling. sum_dists also has convenience functions such as draw_pdf, which plots the pdf,
+In addition, the class SumDists subclasses rv_continuous. This is so that distributions created out of the sum of distributions also have
+access to scipy rv_continuous methods, such as random sampling. SumDists also has convenience functions such as draw_pdf, which plots the pdf,
 and required_args which returns a list of the required arguments for the sum of the distribution.
 """

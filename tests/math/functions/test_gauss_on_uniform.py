@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm, uniform
 
 from pygama.math.functions.gauss_on_uniform import gauss_on_uniform
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def test_gauss_on_uniform_pdf():
@@ -14,7 +14,7 @@ def test_gauss_on_uniform_pdf():
 
     pars = np.array([np.amin(x), np.amax(x), n_sig, mu, sigma, n_bkg], dtype=float)
 
-    assert isinstance(gauss_on_uniform, sum_dists)
+    assert isinstance(gauss_on_uniform, SumDists)
 
     y_direct = gauss_on_uniform.get_pdf(x, *pars)
 
@@ -39,7 +39,7 @@ def test_gauss_on_uniform_cdf():
 
     pars = np.array([np.amin(x), np.amax(x), n_sig, mu, sigma, n_bkg], dtype=float)
 
-    assert isinstance(gauss_on_uniform, sum_dists)
+    assert isinstance(gauss_on_uniform, SumDists)
 
     y_direct = gauss_on_uniform.get_cdf(x, *pars)
 

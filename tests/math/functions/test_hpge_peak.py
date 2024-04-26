@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import exponnorm, norm
 
 from pygama.math.functions.hpge_peak import hpge_peak
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def test_hpge_peak_pdf():
@@ -23,7 +23,7 @@ def test_hpge_peak_pdf():
         dtype=float,
     )
 
-    assert isinstance(hpge_peak, sum_dists)
+    assert isinstance(hpge_peak, SumDists)
 
     y_direct = hpge_peak.get_pdf(x, *pars)
     scipy_exgauss = htail * exponnorm.pdf(
@@ -76,7 +76,7 @@ def test_hpge_peak_cdf():
         dtype=float,
     )
 
-    assert isinstance(hpge_peak, sum_dists)
+    assert isinstance(hpge_peak, SumDists)
 
     y_direct = hpge_peak.get_cdf(x, *pars)
 

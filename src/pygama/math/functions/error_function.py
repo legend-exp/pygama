@@ -1,13 +1,11 @@
-from typing import Union
-import math
 from math import erf, erfc
+from typing import Union
 
 import numba as nb
 import numpy as np
 
 
-@nb.vectorize([nb.float32(nb.float32),
-nb.float64(nb.float64)])
+@nb.vectorize([nb.float32(nb.float32), nb.float64(nb.float64)])
 def nb_erf(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     r"""
     Numba version of error function.
@@ -29,9 +27,7 @@ def nb_erf(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     return erf(x)
 
 
-
-@nb.vectorize([nb.float32(nb.float32),
-nb.float64(nb.float64)])
+@nb.vectorize([nb.float32(nb.float32), nb.float64(nb.float64)])
 def nb_erfc(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     r"""
     Numba version of complementary error function
@@ -49,5 +45,5 @@ def nb_erfc(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
     math.erfc(x)
         Complementary error function acting on the input
     """
-    
+
     return erfc(x)

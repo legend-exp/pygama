@@ -1,13 +1,12 @@
 """
 pygama convenience functions for fitting binned data
 """
+
 import logging
-import math
-from typing import Optional, Union, Callable
+from typing import Callable, Optional
 
 import numpy as np
 from iminuit import Minuit, cost
-from scipy.optimize import brentq, minimize_scalar
 
 import pygama.math.histogram as pgh
 from pygama.math.functions.gauss import nb_gauss_amp
@@ -15,31 +14,41 @@ from pygama.math.functions.gauss import nb_gauss_amp
 log = logging.getLogger(__name__)
 
 
-def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarray=None, guess: np.ndarray=None,
-             cost_func: str='LL', Extended: bool=True,  simplex: bool=False, bounds: tuple[tuple[float, float], ...]=None, fixed: tuple[int, ...] = None) -> tuple[np.ndarray, ...]:
+def fit_binned(
+    func: Callable,
+    hist: np.ndarray,
+    bins: np.ndarray,
+    var: np.ndarray = None,
+    guess: np.ndarray = None,
+    cost_func: str = "LL",
+    extended: bool = True,
+    simplex: bool = False,
+    bounds: tuple[tuple[float, float], ...] = None,
+    fixed: tuple[int, ...] = None,
+) -> tuple[np.ndarray, ...]:
     """
     Do a binned fit to a histogram.
 
-    Default is Extended Log Likelihood fit, with option for either Least
+    Default is extended Log Likelihood fit, with option for either Least
     Squares or other cost function.
 
     Parameters
     ----------
-    func 
+    func
         the function to fit, if using LL as method needs to be a cdf
-    hist, bins, var 
+    hist, bins, var
         histogrammed data
-    guess 
+    guess
         initial guess parameters
     cost_func
         cost function to use
-    Extended
+    extended
         run extended or non extended fit
     simplex
         whether to include a round of simpson minimisation before main minimisation
-    bounds 
+    bounds
         list of tuples with bounds can be None, e.g. [(0,None), (0,10)]
-    fixed   
+    fixed
         list of parameter indices to fix
 
     Returns
@@ -52,36 +61,38 @@ def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarr
         Covariance matrix
     """
     if guess is None:
-        raise NotImplementedError("auto-guessing not yet implemented, you must supply a guess.")
+        raise NotImplementedError(
+            "auto-guessing not yet implemented, you must supply a guess."
+        )
 
-    if cost_func == 'LL':
+    if cost_func == "LL":
 
         if var is not None:
-            t_arr = np.zeros((len(hist),2))
-            t_arr[:,0] = hist
-            t_arr[:,1] = var
+            t_arr = np.zeros((len(hist), 2))
+            t_arr[:, 0] = hist
+            t_arr[:, 1] = var
             hist = t_arr
 
-        if Extended ==True:
-            cost_func = cost.ExtendedBinnedNLL(hist,bins,  func)
+        if extended is True:
+            cost_func = cost.ExtendedBinnedNLL(hist, bins, func)
 
         else:
-            cost_func = cost.BinnedNLL( hist,bins, func)
+            cost_func = cost.BinnedNLL(hist, bins, func)
 
-    elif cost_func == 'Least Squares':
+    elif cost_func == "Least Squares":
 
         if var is None:
-            var = hist # assume Poisson stats if variances are not provided
+            var = hist  # assume Poisson stats if variances are not provided
 
-        if len(bins) == len(hist)+1:
+        if len(bins) == len(hist) + 1:
             bin_centres = pgh.get_bin_centers(bins)
         else:
-             bin_centres = bins
+            bin_centres = bins
 
         # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
-        zeros = (hist == 0)
-        zero_errors = (var == 0)
+        zeros = hist == 0
+        zero_errors = var == 0
         mask = ~(zeros & zero_errors)
         hist = hist[mask]
         var = np.sqrt(var[mask])
@@ -96,7 +107,7 @@ def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarr
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True
-    if simplex == True:
+    if simplex is True:
         m.simplex().migrad()
     else:
         m.migrad()
@@ -104,13 +115,21 @@ def fit_binned(func: Callable, hist: np.ndarray, bins: np.ndarray, var: np.ndarr
     return m.values, m.errors, m.covariance
 
 
-def goodness_of_fit(hist: np.ndarray, bins: np.ndarray, var: np.ndarray, func: Callable, pars: np.ndarray, method: str='var', scale_bins: bool = False) -> tuple[float, int]:
+def goodness_of_fit(
+    hist: np.ndarray,
+    bins: np.ndarray,
+    var: np.ndarray,
+    func: Callable,
+    pars: np.ndarray,
+    method: str = "var",
+    scale_bins: bool = False,
+) -> tuple[float, int]:
     """
     Compute chisq and dof of fit
 
     Parameters
     ----------
-    hist, bins, var 
+    hist, bins, var
         histogram data. var can be None if hist is integer counts
     func
         the function that was fit to the hist
@@ -130,62 +149,73 @@ def goodness_of_fit(hist: np.ndarray, bins: np.ndarray, var: np.ndarray, func: C
         the number of degrees of freedom
     """
     # arg checks
-    if method == 'var':
+    if method == "var":
         if var is None:
             raise RuntimeError("var must be non-None to use method 'var'")
-        if np.any(var==0):
+        if np.any(var == 0):
             raise ValueError("var cannot contain zeros")
-    if method == 'Neyman' and np.any(hist==0):
+    if method == "Neyman" and np.any(hist == 0):
         raise ValueError("hist cannot contain zeros for Neyman method")
-
 
     # compute expected values
     yy = func(pgh.get_bin_centers(bins), *pars)
-    if scale_bins == True: 
+    if scale_bins is True:
         yy *= pgh.get_bin_widths(bins)
-    
 
-    if method == 'LR':
-        log_lr = 2*np.sum(np.where(hist>0 , yy-hist + hist*np.log((hist+1.e-99) / (yy+1.e-99)), yy-hist))
+    if method == "LR":
+        log_lr = 2 * np.sum(
+            np.where(
+                hist > 0,
+                yy - hist + hist * np.log((hist + 1.0e-99) / (yy + 1.0e-99)),
+                yy - hist,
+            )
+        )
         dof = len(hist) - len(pars)
         return log_lr, dof
 
     else:
         # compute chi2 numerator and denominator
-        numerator = (hist - yy)**2
-        if method == 'var':
+        numerator = (hist - yy) ** 2
+        if method == "var":
             denominator = var
-        elif method == 'Pearson':
+        elif method == "Pearson":
             denominator = yy
-        elif method == 'Neyman':
+        elif method == "Neyman":
             denominator = hist
         else:
             raise NameError(f"goodness_of_fit: unknown method {method}")
 
         # compute chi2 and dof
-        chisq = np.sum(numerator/denominator)
+        chisq = np.sum(numerator / denominator)
         dof = len(hist) - len(pars)
         return chisq, dof
 
 
-def poisson_gof(pars: np.ndarray, func: Callable, hist: np.ndarray, bins: np.ndarray, is_integral: bool=False, **kwargs) -> float:
+def poisson_gof(
+    pars: np.ndarray,
+    func: Callable,
+    hist: np.ndarray,
+    bins: np.ndarray,
+    is_integral: bool = False,
+    **kwargs,
+) -> float:
     """
-    Calculate the goodness of fit for the Poisson likelihood. 
+    Calculate the goodness of fit for the Poisson likelihood.
 
-    Parameters 
+    Parameters
     ----------
-    pars 
+    pars
         The parameters of the function, func
-    func 
-        The function that was fit 
-    hist 
-        The data that were fit 
-    bins 
-        The bins of the histogram that was fit to 
-    is_integral 
-        Tells get_bin_estimates if the function is an integral function 
+    func
+        The function that was fit
+    hist
+        The data that were fit
+    bins
+        The bins of the histogram that was fit to
+    is_integral
+        Tells get_bin_estimates if the function is an integral function
 
-    Returns 
+    Returns
     -------
     Poisson G.O.F.
 
@@ -197,11 +227,19 @@ def poisson_gof(pars: np.ndarray, func: Callable, hist: np.ndarray, bins: np.nda
     it here.
     """
     mu = pgh.get_bin_estimates(pars, func, bins, is_integral, **kwargs)
-    return 2.*np.sum(mu + hist*(np.log( (hist+1.e-99) / (mu+1.e-99) ) + 1))
+    return 2.0 * np.sum(mu + hist * (np.log((hist + 1.0e-99) / (mu + 1.0e-99)) + 1))
 
 
-def gauss_mode_width_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.ndarray]=None, mode_guess: Optional[float]=None, n_bins: Optional[int]=5,
-                         cost_func: str='Least Squares', inflate_errors: Optional[bool]=False, gof_method: Optional[str]='var') -> tuple[np.ndarray, ...]:
+def gauss_mode_width_max(
+    hist: np.ndarray,
+    bins: np.ndarray,
+    var: Optional[np.ndarray] = None,
+    mode_guess: Optional[float] = None,
+    n_bins: Optional[int] = 5,
+    cost_func: str = "Least Squares",
+    inflate_errors: Optional[bool] = False,
+    gof_method: Optional[str] = "var",
+) -> tuple[np.ndarray, ...]:
     r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
     Returns the parameters of a gaussian fit over n_bins in the vicinity of the
@@ -260,25 +298,37 @@ def gauss_mode_width_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.nd
         The covariance matrix for the 3 parameters in pars
     """
     bin_centers = pgh.get_bin_centers(bins)
-    if mode_guess is not None: i_0 = pgh.find_bin(mode_guess, bins)
+    if mode_guess is not None:
+        i_0 = pgh.find_bin(mode_guess, bins)
     else:
         i_0 = np.argmax(hist)
         mode_guess = bin_centers[i_0]
     amp_guess = hist[i_0]
-    i_0 -= int(np.floor(n_bins/2))
+    i_0 -= int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
-    width_guess = (bin_centers[i_n] - bin_centers[i_0])
+    width_guess = bin_centers[i_n] - bin_centers[i_0]
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
-    pars, errors, cov = fit_binned(nb_gauss_amp, hist[i_0:i_n], bins[i_0:i_n+1], vv, guess=guess, cost_func=cost_func)
-    if pars[1] < 0: pars[1] = -pars[1]
+    pars, errors, cov = fit_binned(
+        nb_gauss_amp,
+        hist[i_0:i_n],
+        bins[i_0 : i_n + 1],
+        vv,
+        guess=guess,
+        cost_func=cost_func,
+    )
+    if pars[1] < 0:
+        pars[1] = -pars[1]
     if inflate_errors:
         chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars)
-        if chi2 > dof: cov *= chi2/dof
-    return np.asarray([pars['mu'], pars['sigma'], pars['a']]), np.asarray(cov)
+        if chi2 > dof:
+            cov *= chi2 / dof
+    return np.asarray([pars["mu"], pars["sigma"], pars["a"]]), np.asarray(cov)
 
 
-def gauss_mode_max(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[np.ndarray, ...]:
+def gauss_mode_max(
+    hist: np.ndarray, bins: np.ndarray, **kwargs
+) -> tuple[np.ndarray, ...]:
     """Alias for gauss_mode_width_max that just returns the max and mode
 
     See Also
@@ -304,7 +354,7 @@ def gauss_mode_max(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[np.nda
     pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
     if pars is None or cov is None:
         raise RuntimeError("fit binned failed to work")
-    return pars[::2], cov[::2, ::2] # skips "sigma" rows and columns
+    return pars[::2], cov[::2, ::2]  # skips "sigma" rows and columns
 
 
 def gauss_mode(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[float, float]:
@@ -320,11 +370,18 @@ def gauss_mode(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[float, flo
     dmode : the uncertainty in the mode
     """
     pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
-    if pars is None or cov is None: return None, None
+    if pars is None or cov is None:
+        return None, None
     return pars[0], np.sqrt(cov[0, 0])
 
 
-def taylor_mode_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.ndarray]=None, mode_guess: Optional[float]=None, n_bins: int = 5) -> tuple[np.ndarray, ...]:
+def taylor_mode_max(
+    hist: np.ndarray,
+    bins: np.ndarray,
+    var: Optional[np.ndarray] = None,
+    mode_guess: Optional[float] = None,
+    n_bins: int = 5,
+) -> tuple[np.ndarray, ...]:
     """Get the max and mode of a peak based on Taylor exp near the max
     Returns the amplitude and position of a peak based on a poly fit over n_bins
     in the vicinity of the maximum of the hist (or the max near mode_guess, if provided)
@@ -362,18 +419,26 @@ def taylor_mode_max(hist: np.ndarray, bins: np.ndarray, var: Optional[np.ndarray
     >>> hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5,5))
     >>> pgf.taylor_mode_max(hist, bins, var, n_bins=5)
     """
-    if mode_guess is not None: i_0 = pgh.find_bin(mode_guess, bins)
-    else: i_0 = np.argmax(hist)
-    i_0 -= int(np.floor(n_bins/2))
+    if mode_guess is not None:
+        i_0 = pgh.find_bin(mode_guess, bins)
+    else:
+        i_0 = np.argmax(hist)
+    i_0 -= int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
-    wts = None if var is None else 1/np.sqrt(var[i_0:i_n])
+    wts = None if var is None else 1 / np.sqrt(var[i_0:i_n])
 
-    pars, cov = np.polyfit(pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov='unscaled')
+    pars, cov = np.polyfit(
+        pgh.get_bin_centers(bins)[i_0:i_n], hist[i_0:i_n], 2, w=wts, cov="unscaled"
+    )
     mode = -pars[1] / 2 / pars[0]
     maximum = pars[2] - pars[0] * mode**2
     # build the jacobian to compute the output covariance matrix
-    jac = np.array( [ [pars[1]/2/pars[0]**2,    -1/2/pars[0],       0],
-                      [pars[1]**2/4/pars[0]**2, -pars[1]/2/pars[0], 1] ] )
+    jac = np.array(
+        [
+            [pars[1] / 2 / pars[0] ** 2, -1 / 2 / pars[0], 0],
+            [pars[1] ** 2 / 4 / pars[0] ** 2, -pars[1] / 2 / pars[0], 1],
+        ]
+    )
     cov_jact = np.matmul(cov, jac.transpose())
     cov = np.matmul(jac, cov_jact)
     return (mode, maximum), cov
