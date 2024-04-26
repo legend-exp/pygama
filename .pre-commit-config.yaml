@@ -3,7 +3,7 @@ ci:
   autoupdate_schedule: "quarterly"
   autofix_commit_msg: "style: pre-commit fixes"
 
-exclude: ^(attic|tutorials|src/pygama/math|src/pygama/flow/datagroup.py)
+exclude: ^(attic|src/pygama/math|src/pygama/flow/datagroup.py)
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: "v4.5.0"
@@ -17,7 +17,6 @@ repos:
   - id: check-json
   - id: check-toml
   - id: check-docstring-first
-    exclude: ^src/pygama/raw/(fc/fc_event_decoder.py|compass/compass_event_decoder.py)$
   - id: debug-statements
   - id: end-of-file-fixer
   - id: forbid-new-submodules

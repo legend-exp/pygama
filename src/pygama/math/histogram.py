@@ -19,7 +19,7 @@ from typing import Optional, Union, Callable
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rcParams
-import boost_histogram as bh
+import hist as bh
 import numba as nb
 
 import pygama.math.utils as pgu
@@ -92,10 +92,10 @@ def get_hist(data: np.ndarray, bins: Optional[Union[int, np.ndarray, str]] = Non
 
     # initialize the boost_histogram object 
     if isinstance(bins, int):
-        boost_histogram = bh.Histogram(bh.axis.Regular(bins=bins, start=range[0], stop=range[1]), storage=bh.storage.Weight())
+        boost_histogram = bh.Hist(bh.axis.Regular(bins=bins, start=range[0], stop=range[1]), storage=bh.storage.Weight())
     else:
         # if bins are specified need to use variable
-        boost_histogram = bh.Histogram(bh.axis.Variable(bins), storage=bh.storage.Weight())
+        boost_histogram = bh.Hist(bh.axis.Variable(bins), storage=bh.storage.Weight())
     # create the histogram
     boost_histogram.fill(data, weight=wts)
     # read out the histogram, bins, and variances
