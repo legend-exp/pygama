@@ -369,8 +369,8 @@ class HPGeCalibration:
         self.update_results_dict(
             {
                 "input_peaks_kev": input_peaks,
-                "got_peaks_kev": got_peak_locations,
-                "got_peaks_locs": matched_energies,
+                "got_peaks_kev": matched_energies,
+                "got_peaks_locs": got_peak_locations,
             }
         )
 
@@ -2174,8 +2174,9 @@ def unbinned_staged_energy_fit(
                 bin_width=bin_width,
                 **guess_kwargs if guess_kwargs is not None else {},
             )
-            for arg in x0_notail.to_dict():
-                x0[arg] = x0_notail[arg]
+            if m.valid:
+                for arg in x0_notail.to_dict():
+                    x0[arg] = x0_notail[arg]
 
         else:
             x0 = guess_func(
