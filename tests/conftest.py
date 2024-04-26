@@ -30,7 +30,7 @@ def pytest_sessionfinish(session, exitstatus):
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("89e91f6")
+    ldata.checkout("8f55832")
     return ldata
 
 
