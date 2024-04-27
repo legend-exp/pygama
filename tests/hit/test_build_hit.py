@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -183,10 +184,19 @@ def test_build_hit_spms_basic(dsp_test_file_spm, tmptestdir):
 def test_build_hit_spms_multiconfig(dsp_test_file_spm, tmptestdir):
     out_file = f"{tmptestdir}/L200-comm-20211130-phy-spms_hit.lh5"
 
+    # append the tmptestdir to the start of paths in the spms-hit-multi-config.json
+    with open(f"{config_dir}/spms-hit-multi-config.json") as f:
+        configdict = json.load(f)
+    for key in configdict.keys():
+        configdict[key] = f"{config_dir}/" + configdict[key].split("/")[-1]
+    newdict = json.dumps(configdict)
+    with open(f"{tmptestdir}/spms-hit-multi-config.json", "w") as file:
+        file.write(newdict)
+
     build_hit(
         dsp_test_file_spm,
         outfile=out_file,
-        lh5_tables_config=f"{config_dir}/spms-hit-multi-config.json",
+        lh5_tables_config=f"{tmptestdir}/spms-hit-multi-config.json",
         wo_mode="overwrite",
     )
     assert lh5.ls(out_file) == ["ch0", "ch1", "ch2"]

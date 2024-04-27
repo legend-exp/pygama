@@ -4,9 +4,36 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import numpy as np
 from lgdo import lh5, types
 
 from .. import utils
+
+
+def apply_recovery_cut(
+    datainfo: utils.DataInfo,
+    tcm: utils.TCMData,
+    table_names: Sequence[str],
+    *,
+    timestamps: types.Array,
+    flag: types.Array,
+    time_window: float,
+) -> types.Array:
+
+    discharge_timestamps = timestamps.nda[flag.nda == 1]
+    is_recovering = np.full(len(timestamps.nda), False)
+    for tstamp in discharge_timestamps:
+        is_recovering = is_recovering | np.where(
+            (
+                ((timestamps.nda - tstamp) < time_window)
+                & ((timestamps.nda - tstamp) > 0)
+            ),
+            True,
+            False,
+        )
+
+    # return the result as LGDO
+    return types.Array(is_recovering)
 
 
 def apply_xtalk_correction(

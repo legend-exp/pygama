@@ -30,6 +30,7 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
+    "hist",
     "colorlog",
     "dspeed>=1.3",
     "h5py>=3.2",
@@ -115,7 +116,7 @@ report.exclude_also = [
 extend-ignore = "E203, E501"
 
 [tool.codespell]
-ignore-words-list = "hist, gaus, nd, ans, crate, nin, puls, spms, fom"
+ignore-words-list = "hist, gaus, nd, ans, crate, nin, puls, spms, fom, FOM"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
