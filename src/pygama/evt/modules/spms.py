@@ -331,10 +331,13 @@ def geds_coincidence_classifier(
         t_loc_default_ns=48_000,
     )
 
+    # we'll need to remove pulses below noise threshold later
+    is_good_pulse = gather_is_valid_hit(datainfo, tcm, table_names).view_as("ak")
+
     # load the data
     data = {}
     for k, obs in {"amp": "hit.energy_in_pe", "t0": "hit.trigger_pos"}.items():
-        data[k] = gather_pulse_data(
+        all_data = gather_pulse_data(
             datainfo,
             tcm,
             table_names,
@@ -342,6 +345,9 @@ def geds_coincidence_classifier(
             pulse_mask=pulse_mask,
             drop_empty=True,
         ).view_as("ak")
+
+        # remove pulses below noise threshold
+        data[k] = all_data[is_good_pulse]
 
     # load the channel info
     # rawids = spms.gather_tcm_id_data(
