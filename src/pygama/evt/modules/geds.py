@@ -20,7 +20,7 @@ def apply_xtalk_correction(
     calibrated_energy_name: str,
     threshold: float = None,
     xtalk_matrix_filename: str,
-    xtalk_rawid_name: str = "xtc/xtalk_rawids",
+    xtalk_rawid_name: str = "xtc/rawid_index",
     xtalk_matrix_name: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_name: str = "xtc/xtalk_matrix_positive",
 ) -> types.VectorOfVectors:
@@ -56,7 +56,9 @@ def apply_xtalk_correction(
 
     # read lh5 files to numpy
     xtalk_matrix_numpy = lh5.read_as(xtalk_matrix_name, xtalk_matrix_filename, "np")
+    print(f"Read {xtalk_rawid_name}, {xtalk_matrix_filename}")
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
+
     positive_xtalk_matrix_numpy = lh5.read_as(
         positive_xtalk_matrix_name, xtalk_matrix_filename, "np"
     )
@@ -87,5 +89,5 @@ def apply_xtalk_correction(
 
     # return the result as LGDO
     return types.VectorOfVectors(
-        energies_corr, attrs=utils.copy_lgdo_attrs(uncalibrated_energy_name)
+        energies_corr
     )

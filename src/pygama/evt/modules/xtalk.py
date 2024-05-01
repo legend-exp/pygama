@@ -4,7 +4,8 @@ Module for cross talk correction of energies.
 
 import awkward as ak
 import numpy as np
-from lgdo import lh5, ls
+from lgdo import lh5
+from lgdo.lh5 import ls
 
 from .. import utils
 
@@ -38,7 +39,7 @@ def build_energy_array(
     file = datainfo._asdict()[tier].file
 
     # initialise the output object
-    energies_out = np.full((len(rawids), np.max(ak.flatten(tcm.idx)) + 1), np.nan)
+    energies_out = np.full((len(rawids), np.max(tcm.idx) + 1), np.nan)
 
     # parse observables string. default to hit tier
     keys = ls(file)
@@ -46,8 +47,8 @@ def build_energy_array(
     for idx_chan, channel in enumerate(rawids):
 
         # get the event indexs
-        table_id = utils.get_tcm_id_by_pattern(table_fmt, channel)
-        idx_events = ak.to_numpy(ak.flatten(tcm.idx[tcm.id == table_id]))
+        table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{channel}")
+        idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
 
         # read the energy data
         if f"ch{channel}" in keys:
