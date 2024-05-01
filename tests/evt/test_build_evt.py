@@ -123,7 +123,7 @@ def test_field_nesting(lgnd_test_data, files_config):
     assert sorted(evt.sub2.keys()) == ["dummy", "multiplicity"]
 
 
-def test_xtalk(lgnd_test_data,files_config):
+def test_xtalk(lgnd_test_data, files_config):
 
     config = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
@@ -137,9 +137,9 @@ def test_xtalk(lgnd_test_data,files_config):
                 "channels": "geds_on",
                 "aggregation_mode": "function",
                 "expression": "pygama.evt.modules.geds.apply_xtalk_correction(<...>,uncalibrated_energy_name='cuspEmax_ctc',calibrated_energy_name=\
-                'cuspEmax_ctc_cal',xtalk_matrix_filename='/data1/users/tdixon/cross_talk/l200-p08-r015-x-talk-matrix_trapTmax.lh5')"
+                'cuspEmax_ctc_cal',xtalk_matrix_filename='/data1/users/tdixon/cross_talk/l200-p08-r015-x-talk-matrix_trapTmax.lh5')",
             }
-        }
+        },
     }
     build_evt(
         files_config,
@@ -151,6 +151,7 @@ def test_xtalk(lgnd_test_data,files_config):
 
     evt = lh5.read("/evt", outfile)
     show(outfile)
+
 
 def test_spms_module(lgnd_test_data, files_config):
     build_evt(

@@ -4,9 +4,7 @@ Module for cross talk correction of energies.
 
 import awkward as ak
 import numpy as np
-from lgdo import lh5
-
-from lgdo import ls
+from lgdo import lh5, ls
 
 from .. import utils
 
