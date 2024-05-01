@@ -114,6 +114,4 @@ def apply_xtalk_correction(
     )
 
     # return the result as LGDO
-    return types.VectorOfVectors(
-        energies_corr
-    )
+    return types.VectorOfVectors(energies_corr)
