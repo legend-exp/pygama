@@ -153,6 +153,7 @@ def build_hit(
                 if "lgdo_attrs" in info:
                     outcol.attrs |= info["lgdo_attrs"]
 
+                log.debug(f"made new column {outname!r}={outcol!r}")
                 outtbl_obj.add_column(outname, outcol)
 
             # make high level flags
