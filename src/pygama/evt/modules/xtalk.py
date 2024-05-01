@@ -6,7 +6,7 @@ import awkward as ak
 import numpy as np
 from lgdo import lh5
 
-from pygama.lgdo import ls
+from lgdo import ls
 
 from .. import utils
 
@@ -94,9 +94,12 @@ def xtalk_corrected_energy(
     uncalibrated_energies_no_nan = np.nan_to_num(uncalibrated_energies, 0)
     calibrated_energies_no_nan = np.nan_to_num(calibrated_energies, 0)
 
-    energies_threshold = np.where(
-        calibrated_energies_no_nan < threshold, 0, uncalibrated_energies_no_nan
-    )
+    if threshold is not None:
+        energies_threshold = np.where(
+            calibrated_energies_no_nan < threshold, 0, uncalibrated_energies_no_nan
+        )
+    else:
+        energies_threshold = uncalibrated_energies_no_nan
 
     energies_correction = -np.matmul(matrix, energies_threshold.T).T
     return uncalibrated_energies + energies_correction

@@ -20,9 +20,9 @@ def apply_xtalk_correction(
     calibrated_energy_name: str,
     threshold: float = None,
     xtalk_matrix_filename: str,
-    xtalk_rawid_name: str = "xtalk_rawids",
-    xtalk_matrix_name: str = "xtalk_matrix_negative",
-    positive_xtalk_matrix_name: str = "xtalk_matrix_positive",
+    xtalk_rawid_name: str = "xtc/xtalk_rawids",
+    xtalk_matrix_name: str = "xtc/xtalk_matrix_negative",
+    positive_xtalk_matrix_name: str = "xtc/xtalk_matrix_positive",
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a lh5 file.
