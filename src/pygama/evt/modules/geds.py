@@ -167,41 +167,21 @@ def apply_xtalk_correction_and_calibrate(
         name of the lh5 object containing the name of the rawids
     """
 
-    # read lh5 files to numpy
-    xtalk_matrix_numpy = lh5.read_as(xtalk_matrix_name, xtalk_matrix_filename, "np")
-    print(f"Read {xtalk_rawid_name}, {xtalk_matrix_filename}")
-    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
 
-    positive_xtalk_matrix_numpy = lh5.read_as(
-        positive_xtalk_matrix_name, xtalk_matrix_filename, "np"
-    )
+    energies_corr = apply_xtalk_correction(
+        datainfo
+        tcm
+        table_names
+        *,
+        uncalibrated_energy_name =  uncalibrated_energy_name,
+        calibrated_energy_name = calibrated_energy_name,
+        threshold = threshold,
+        xtalk_matrix_filename = xtalk_matrix_filename,
+        xtalk_rawid_name = xtalk_rawid_name,
+        xtalk_matrix_name = xtalk_matrix_name,
+        positive_xtalk_matrix_name = positive_xtalk_matrix_name,
+    ).view_as("np")
 
-    # Combine positive and negative matrixs
-    # Now the matrix should have negative values corresponding to negative cross talk
-    # and positive values corresponding to positive cross talk .
-    # we also set nan to 0 and we transpose so that the row corresponds to response and column trigger
-    xtalk_matrix = np.nan_to_num(
-        np.where(
-            abs(xtalk_matrix_numpy) > abs(positive_xtalk_matrix_numpy),
-            xtalk_matrix_numpy,
-            positive_xtalk_matrix_numpy,
-        ),
-        0,
-    ).T
-
-    uncalibrated_energy_array = xtalk.build_energy_array(
-        uncalibrated_energy_name, tcm, datainfo, xtalk_matrix_rawids
-    )
-    calibrated_energy_array = xtalk.build_energy_array(
-        calibrated_energy_name, tcm, datainfo, xtalk_matrix_rawids
-    )
-    dt_array = xtalk.build_energy_array(
-        "dsp.dt_eff", tcm, datainfo, xtalk_matrix_rawids
-    )
-
-    energies_corr = xtalk.xtalk_corrected_energy(
-        uncalibrated_energy_array, calibrated_energy_array, xtalk_matrix, threshold
-    )
     out_arr = np.full_like(energies_corr, np.nan)
     par_dicts = Props.read_from(par_files)
     pars = {chan: chan_dict["pars"]["operations"] for chan, chan_dict in par_dicts.items()}
