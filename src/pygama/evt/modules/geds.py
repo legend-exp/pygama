@@ -6,16 +6,17 @@ from collections.abc import Sequence
 
 import awkward as ak
 import numpy as np
-from lgdo import lh5, types
-from lgdo import lh5
-from lgdo.lh5 import ls
 from legendmeta.catalog import Props
+from lgdo import lh5, types
+from lgdo.lh5 import ls
+
 from pygama.hit.build_hit import _reorder_table_operations
 
 from .. import utils
 from . import xtalk
 
 sto = lh5.LH5Store()
+
 
 def apply_recovery_cut(
     datainfo: utils.DataInfo,
@@ -122,6 +123,7 @@ def apply_xtalk_correction(
     # return the result as LGDO
     return types.VectorOfVectors(energies_corr)
 
+
 def apply_xtalk_correction_and_calibrate(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
@@ -135,7 +137,7 @@ def apply_xtalk_correction_and_calibrate(
     xtalk_rawid_name: str = "xtc/rawid_index",
     xtalk_matrix_name: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_name: str = "xtc/xtalk_matrix_positive",
-    out_param:str = None,
+    out_param: str = None,
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a lh5 file.
@@ -204,8 +206,10 @@ def apply_xtalk_correction_and_calibrate(
     )
     out_arr = np.full_like(energies_corr, np.nan)
     par_dicts = Props.read_from(par_files)
-    pars = {chan: chan_dict["pars"]["operations"] for chan, chan_dict in par_dicts.items()}
-    
+    pars = {
+        chan: chan_dict["pars"]["operations"] for chan, chan_dict in par_dicts.items()
+    }
+
     p = uncalibrated_energy_name.split(".")
     tier = p[0] if len(p) > 1 else "hit"
     column = p[1] if len(p) > 1 else p[0]
@@ -213,7 +217,7 @@ def apply_xtalk_correction_and_calibrate(
     table_fmt = datainfo._asdict()[tier].table_fmt
     group = datainfo._asdict()[tier].group
     file = datainfo._asdict()[tier].file
-    
+
     keys = ls(file)
 
     if out_param is None:
@@ -222,10 +226,11 @@ def apply_xtalk_correction_and_calibrate(
     for i, chan in enumerate(xtalk_matrix_rawids):
         try:
             cfg = pars[f"ch{chan}"]
-            cfg, chan_inputs = xtalk.remove_uneeded_operations(_reorder_table_operations(cfg), 
-                                out_param)
+            cfg, chan_inputs = xtalk.remove_uneeded_operations(
+                _reorder_table_operations(cfg), out_param
+            )
             chan_inputs.remove(uncalibrated_energy_name.split(".")[-1])
-            
+
             # get the event indexs
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
             idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
@@ -233,18 +238,21 @@ def apply_xtalk_correction_and_calibrate(
             # read the energy data
             if f"ch{chan}" in keys:
                 outtbl_obj = sto.read(
-                    f"ch{chan}/dsp/", file, idx=idx_events, field_mask = chan_inputs
+                    f"ch{chan}/dsp/", file, idx=idx_events, field_mask=chan_inputs
                 )[0]
-            outtbl_obj.add_column(uncalibrated_energy_name.split(".")[-1], types.Array(energies_corr[:,i]))
+            outtbl_obj.add_column(
+                uncalibrated_energy_name.split(".")[-1],
+                types.Array(energies_corr[:, i]),
+            )
 
             for outname, info in cfg.items():
                 outcol = outtbl_obj.eval(
                     info["expression"], info.get("parameters", None)
                 )
                 outtbl_obj.add_column(outname, outcol)
-            out_arr[:,i] = outtbl_obj[out_param].nda
+            out_arr[:, i] = outtbl_obj[out_param].nda
         except KeyError:
-            out_arr[:,i] = np.nan
+            out_arr[:, i] = np.nan
 
     # return the result as LGDO
     return types.VectorOfVectors(out_arr)
