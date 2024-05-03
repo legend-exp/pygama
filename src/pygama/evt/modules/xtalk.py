@@ -102,3 +102,35 @@ def xtalk_corrected_energy(
 
     energies_correction = -np.matmul(matrix, energies_threshold.T).T
     return uncalibrated_energies + energies_correction
+
+def get_dependencies(config, par, pars=[]):
+    par_op = config[par]
+    c = compile(
+                    par_op["expression"], "gcc -O3 -ffast-math build_hit.py", "eval"
+                )
+    for p in c.co_names:
+        if p in par_op["parameters"]:
+            pass
+        else:
+            pars.append(p)
+            if p in config:
+                pars = get_dependencies(config, p, pars)
+    return pars
+
+def remove_uneeded_operations(config, outpars):
+    if not isinstance(outpars, list): 
+        outpars = [outpars]
+    dependent_keys = [*outpars]
+    inkeys = []
+    for par in outpars:
+        pars = get_dependencies(config, par)
+        for p in pars:
+            if p in config and p not in dependent_keys:
+                dependent_keys.append(p)
+            elif p not in config and p not in inkeys:
+                inkeys.append(p)
+        
+    for key in list(config):
+        if key not in dependent_keys:
+            config.pop(key)
+    return config, inkeys
