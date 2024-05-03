@@ -61,7 +61,13 @@ def build_energy_array(
     return energies_out.T
 
 
-def filter_hits(datainfo:utils.DataInfo,tcm:utils.TCMData,logic:str,corrected_energy:np.ndarray,rawids:np.ndarray)->np.ndarray:
+def filter_hits(
+    datainfo: utils.DataInfo,
+    tcm: utils.TCMData,
+    logic: str,
+    corrected_energy: np.ndarray,
+    rawids: np.ndarray,
+) -> np.ndarray:
     """
     Function to which hits in an event are above threshold.
     Parameters:
@@ -76,7 +82,7 @@ def filter_hits(datainfo:utils.DataInfo,tcm:utils.TCMData,logic:str,corrected_en
     rawids
         1D array of the rawids corresponding to each column
     Returns
-        a numpy array of the mask of which 
+        a numpy array of the mask of which
 
     """
 
@@ -87,11 +93,11 @@ def filter_hits(datainfo:utils.DataInfo,tcm:utils.TCMData,logic:str,corrected_en
     logic = logic.replace(".", "___")
 
     c = compile(logic, "gcc -O3 -ffast-math build_hit.py", "eval")
-    for idx_chan,channel in enumerate(rawids):
+    for idx_chan, channel in enumerate(rawids):
         tbl = lgdo.Table()
-    
+
         for name in c.co_names:
-            if ("___" not in name):
+            if "___" not in name:
                 continue
             tier, column = name.split("___")
 
@@ -99,7 +105,7 @@ def filter_hits(datainfo:utils.DataInfo,tcm:utils.TCMData,logic:str,corrected_en
                 table_fmt = datainfo._asdict()[tier].table_fmt
                 group = datainfo._asdict()[tier].group
                 file = datainfo._asdict()[tier].file
-                keys=ls(file)
+                keys = ls(file)
                 table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{channel}")
                 idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
 
@@ -108,16 +114,17 @@ def filter_hits(datainfo:utils.DataInfo,tcm:utils.TCMData,logic:str,corrected_en
                     data = lh5.read(
                         f"ch{channel}/{group}/{column}", file, idx=idx_events
                     )
-                tbl.add_column(name,data)
+                tbl.add_column(name, data)
             except KeyError:
                 pass
-        
+
         # add the corrected energy to the table
-        tbl.add_column("corrected_energy",lgdo.Array(corrected_energy[:][idx_chan]))
+        tbl.add_column("corrected_energy", lgdo.Array(corrected_energy[:][idx_chan]))
         res = tbl.eval(logic)
-        mask[idx_chan][idx_events]=res
-    
+        mask[idx_chan][idx_events] = res
+
     return mask
+
 
 def xtalk_corrected_energy(
     uncalibrated_energies: np.ndarray,
