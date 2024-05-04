@@ -65,9 +65,7 @@ def apply_xtalk_correction(
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
     uncalibrated_energy_name
-        name of the pulse parameter for uncalibrated energy to be gathered, optionally prefixed by tier
-        name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
-        to ``hit``.
+        expression for the pulse parameter to be gathered, can be a combination of different fields.
     calibrated_energy_name
         name of the pulse parameter for calibrated energy to be gathered, optionally prefixed by tier
         name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
@@ -145,9 +143,7 @@ def apply_xtalk_correction_and_calibrate(
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
     uncalibrated_energy_name
-        name of the pulse parameter for uncalibrated energy to be gathered, optionally prefixed by tier
-        name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
-        to ``hit``.
+        expression for the pulse parameter to be gathered, can be a combination of different fields.
     calibrated_energy_name
         name of the pulse parameter for calibrated energy to be gathered, optionally prefixed by tier
         name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults

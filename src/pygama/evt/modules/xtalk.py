@@ -55,9 +55,7 @@ def build_energy_array(
     Parameters
     ----------
     observable
-        name of the pulse parameter to be gathered, optionally prefixed by tier
-        name (e.g. ``hit.cuspEmax_ctc_cal``). If no tier is specified, it defaults
-        to ``hit``.
+        expression for the pulse parameter to be gathered, can be a combination of different fields.
     datainfo
         utils.DataInfo object
     tcm
@@ -66,37 +64,55 @@ def build_energy_array(
         list of channel rawids from the cross talk matrix.
     """
 
-    # build the energy arrays
-    p = observable.split(".")
-    tier = p[0] if len(p) > 1 else "hit"
-    column = p[1] if len(p) > 1 else p[0]
 
-    table_fmt = datainfo._asdict()[tier].table_fmt
-    group = datainfo._asdict()[tier].group
-    file = datainfo._asdict()[tier].file
+     # replace group. with group___
+    for tier in datainfo._asdict():
+        group = datainfo._asdict()[tier].group
+        observable= observable.replace(f"{group}.", f"{group}___")
+
+    observable = observable.replace(".", "__")
+
+    c = compile(observable, "gcc -O3 -ffast-math build_hit.py", "eval")
+
+    tier_params = []
+    for name in c.co_names:
+        if "___" in name:
+            tier, column = name.split("___")
+            group = datainfo._asdict()[tier].group
+            file = datainfo._asdict()[tier].file
+            if (file, group, column) not in tier_params:
+                tier_params.append((file, group, column))
+        elif "__" in name:
+            # get module and function names
+            package, func = name.rsplit("__", 1)
+            # import function into current namespace
+            importlib.import_module(package)
+
 
     # initialise the output object
-    energies_out = np.full((len(rawids), np.max(tcm.idx) + 1), np.nan)
-
-    # parse observables string. default to hit tier
-    keys = ls(file)
+    energies_out = np.full(( np.max(tcm.idx) + 1,len(rawids)), np.nan)
 
     for idx_chan, channel in enumerate(rawids):
+        tbl = types.Table()
+        idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
-        # get the event indexes
-        table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{channel}")
-        idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
+        for file, group, column in tier_params:
+            keys = ls(file)
+            try:
+                # read the energy data
+                if f"ch{channel}" in keys:
+                    data = lh5.read(
+                        f"ch{channel}/{group}/{column}", file, idx=idx_events
+                    )
+                tbl.add_column(name, data)
+            except KeyError:
+                tbl.add_column(name, np.full_like(idx_events, np.nan))
 
-        # read the energy data
-        if f"ch{channel}" in keys:
-            data = lh5.read_as(
-                f"ch{channel}/{group}/{column}", file, idx=idx_events, library="np"
-            )
-            energies_out[idx_chan][idx_events] = data
+       
+        res = tbl.eval(observable)
+        energies_out[idx_events, idx_chan] = res.nda
 
-    # transpose to return object where row is events and column rawid idx
-    return energies_out.T
-
+    return energies_out
 
 def filter_hits(
     datainfo: utils.DataInfo,

@@ -26,36 +26,6 @@ def files_config(lgnd_test_data, tmptestdir):
     }
 
 
-def test_xtalk(lgnd_test_data, files_config):
-
-    config = {
-        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
-        "outputs": [
-            "corrected_energy",
-        ],
-        "operations": {
-            "corrected_energy": {
-                "channels": "geds_on",
-                "aggregation_mode": "function",
-                "expression": "pygama.evt.modules.geds.apply_xtalk_correction(<...>,uncalibrated_energy_name='dsp.cuspEmax',calibrated_energy_name=\
-                'hit.cuspEmax_ctc_cal',xtalk_matrix_filename='/data1/users/tdixon/cross_talk/l200-p08-r015-x-talk-matrix_trapTmax.lh5')",
-            }
-        },
-    }
-
-    build_evt(
-        files_config,
-        config=config,
-        wo_mode="of",
-    )
-
-    outfile = files_config["evt"][0]
-
-    evt = lh5.read("/evt", outfile)
-
-    assert os.path.exists(outfile)
-    assert sorted(evt.keys()) == ["corrected_energy"]
-
 
 def test_basics(lgnd_test_data, files_config):
     build_evt(
