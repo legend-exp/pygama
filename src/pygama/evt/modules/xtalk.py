@@ -2,6 +2,8 @@
 Module for cross talk correction of energies.
 """
 
+import importlib
+
 import awkward as ak
 import numpy as np
 from legendmeta.catalog import Props
@@ -94,6 +96,83 @@ def build_energy_array(
     return energies_out.T
 
 
+def filter_hits(
+    datainfo: utils.DataInfo,
+    tcm: utils.TCMData,
+    logic: str,
+    corrected_energy: np.ndarray,
+    rawids: np.ndarray,
+) -> np.ndarray:
+    """
+    Function to which hits in an event are above threshold.
+    Parameters:
+    -----------
+    datainfo, tcm
+        utils.DataInfo and utils.TCMData objects
+    logic
+        string containing the logic used to define which events are above threshold.
+        this string can also refer to the corrected energy as 'corrected_energy'
+    corrected_energy
+        2D numpy array of correct energy, the row corresponds to the event and the column the rawid
+    rawids
+        1D array of the rawids corresponding to each column
+    Returns
+        a numpy array of the mask of which
+
+    """
+
+    # find the fields in the string
+    mask = np.full((len(rawids), np.max(tcm.idx) + 1), False)
+
+    # replace group. with group___
+    for tier in datainfo._asdict():
+        group = datainfo._asdict()[tier].group
+        logic = logic.replace(f"{group}.", f"{group}___")
+
+    # replace remaining . with __ as these are module calls
+    logic = logic.replace(".", "__")
+
+    c = compile(logic, "gcc -O3 -ffast-math build_hit.py", "eval")
+    for idx_chan, channel in enumerate(rawids):
+        tbl = types.Table()
+
+        for name in c.co_names:
+            if "__" not in name:
+                continue
+            if "___" not in name:
+                # get module and function names
+                package, func = name.rsplit("__", 1)
+                # import function into current namespace
+                importlib.import_module(package)
+
+            else:
+                tier, column = name.split("___")
+
+                try:
+                    table_fmt = datainfo._asdict()[tier].table_fmt
+                    group = datainfo._asdict()[tier].group
+                    file = datainfo._asdict()[tier].file
+                    keys = ls(file)
+                    table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{channel}")
+                    idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
+
+                    # read the energy data
+                    if f"ch{channel}" in keys:
+                        data = lh5.read(
+                            f"ch{channel}/{group}/{column}", file, idx=idx_events
+                        )
+                    tbl.add_column(name, data)
+                except KeyError:
+                    pass
+
+        # add the corrected energy to the table
+        tbl.add_column("corrected_energy", types.Array(corrected_energy[:][idx_chan]))
+        res = tbl.eval(logic)
+        mask[idx_chan][idx_events] = res
+
+    return mask
+
+
 def xtalk_corrected_energy(
     uncalibrated_energies: np.ndarray,
     calibrated_energies: np.ndarray,
@@ -132,7 +211,6 @@ def xtalk_corrected_energy(
         )
     else:
         energies_threshold = uncalibrated_energies_no_nan
-
     energies_correction = -np.matmul(matrix, energies_threshold.T).T
     return uncalibrated_energies + energies_correction
 

@@ -47,6 +47,7 @@ def apply_xtalk_correction(
     mode: str,
     uncalibrated_energy_name: str,
     calibrated_energy_name: str,
+    multiplicity_logic: str,
     threshold: float = None,
     xtalk_matrix_filename: str = "",
     xtalk_rawid_name: str = "xtc/rawid_index",
@@ -98,10 +99,18 @@ def apply_xtalk_correction(
         positive_xtalk_matrix_name,
     )
 
+    multiplicity_mask = xtalk.filter_hits(
+        datainfo,
+        tcm,
+        multiplicity_logic,
+        energies_corr,
+        xtalk_matrix_rawids,
+    )
+
     if mode == "energy":
-        return types.VectorOfVectors(energies_corr)
+        return types.VectorOfVectors(energies_corr[multiplicity_mask])
     elif mode == "tcm_id":
-        return types.VectorOfVectors(tcm_id_array)
+        return types.VectorOfVectors(tcm_id_array[multiplicity_mask])
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -115,6 +124,7 @@ def apply_xtalk_correction_and_calibrate(
     uncalibrated_energy_name: str,
     calibrated_energy_name: str,
     par_files: str | list[str],
+    multiplicity_logic: str,
     threshold: float = None,
     xtalk_matrix_filename: str = "",
     xtalk_rawid_name: str = "xtc/rawid_index",
@@ -182,9 +192,17 @@ def apply_xtalk_correction_and_calibrate(
         out_param,
     )
 
+    multiplicity_mask = xtalk.filter_hits(
+        datainfo,
+        tcm,
+        multiplicity_logic,
+        calibrated_corr,
+        xtalk_matrix_rawids,
+    )
+
     if mode == "energy":
-        return types.VectorOfVectors(calibrated_corr)
+        return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
     elif mode == "tcm_id":
-        return types.VectorOfVectors(tcm_id_array)
+        return types.VectorOfVectors(tcm_id_array[multiplicity_mask])
     else:
         raise ValueError(f"Unknown mode: {mode}")
