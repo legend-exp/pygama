@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+import awkward as ak
 import numpy as np
 from lgdo import lh5, types
 
@@ -106,6 +107,8 @@ def apply_xtalk_correction(
         energies_corr,
         xtalk_matrix_rawids,
     )
+    energies_corr = ak.from_regular(energies_corr)
+    multiplicity_mask = ak.from_regular(multiplicity_mask)
 
     if mode == "energy":
         return types.VectorOfVectors(energies_corr[multiplicity_mask])
@@ -177,8 +180,6 @@ def apply_xtalk_correction_and_calibrate(
         positive_xtalk_matrix_name,
     )
 
-    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
-
     if out_param is None:
         out_param = calibrated_energy_name.split(".")[-1]
 
@@ -199,6 +200,9 @@ def apply_xtalk_correction_and_calibrate(
         calibrated_corr,
         xtalk_matrix_rawids,
     )
+
+    calibrated_corr = ak.from_regular(calibrated_corr)
+    multiplicity_mask = ak.from_regular(multiplicity_mask)
 
     if mode == "energy":
         return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
