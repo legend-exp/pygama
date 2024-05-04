@@ -2,6 +2,8 @@
 Module for cross talk correction of energies.
 """
 
+from __future__ import annotations
+
 import importlib
 
 import awkward as ak
@@ -122,7 +124,7 @@ def filter_hits(
     """
 
     # find the fields in the string
-    mask = np.full((len(rawids), np.max(tcm.idx) + 1), False)
+    mask = np.full_like(corrected_energy, False, dtype=bool)
 
     # replace group. with group___
     for tier in datainfo._asdict():
@@ -133,42 +135,43 @@ def filter_hits(
     logic = logic.replace(".", "__")
 
     c = compile(logic, "gcc -O3 -ffast-math build_hit.py", "eval")
+
+    tier_params = []
+    for name in c.co_names:
+        if "___" in name:
+            tier, column = name.split("___")
+            group = datainfo._asdict()[tier].group
+            file = datainfo._asdict()[tier].file
+            if (file, group, column) not in tier_params:
+                tier_params.append((file, group, column))
+        elif "__" in name:
+            # get module and function names
+            package, func = name.rsplit("__", 1)
+            # import function into current namespace
+            importlib.import_module(package)
+
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
+        idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
-        for name in c.co_names:
-            if "__" not in name:
-                continue
-            if "___" not in name:
-                # get module and function names
-                package, func = name.rsplit("__", 1)
-                # import function into current namespace
-                importlib.import_module(package)
-
-            else:
-                tier, column = name.split("___")
-
-                try:
-                    table_fmt = datainfo._asdict()[tier].table_fmt
-                    group = datainfo._asdict()[tier].group
-                    file = datainfo._asdict()[tier].file
-                    keys = ls(file)
-                    table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{channel}")
-                    idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
-
-                    # read the energy data
-                    if f"ch{channel}" in keys:
-                        data = lh5.read(
-                            f"ch{channel}/{group}/{column}", file, idx=idx_events
-                        )
-                    tbl.add_column(name, data)
-                except KeyError:
-                    pass
+        for file, group, column in tier_params:
+            keys = ls(file)
+            try:
+                # read the energy data
+                if f"ch{channel}" in keys:
+                    data = lh5.read(
+                        f"ch{channel}/{group}/{column}", file, idx=idx_events
+                    )
+                tbl.add_column(name, data)
+            except KeyError:
+                tbl.add_column(name, np.full_like(idx_events, np.nan))
 
         # add the corrected energy to the table
-        tbl.add_column("corrected_energy", types.Array(corrected_energy[:][idx_chan]))
+        tbl.add_column(
+            "corrected_energy", types.Array(corrected_energy[idx_events, idx_chan])
+        )
         res = tbl.eval(logic)
-        mask[idx_chan][idx_events] = res
+        mask[idx_events, idx_chan] = res.nda
 
     return mask
 
