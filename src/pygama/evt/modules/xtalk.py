@@ -64,11 +64,10 @@ def build_energy_array(
         list of channel rawids from the cross talk matrix.
     """
 
-
-     # replace group. with group___
+    # replace group. with group___
     for tier in datainfo._asdict():
         group = datainfo._asdict()[tier].group
-        observable= observable.replace(f"{group}.", f"{group}___")
+        observable = observable.replace(f"{group}.", f"{group}___")
 
     observable = observable.replace(".", "__")
 
@@ -88,9 +87,8 @@ def build_energy_array(
             # import function into current namespace
             importlib.import_module(package)
 
-
     # initialise the output object
-    energies_out = np.full(( np.max(tcm.idx) + 1,len(rawids)), np.nan)
+    energies_out = np.full((np.max(tcm.idx) + 1, len(rawids)), np.nan)
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
@@ -108,11 +106,11 @@ def build_energy_array(
             except KeyError:
                 tbl.add_column(name, np.full_like(idx_events, np.nan))
 
-       
         res = tbl.eval(observable)
         energies_out[idx_events, idx_chan] = res.nda
 
     return energies_out
+
 
 def filter_hits(
     datainfo: utils.DataInfo,

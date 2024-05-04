@@ -26,7 +26,6 @@ def files_config(lgnd_test_data, tmptestdir):
     }
 
 
-
 def test_basics(lgnd_test_data, files_config):
     build_evt(
         files_config,
