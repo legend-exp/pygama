@@ -7,8 +7,8 @@ import importlib
 import awkward as ak
 import numpy as np
 from legendmeta.catalog import Props
-from lgdo import lh5
-from lgdo.lh5 import ls, types
+from lgdo import lh5, types
+from lgdo.lh5 import ls
 
 from pygama.hit.build_hit import _remove_uneeded_operations, _reorder_table_operations
 
