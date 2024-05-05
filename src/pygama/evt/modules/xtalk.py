@@ -4,8 +4,6 @@ Module for cross talk correction of energies.
 
 from __future__ import annotations
 
-import importlib
-
 import awkward as ak
 import numpy as np
 from legendmeta.catalog import Props
@@ -79,13 +77,9 @@ def build_energy_array(
             tier, column = name.split("___")
             group = datainfo._asdict()[tier].group
             file = datainfo._asdict()[tier].file
-            if (file, group, column) not in tier_params:
-                tier_params.append((file, group, column))
-        elif "__" in name:
-            # get module and function names
-            package, func = name.rsplit("__", 1)
-            # import function into current namespace
-            importlib.import_module(package)
+            if (name, file, group, column) not in tier_params:
+                tier_params.append((name, file, group, column))
+        
 
     # initialise the output object
     energies_out = np.full((np.max(tcm.idx) + 1, len(rawids)), np.nan)
@@ -94,7 +88,7 @@ def build_energy_array(
         tbl = types.Table()
         idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
-        for file, group, column in tier_params:
+        for name, file, group, column in tier_params:
             keys = ls(file)
             try:
                 # read the energy data
@@ -145,9 +139,6 @@ def filter_hits(
         group = datainfo._asdict()[tier].group
         logic = logic.replace(f"{group}.", f"{group}___")
 
-    # replace remaining . with __ as these are module calls
-    logic = logic.replace(".", "__")
-
     c = compile(logic, "gcc -O3 -ffast-math build_hit.py", "eval")
 
     tier_params = []
@@ -156,13 +147,8 @@ def filter_hits(
             tier, column = name.split("___")
             group = datainfo._asdict()[tier].group
             file = datainfo._asdict()[tier].file
-            if (file, group, column) not in tier_params:
+            if (name, file, group, column) not in tier_params:
                 tier_params.append((name, file, group, column))
-        elif "__" in name:
-            # get module and function names
-            package, func = name.rsplit("__", 1)
-            # import function into current namespace
-            importlib.import_module(package)
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()

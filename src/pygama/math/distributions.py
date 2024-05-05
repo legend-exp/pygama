@@ -5,14 +5,14 @@ Contains a list of distribution functions, all implemented using Numba's
 
 # nopycln: file
 
+from pygama.math.functions.crystal_ball import crystal_ball  # noqa: F401
 from pygama.math.functions.crystal_ball import (  # noqa: F401
-    crystal_ball,
     nb_crystal_ball_cdf,
     nb_crystal_ball_pdf,
 )
 from pygama.math.functions.error_function import nb_erf, nb_erfc  # noqa: F401
+from pygama.math.functions.exgauss import exgauss  # noqa: F401
 from pygama.math.functions.exgauss import (  # noqa: F401
-    exgauss,
     nb_exgauss_cdf,
     nb_exgauss_pdf,
     nb_gauss_tail_approx,
