@@ -157,7 +157,7 @@ def filter_hits(
             group = datainfo._asdict()[tier].group
             file = datainfo._asdict()[tier].file
             if (file, group, column) not in tier_params:
-                tier_params.append((file, group, column))
+                tier_params.append((name, file, group, column))
         elif "__" in name:
             # get module and function names
             package, func = name.rsplit("__", 1)
@@ -168,8 +168,9 @@ def filter_hits(
         tbl = types.Table()
         idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
-        for file, group, column in tier_params:
+        for name, file, group, column in tier_params:
             keys = ls(file)
+      
             try:
                 # read the energy data
                 if f"ch{channel}" in keys:
