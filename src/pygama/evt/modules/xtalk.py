@@ -79,7 +79,6 @@ def build_energy_array(
             file = datainfo._asdict()[tier].file
             if (name, file, group, column) not in tier_params:
                 tier_params.append((name, file, group, column))
-        
 
     # initialise the output object
     energies_out = np.full((np.max(tcm.idx) + 1, len(rawids)), np.nan)
@@ -156,7 +155,7 @@ def filter_hits(
 
         for name, file, group, column in tier_params:
             keys = ls(file)
-      
+
             try:
                 # read the energy data
                 if f"ch{channel}" in keys:
