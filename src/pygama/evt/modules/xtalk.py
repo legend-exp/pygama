@@ -88,16 +88,14 @@ def build_energy_array(
         idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
         for name, file, group, column in tier_params:
-            keys = ls(file)
             try:
                 # read the energy data
-                if f"ch{channel}" in keys:
-                    data = lh5.read(
+                data = lh5.read(
                         f"ch{channel}/{group}/{column}", file, idx=idx_events
                     )
                 tbl.add_column(name, data)
-            except KeyError:
-                tbl.add_column(name, np.full_like(idx_events, np.nan))
+            except (lh5.exceptions.LH5DecodeError,KeyError):
+                tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
 
         res = tbl.eval(observable)
         energies_out[idx_events, idx_chan] = res.nda
@@ -154,17 +152,14 @@ def filter_hits(
         idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
 
         for name, file, group, column in tier_params:
-            keys = ls(file)
-
             try:
                 # read the energy data
-                if f"ch{channel}" in keys:
-                    data = lh5.read(
-                        f"ch{channel}/{group}/{column}", file, idx=idx_events
-                    )
+                data = lh5.read(
+                        f"ch{channel}/{group}/{column}", file, idx=idx_events)
+                
                 tbl.add_column(name, data)
-            except KeyError:
-                tbl.add_column(name, np.full_like(idx_events, np.nan))
+            except (lh5.exceptions.LH5DecodeError,KeyError):
+                tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
 
         # add the corrected energy to the table
         tbl.add_column(

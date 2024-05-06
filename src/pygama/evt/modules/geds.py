@@ -64,6 +64,8 @@ def apply_xtalk_correction(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
+    mode
+        string which can be either energy to return corrected energy or tcm_id
     uncalibrated_energy_name
         expression for the pulse parameter to be gathered, can be a combination of different fields.
     calibrated_energy_name
@@ -107,6 +109,7 @@ def apply_xtalk_correction(
     )
     energies_corr = ak.from_regular(energies_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
+    tcm_id_array=ak.from_regular(tcm_id_array)
 
     if mode == "energy":
         return types.VectorOfVectors(energies_corr[multiplicity_mask])
@@ -142,12 +145,18 @@ def apply_xtalk_correction_and_calibrate(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
+    mode
+        string which can be either energy to return corrected energy or tcm_id
     uncalibrated_energy_name
         expression for the pulse parameter to be gathered, can be a combination of different fields.
     calibrated_energy_name
         name of the pulse parameter for calibrated energy to be gathered, optionally prefixed by tier
         name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
         to ``hit``.
+    par_files
+        path to the generated par files used to recalibrate the data
+    multiplicity_logic:
+        string containing the logic used to define the multiplicity
     threshold
         threshold used for xtalk correction, hits below this energy will not
         be used to correct the other hits.
@@ -159,6 +168,8 @@ def apply_xtalk_correction_and_calibrate(
         name of the lh5 object containing the positive polarity xtalk matrix
     xtalk_matrix_rawids
         name of the lh5 object containing the name of the rawids
+    out_param
+        name of the energy variable to use for recalibration (default None)
     """
 
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
@@ -197,8 +208,11 @@ def apply_xtalk_correction_and_calibrate(
         xtalk_matrix_rawids,
     )
 
+ 
     calibrated_corr = ak.from_regular(calibrated_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
+    tcm_id_array = ak.from_regular(tcm_id_array)
+
 
     if mode == "energy":
         return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
