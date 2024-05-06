@@ -58,10 +58,10 @@ def test_gather_energy(lgnd_test_data, files_config):
     energy = xtalk.gather_energy(
         "hit.cuspEmax_ctc_cal", tcm, f, np.array([1084803, 1084804])
     )
-    n_rows = np.max(tcm.idx)+1
+    n_rows = np.max(tcm.idx) + 1
     assert isinstance(energy, np.ndarray)
     assert energy.ndim == 2
-    assert np.shape(energy) == (n_rows,2)
+    assert np.shape(energy) == (n_rows, 2)
 
 
 def test_filter_hits(lgnd_test_data, files_config):
@@ -74,7 +74,7 @@ def test_filter_hits(lgnd_test_data, files_config):
         ),
     )
     n_rows = np.max(tcm.idx) + 1
-    
+
     filter = xtalk.filter_hits(
         f,
         tcm,
@@ -85,4 +85,4 @@ def test_filter_hits(lgnd_test_data, files_config):
 
     assert isinstance(filter, np.ndarray)
     assert filter.ndim == 2
-    assert np.shape(filter)==(n_rows,2)
+    assert np.shape(filter) == (n_rows, 2)
