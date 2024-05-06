@@ -90,11 +90,9 @@ def build_energy_array(
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(
-                        f"ch{channel}/{group}/{column}", file, idx=idx_events
-                    )
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=idx_events)
                 tbl.add_column(name, data)
-            except (lh5.exceptions.LH5DecodeError,KeyError):
+            except (lh5.exceptions.LH5DecodeError, KeyError):
                 tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
 
         res = tbl.eval(observable)
@@ -154,11 +152,10 @@ def filter_hits(
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(
-                        f"ch{channel}/{group}/{column}", file, idx=idx_events)
-                
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=idx_events)
+
                 tbl.add_column(name, data)
-            except (lh5.exceptions.LH5DecodeError,KeyError):
+            except (lh5.exceptions.LH5DecodeError, KeyError):
                 tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
 
         # add the corrected energy to the table

@@ -109,7 +109,7 @@ def apply_xtalk_correction(
     )
     energies_corr = ak.from_regular(energies_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
-    tcm_id_array=ak.from_regular(tcm_id_array)
+    tcm_id_array = ak.from_regular(tcm_id_array)
 
     if mode == "energy":
         return types.VectorOfVectors(energies_corr[multiplicity_mask])
@@ -208,11 +208,9 @@ def apply_xtalk_correction_and_calibrate(
         xtalk_matrix_rawids,
     )
 
- 
     calibrated_corr = ak.from_regular(calibrated_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
     tcm_id_array = ak.from_regular(tcm_id_array)
-
 
     if mode == "energy":
         return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
