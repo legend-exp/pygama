@@ -45,15 +45,15 @@ def apply_xtalk_correction(
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
-    mode: str,
-    uncalibrated_energy_name: str,
-    calibrated_energy_name: str,
-    multiplicity_logic: str,
-    threshold: float = None,
+    return_mode: str,
+    uncal_energy_expr: str,
+    cal_energy_expr: str,
+    multiplicity_expr: str,
+    xtalk_threshold: float = None,
     xtalk_matrix_filename: str = "",
-    xtalk_rawid_name: str = "xtc/rawid_index",
-    xtalk_matrix_name: str = "xtc/xtalk_matrix_negative",
-    positive_xtalk_matrix_name: str = "xtc/xtalk_matrix_positive",
+    xtalk_rawid_obj: str = "xtc/rawid_index",
+    xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
+    positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a lh5 file.
@@ -64,59 +64,59 @@ def apply_xtalk_correction(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
-    mode
-        string which can be either energy to return corrected energy or tcm_id
-    uncalibrated_energy_name
-        expression for the pulse parameter to be gathered, can be a combination of different fields.
-    calibrated_energy_name
-        name of the pulse parameter for calibrated energy to be gathered, optionally prefixed by tier
-        name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
-        to ``hit``.
-    threshold
+    return_mode
+        string which can be either energy to return corrected energy or tcm_index
+    uncal_energy_expr
+        expression for the pulse parameter to be gathered for the uncalibrated energy (used for correction),
+        can be a combination of different fields.
+    cal_energy_expr
+        expression for the pulse parameter to be gathered for the calibrated energy, used for the xtalk threshold,
+        can be a combination of different fields.
+    xtalk_threshold
         threshold used for xtalk correction, hits below this energy will not
         be used to correct the other hits.
     xtalk_matrix_filename
         name of the file containing the xtalk matrices.
-    xtalk_matrix_name
+    xtalk_matrix_obj
         name of the lh5 object containing the xtalk matrix
-    positive_xtalk_matrix_name
+    positive_xtalk_matrix_obj
         name of the lh5 object containing the positive polarity xtalk matrix
-    xtalk_matrix_rawids
+    xtalk_rawids_obj
         name of the lh5 object containing the name of the rawids
     """
 
-    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
-    tcm_id_array = xtalk.build_tcm_id_array(tcm, datainfo, xtalk_matrix_rawids)
+    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
+    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, xtalk_matrix_rawids)
 
-    energies_corr = xtalk.get_xtalk_correction(
+    energy_corr = xtalk.get_xtalk_correction(
         tcm,
         datainfo,
-        uncalibrated_energy_name,
-        calibrated_energy_name,
-        threshold,
+        uncal_energy_expr,
+        cal_energy_expr,
+        xtalk_threshold,
         xtalk_matrix_filename,
-        xtalk_rawid_name,
-        xtalk_matrix_name,
-        positive_xtalk_matrix_name,
+        xtalk_rawid_obj,
+        xtalk_matrix_obj,
+        positive_xtalk_matrix_obj,
     )
 
     multiplicity_mask = xtalk.filter_hits(
         datainfo,
         tcm,
-        multiplicity_logic,
-        energies_corr,
+        multiplicity_expr,
+        energy_corr,
         xtalk_matrix_rawids,
     )
-    energies_corr = ak.from_regular(energies_corr)
+    energy_corr = ak.from_regular(energy_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
-    tcm_id_array=ak.from_regular(tcm_id_array)
+    tcm_index_array = ak.from_regular(tcm_index_array)
 
-    if mode == "energy":
-        return types.VectorOfVectors(energies_corr[multiplicity_mask])
-    elif mode == "tcm_id":
-        return types.VectorOfVectors(tcm_id_array[multiplicity_mask])
+    if return_mode == "energy":
+        return types.VectorOfVectors(energy_corr[multiplicity_mask])
+    elif return_mode == "tcm_index":
+        return types.VectorOfVectors(tcm_index_array[multiplicity_mask])
     else:
-        raise ValueError(f"Unknown mode: {mode}")
+        raise ValueError(f"Unknown mode: {return_mode}")
 
 
 def apply_xtalk_correction_and_calibrate(
@@ -124,99 +124,94 @@ def apply_xtalk_correction_and_calibrate(
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
-    mode: str,
-    uncalibrated_energy_name: str,
-    calibrated_energy_name: str,
-    par_files: str | list[str],
-    multiplicity_logic: str,
-    threshold: float = None,
+    return_mode: str,
+    uncal_energy_expr: str,
+    cal_energy_expr: str,
+    cal_par_files: str | list[str],
+    multiplicity_expr: str,
+    xtalk_threshold: float = None,
     xtalk_matrix_filename: str = "",
-    xtalk_rawid_name: str = "xtc/rawid_index",
-    xtalk_matrix_name: str = "xtc/xtalk_matrix_negative",
-    positive_xtalk_matrix_name: str = "xtc/xtalk_matrix_positive",
-    out_param: str = None,
+    xtalk_rawid_obj: str = "xtc/rawid_index",
+    xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
+    positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
+    recal_var: str = "hit.cuspEmax_ctc_cal",
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
     The format of `xtalk_matrix_filename` should be currently be a path to a lh5 file.
 
-    The correction is applied using matrix algebra for all triggers above the threshold.
+    The correction is applied using matrix algebra for all triggers above the xalk threshold.
 
     Parameters
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
-    mode
-        string which can be either energy to return corrected energy or tcm_id
-    uncalibrated_energy_name
-        expression for the pulse parameter to be gathered, can be a combination of different fields.
-    calibrated_energy_name
-        name of the pulse parameter for calibrated energy to be gathered, optionally prefixed by tier
-        name (e.g. ``hit.cusp_Emax``). If no tier is specified, it defaults
-        to ``hit``.
-    par_files
-        path to the generated par files used to recalibrate the data
-    multiplicity_logic:
+    return_mode
+        string which can be either energy to return corrected energy or tcm_index
+    uncal_energy_expr
+        expression for the pulse parameter to be gathered for the uncalibrated energy (used for correction),
+        can be a combination of different fields.
+    cal_energy_expr
+        expression for the pulse parameter to be gathered for the calibrated energy, used for the xtalk threshold,
+        can be a combination of different fields.
+    cal_par_files
+        path to the generated hit tier par files used to recalibrate the data
+    multiplicity_expr:
         string containing the logic used to define the multiplicity
-    threshold
+    xtalk_threshold
         threshold used for xtalk correction, hits below this energy will not
         be used to correct the other hits.
     xtalk_matrix_filename
         name of the file containing the xtalk matrices.
-    xtalk_matrix_name
+    xtalk_matrix_obj
         name of the lh5 object containing the xtalk matrix
-    positive_xtalk_matrix_name
+    positive_xtalk_matrix_obj
         name of the lh5 object containing the positive polarity xtalk matrix
     xtalk_matrix_rawids
         name of the lh5 object containing the name of the rawids
-    out_param
-        name of the energy variable to use for recalibration (default None)
+    recal_var
+        name of the energy variable to use for recalibration
     """
 
-    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_name, xtalk_matrix_filename, "np")
-    tcm_id_array = xtalk.build_tcm_id_array(tcm, datainfo, xtalk_matrix_rawids)
+    xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
+    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, xtalk_matrix_rawids)
 
-    energies_corr = xtalk.get_xtalk_correction(
+    energy_corr = xtalk.get_xtalk_correction(
         tcm,
         datainfo,
-        uncalibrated_energy_name,
-        calibrated_energy_name,
-        threshold,
+        uncal_energy_expr,
+        cal_energy_expr,
+        xtalk_threshold,
         xtalk_matrix_filename,
-        xtalk_rawid_name,
-        xtalk_matrix_name,
-        positive_xtalk_matrix_name,
+        xtalk_rawid_obj,
+        xtalk_matrix_obj,
+        positive_xtalk_matrix_obj,
     )
-
-    if out_param is None:
-        out_param = calibrated_energy_name.split(".")[-1]
 
     calibrated_corr = xtalk.calibrate_energy(
         datainfo,
         tcm,
-        energies_corr,
+        energy_corr,
         xtalk_matrix_rawids,
-        par_files,
-        uncalibrated_energy_name,
-        out_param,
+        cal_par_files,
+        uncal_energy_expr,
+        recal_var,
     )
 
     multiplicity_mask = xtalk.filter_hits(
         datainfo,
         tcm,
-        multiplicity_logic,
+        multiplicity_expr,
         calibrated_corr,
         xtalk_matrix_rawids,
     )
 
- 
     calibrated_corr = ak.from_regular(calibrated_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
-    tcm_id_array = ak.from_regular(tcm_id_array)
+    tcm_index_array = ak.from_regular(tcm_index_array)
 
-
-    if mode == "energy":
+    if return_mode == "energy":
         return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
-    elif mode == "tcm_id":
-        return types.VectorOfVectors(tcm_id_array[multiplicity_mask])
+    elif return_mode == "tcm_index":
+        return types.VectorOfVectors(tcm_index_array[multiplicity_mask])
     else:
-        raise ValueError(f"Unknown mode: {mode}")
+        raise ValueError(f"Unknown mode: {return_mode}")
