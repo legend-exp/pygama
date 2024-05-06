@@ -168,7 +168,7 @@ def filter_hits(
     return mask
 
 
-def xtalk_correct_energy(
+def xtalk_correct_energy_impl(
     uncal_energy: np.ndarray,
     cal_energy: np.ndarray,
     xtalk_matrix: np.ndarray,
@@ -250,7 +250,7 @@ def get_xtalk_correction(
         cal_energy_expr, tcm, datainfo, xtalk_matrix_rawids
     )
 
-    energy_corr = xtalk_correct_energy(
+    energy_corr = xtalk_correct_energy_impl(
         uncal_energy_array, cal_energy_array, xtalk_matrix, xtalk_threshold
     )
     return energy_corr
