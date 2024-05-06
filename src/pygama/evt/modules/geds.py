@@ -11,8 +11,6 @@ from lgdo import lh5, types
 from .. import utils
 from . import xtalk
 
-sto = lh5.LH5Store()
-
 
 def apply_recovery_cut(
     datainfo: utils.DataInfo,
