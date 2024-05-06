@@ -207,7 +207,7 @@ def xtalk_correct_energy_impl(
     else:
         uncal_energy_with_threshold = uncal_energy_no_nan
     energy_correction = -np.matmul(xtalk_matrix, uncal_energy_with_threshold.T).T
-    return uncal_energy_with_threshold + energy_correction
+    return uncal_energy_no_nan + energy_correction
 
 
 def get_xtalk_correction(
