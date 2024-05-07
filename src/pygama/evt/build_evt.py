@@ -497,6 +497,7 @@ def evaluate_expression(
                 return aggregators.evaluate_at_channel(
                     datainfo=datainfo,
                     tcm=tcm,
+                    channels=channels,
                     channels_skip=channels_skip,
                     expr=expr,
                     field_list=field_list,
@@ -512,6 +513,7 @@ def evaluate_expression(
                     expr=expr,
                     field_list=field_list,
                     ch_comp=ch_comp,
+                    channels=channels,
                     channels_skip=channels_skip,
                     pars_dict=pars_dict,
                     default_value=default_value,
