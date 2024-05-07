@@ -58,9 +58,13 @@ def get_lq_hist(
         # Get a histogram of events in the peak using sideband subtraction
         # Uses a 13 keV window, and the sideband is to the right of the peak
         # Default option
-        
-        df_peak = df.query(f'{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)')
-        df_sideband = df.query(f'{cal_energy_param} < ({peak} + 20) & {cal_energy_param} > ({peak} + 7)')
+
+        df_peak = df.query(
+            f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
+        )
+        df_sideband = df.query(
+            f"{cal_energy_param} < ({peak} + 20) & {cal_energy_param} > ({peak} + 7)"
+        )
 
         fit_range = get_fit_range(df_peak[lq_param].to_numpy())
 
@@ -78,8 +82,10 @@ def get_lq_hist(
     else:
         # Return a histogram in a 13 keV range surrounding the specified peak
 
-        df_peak = df.query(f'{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)')
-        
+        df_peak = df.query(
+            f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
+        )
+
         fit_range = get_fit_range(df_peak[lq_param].to_numpy())
         dep_hist, bins, var = pgh.get_hist(
             df_peak[lq_param].to_numpy(), bins=100, range=fit_range
@@ -148,6 +154,7 @@ def binned_lq_fit(
 
     return m1.values, m1.errors, hist, bins
 
+
 def calculate_time_means(
     df: pd.DataFrame,
     lq_param: str,
@@ -156,26 +163,29 @@ def calculate_time_means(
     sidebands: bool = True,
 ):
     """
-    Function for calculating the arithmetic mean and sigma for LQ events in a 
+    Function for calculating the arithmetic mean and sigma for LQ events in a
     specified peak
     """
-    
-    df_peak = df.query(f'{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)')
+
+    df_peak = df.query(
+        f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
+    )
     fit_range = get_fit_range(df_peak[lq_param].to_numpy())
-    
+
     lq_peak_vals = df_peak.query(
-        f'{lq_param} < {fit_range[1]} & {lq_param} > {fit_range[0]}'
+        f"{lq_param} < {fit_range[1]} & {lq_param} > {fit_range[0]}"
     )[lq_param].to_numpy()
-    
+
     mean = np.mean(lq_peak_vals)
     sigma = np.std(lq_peak_vals)
-    mean_err = sigma/np.sqrt(len(lq_peak_vals))
-    sig_err = 2*sigma**4/(len(lq_peak_vals) - 1)
-    
-    pars = {'mu': mean, 'sigma': sigma}
-    errors = {'mu': mean_err, 'sigma': sig_err}
-    
+    mean_err = sigma / np.sqrt(len(lq_peak_vals))
+    sig_err = 2 * sigma**4 / (len(lq_peak_vals) - 1)
+
+    pars = {"mu": mean, "sigma": sigma}
+    errors = {"mu": mean_err, "sigma": sig_err}
+
     return pars, errors
+
 
 def fit_time_means(tstamps, means, reses):
     out_dict = {}
@@ -185,10 +195,7 @@ def fit_time_means(tstamps, means, reses):
 
     rolling_mean = means[np.where(~np.isnan(means))[0][0]]
     for i, tstamp in enumerate(tstamps):
-        if (
-            np.isnan(means[i])
-            or np.isnan(reses[i])
-        ):
+        if np.isnan(means[i]) or np.isnan(reses[i]):
             out_dict[tstamp] = np.nan
 
         else:
@@ -201,6 +208,7 @@ def fit_time_means(tstamps, means, reses):
     for tstamp in current_tstamps:
         out_dict[tstamp] = rolling_mean
     return out_dict
+
 
 class LQCal:
     """A class for calibrating the LQ parameter and determining the LQ cut value"""
@@ -270,7 +278,7 @@ class LQCal:
                             time_df.query(f"{self.selection_string}"),
                             lq_param,
                             self.cal_energy_param,
-                            peak = 1592.5,
+                            peak=1592.5,
                         )
                         self.timecorr_df = pd.concat(
                             [
@@ -343,7 +351,7 @@ class LQCal:
                         df.query(f"{self.selection_string}"),
                         lq_param,
                         self.cal_energy_param,
-                        peak = 1592.5,
+                        peak=1592.5,
                     )
                     self.timecorr_df = pd.concat(
                         [
@@ -432,11 +440,11 @@ class LQCal:
 
             dt_range = [
                 np.nanpercentile(dep_events[self.dt_param], 10),
-                np.nanpercentile(dep_events[self.dt_param], 95)
+                np.nanpercentile(dep_events[self.dt_param], 95),
             ]
 
-            lq_range = [mean - 2*sigma, mean + 2*sigma]
-            
+            lq_range = [mean - 2 * sigma, mean + 2 * sigma]
+
             self.lq_range = lq_range
             self.dt_range = dt_range
 
@@ -452,9 +460,11 @@ class LQCal:
             self.dt_fit_pars = result
 
             df["LQ_Corrected"] = (
-                df[lq_param] - df[self.dt_param] * self.dt_fit_pars[0] - self.dt_fit_pars[1]
+                df[lq_param]
+                - df[self.dt_param] * self.dt_fit_pars[0]
+                - self.dt_fit_pars[1]
             )
-            
+
         except BaseException as e:
             if e == KeyboardInterrupt:
                 raise (e)
@@ -476,14 +486,14 @@ class LQCal:
         """
         Determines the cut value for LQ. Value is calculated by fitting the LQ distribution
         for events in the DEP to a gaussian. The LQ values are normalized by the fitted
-        sigma, and the cut value is set to a value of 3. Sideband subtraction is used to 
-        determine the LQ distribution for DEP events. Events greater than the cut value 
+        sigma, and the cut value is set to a value of 3. Sideband subtraction is used to
+        determine the LQ distribution for DEP events. Events greater than the cut value
         fail the cut.
         """
 
         log.info("Starting LQ Cut calculation")
         try:
-            
+
             pars, errs, hist, bins = binned_lq_fit(
                 df, lq_param, cal_energy_param, peak=1592.5
             )
@@ -493,8 +503,8 @@ class LQCal:
             self.fit_hist = (hist, bins)
             self.cut_val = 3
 
-            df['LQ_Classifier'] = np.divide(df[lq_param].to_numpy(), pars[1])
-            df["LQ_Cut"] = df['LQ_Classifier'] < self.cut_val
+            df["LQ_Classifier"] = np.divide(df[lq_param].to_numpy(), pars[1])
+            df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
 
         except BaseException as e:
             if e == KeyboardInterrupt:
@@ -513,10 +523,10 @@ class LQCal:
                 "LQ_Cut": {
                     "expression": f"(LQ_Classifier < a)",
                     "parameters": {"a": self.cut_val},
-                }
+                },
             }
-        )       
-                    
+        )
+
     def calibrate(self, df, initial_lq_param):
         """Run the LQ calibration and calculate the cut value"""
 
@@ -632,19 +642,28 @@ def plot_lq_mean_time(
             for tstamp, cal_dict in lq_class.cal_dicts.items()
         ]
         ax.step(
-            [datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ") for tstamp in lq_class.cal_dicts],
+            [
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                for tstamp in lq_class.cal_dicts
+            ],
             grouped_means,
             where="post",
         )
         ax.fill_between(
-            [datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ") for tstamp in lq_class.cal_dicts],
+            [
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                for tstamp in lq_class.cal_dicts
+            ],
             y1=np.array(grouped_means) - 0.2 * np.array(lq_class.timecorr_df["res"]),
             y2=np.array(grouped_means) + 0.2 * np.array(lq_class.timecorr_df["res"]),
             color="green",
             alpha=0.2,
         )
         ax.fill_between(
-            [datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ") for tstamp in lq_class.cal_dicts],
+            [
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                for tstamp in lq_class.cal_dicts
+            ],
             y1=np.array(grouped_means) - 0.4 * np.array(lq_class.timecorr_df["res"]),
             y2=np.array(grouped_means) + 0.4 * np.array(lq_class.timecorr_df["res"]),
             color="yellow",
@@ -693,11 +712,11 @@ def plot_drift_time_correction(
         model = lq_class.dt_fit_pars[0] * x + lq_class.dt_fit_pars[1]
 
         plt.plot(x, model, color="r")
-        
-        plt.axvline(lq_class.dt_range[0], color = 'k')
-        plt.axvline(lq_class.dt_range[1], color = 'k')
-        plt.axhline(lq_class.lq_range[0], color = 'k')
-        plt.axhline(lq_class.lq_range[1], color = 'k')
+
+        plt.axvline(lq_class.dt_range[0], color="k")
+        plt.axvline(lq_class.dt_range[1], color="k")
+        plt.axhline(lq_class.lq_range[0], color="k")
+        plt.axhline(lq_class.lq_range[1], color="k")
 
         plt.xlabel("Drift Time (ns)")
         plt.ylabel("LQ")
@@ -721,10 +740,9 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     plt.rcParams["font.size"] = fontsize
     fig, (ax1, ax2) = plt.subplots(2, 1)
 
-
     hist, bins = lq_class.fit_hist
     fit_pars = lq_class.cut_fit_pars
-    
+
     x_low = bins[0]
     x_high = bins[-1]
 
@@ -744,8 +762,17 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
 
     bin_centers = (bins[:-1] + bins[1:]) / 2
     reses = (
-        hist - (gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1]) * dx * ls)
-    ) / (gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1]) * dx * ls)
+        hist
+        - (
+            gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
+            * dx
+            * ls
+        )
+    ) / (
+        gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
+        * dx
+        * ls
+    )
     ax2.plot(bin_centers, reses, marker="s", linestyle="")
     ax2.set_xlabel("LQ")
     ax2.set_ylabel("residuals")
