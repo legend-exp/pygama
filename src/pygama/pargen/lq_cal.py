@@ -521,7 +521,7 @@ class LQCal:
                     "parameters": {"a": pars[1]},
                 },
                 "LQ_Cut": {
-                    "expression": f"(LQ_Classifier < a)",
+                    "expression": "(LQ_Classifier < a)",
                     "parameters": {"a": self.cut_val},
                 },
             }
