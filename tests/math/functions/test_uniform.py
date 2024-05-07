@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import uniform as scipy_uniform
 
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 from pygama.math.functions.uniform import uniform
 
 
@@ -14,7 +14,7 @@ def test_uniform_pdf():
     y_direct = uniform.get_pdf(x, a, b)
     scipy_y = scipy_uniform.pdf(x, a, b)
 
-    assert isinstance(uniform, pygama_continuous)
+    assert isinstance(uniform, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.array_equal(y_direct, scipy_y)
 
@@ -40,7 +40,7 @@ def test_uniform_cdf():
     y_direct = uniform.get_cdf(x, a, b)
     scipy_y = scipy_uniform.cdf(x, a, b)
 
-    assert isinstance(uniform, pygama_continuous)
+    assert isinstance(uniform, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

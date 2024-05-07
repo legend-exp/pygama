@@ -95,7 +95,7 @@ def find_parameters(
 
     if len(hit_flds) > 0:
         hit_ak = lh5.read_as(
-            f"{ch.replace('/','')}/{f.hit.group}/",
+            f"{ch.replace('/', '')}/{f.hit.group}/",
             f.hit.file,
             field_mask=hit_flds,
             idx=idx_ch,
@@ -108,7 +108,7 @@ def find_parameters(
 
     if len(dsp_flds) > 0:
         dsp_ak = lh5.read_as(
-            f"{ch.replace('/','')}/{f.dsp.group}/",
+            f"{ch.replace('/', '')}/{f.dsp.group}/",
             f.dsp.file,
             field_mask=dsp_flds,
             idx=idx_ch,

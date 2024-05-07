@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import crystalball as scipy_crystal_ball
 
 from pygama.math.functions.crystal_ball import crystal_ball
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def test_crystalball_pdf():
@@ -18,7 +18,7 @@ def test_crystalball_pdf():
     y_direct = crystal_ball.get_pdf(x, *par_array)
     scipy_y = scipy_crystal_ball.pdf(x, beta, m, mu, sigma)
 
-    assert isinstance(crystal_ball, pygama_continuous)
+    assert isinstance(crystal_ball, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -51,7 +51,7 @@ def test_crystalball_cdf():
     y_direct = crystal_ball.get_cdf(x, *par_array)
     scipy_y = scipy_crystal_ball.cdf(x, beta, m, mu, sigma)
 
-    assert isinstance(crystal_ball, pygama_continuous)
+    assert isinstance(crystal_ball, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

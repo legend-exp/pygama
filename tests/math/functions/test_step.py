@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 from pygama.math.functions.step import step
 
 
@@ -41,7 +41,7 @@ def test_step_pdf():
     # compute the normalized step function
     scipy_y = scipy_step / normalization
 
-    assert isinstance(step, pygama_continuous)
+    assert isinstance(step, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -103,7 +103,7 @@ def test_step_cdf():
     # Compute the cdf
     scipy_y = unnormalized_cdf / pdf_normalization
 
-    assert isinstance(step, pygama_continuous)
+    assert isinstance(step, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 from pygama.math.functions.triple_gauss_on_double_step import (
     triple_gauss_on_double_step,
 )
@@ -83,7 +83,7 @@ def test_triple_gauss_on_double_step_pdf():
 
     scipy_y = scipy_y_step + scipy_y_gauss
 
-    assert isinstance(triple_gauss_on_double_step, sum_dists)
+    assert isinstance(triple_gauss_on_double_step, SumDists)
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -155,7 +155,7 @@ def test_triple_gauss_on_double_step_cdf():
     )
     scipy_y = scipy_y_step + scipy_y_gauss
 
-    assert isinstance(triple_gauss_on_double_step, sum_dists)
+    assert isinstance(triple_gauss_on_double_step, SumDists)
 
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import uniform as scipy_uniform
 
 from pygama.math.functions.linear import linear
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 from pygama.math.functions.uniform import uniform
 
 
@@ -17,7 +17,7 @@ def test_linear_pdf():
     y_direct = linear.get_pdf(x, x_lo, x_hi, m, b)
     scipy_y = scipy_uniform.pdf(x, x[0], x[-1] + np.abs(x[0]))
 
-    assert isinstance(linear, pygama_continuous)
+    assert isinstance(linear, PygamaContinuous)
     assert np.array_equal(y, scipy_y)
     assert np.array_equal(y_direct, scipy_y)
 
@@ -44,7 +44,7 @@ def test_linear_cdf():
     y_direct = linear.get_cdf(x, x_lo, x_hi, m, b)
     scipy_y = scipy_uniform.cdf(x, x[0], x[-1] + np.abs(x[0]))
 
-    assert isinstance(uniform, pygama_continuous)
+    assert isinstance(uniform, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

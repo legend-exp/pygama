@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import norm
 
 from pygama.math.functions.gauss_on_linear import gauss_on_linear
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 
 
 def line(x, m, b):
@@ -26,7 +26,7 @@ def test_gauss_on_linear_pdf():
 
     pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, m, b], dtype=float)
 
-    assert isinstance(gauss_on_linear, sum_dists)
+    assert isinstance(gauss_on_linear, SumDists)
 
     y_direct = gauss_on_linear.get_pdf(x, *pars)
 
@@ -60,7 +60,7 @@ def test_gauss_on_linear_cdf():
 
     pars = np.array([x_lo, x_hi, n_sig, mu, sigma, n_bkg, m, b], dtype=float)
 
-    assert isinstance(gauss_on_linear, sum_dists)
+    assert isinstance(gauss_on_linear, SumDists)
 
     y_direct = gauss_on_linear.get_cdf(x, *pars)
 

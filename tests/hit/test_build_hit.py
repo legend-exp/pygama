@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 
+import awkward as ak
 import numpy as np
 import pytest
 from lgdo import lh5
@@ -236,3 +237,28 @@ def test_build_hit_spms_calc(dsp_test_file_spm, tmptestdir):
     assert np.nanmean(df0) == 0
     assert np.nanmean(df1) == 1
     assert np.nanmean(df2) == 2
+
+
+def test_vov_input(lgnd_test_data, tmptestdir):
+    infile = lgnd_test_data.get_path(
+        "lh5/l200-p03-r000-phy-20230312T055349Z-tier_psp.lh5"
+    )
+    outfile = f"{tmptestdir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+
+    hit_config = {
+        "outputs": ["a"],
+        "operations": {
+            "a": {
+                "expression": "a + m * energies",
+                "parameters": {"a": 0, "m": 1},
+            }
+        },
+    }
+
+    build_hit(
+        infile, outfile=outfile, hit_config=hit_config, wo_mode="of", buffer_len=9999999
+    )
+
+    orig = lh5.read_as("ch1067205/dsp/energies", infile, "ak")
+    data = lh5.read_as("ch1067205/hit/a", outfile, "ak")
+    assert ak.all(data == orig)

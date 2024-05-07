@@ -2,7 +2,7 @@ import numpy as np
 from scipy.stats import moyal as scipy_moyal
 
 from pygama.math.functions.moyal import moyal
-from pygama.math.functions.pygama_continuous import pygama_continuous
+from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def test_moyal_pdf():
@@ -14,7 +14,7 @@ def test_moyal_pdf():
     y_direct = moyal.get_pdf(x, mu, sigma)
     scipy_y = scipy_moyal.pdf(x, mu, sigma)
 
-    assert isinstance(moyal, pygama_continuous)
+    assert isinstance(moyal, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 
@@ -41,7 +41,7 @@ def test_moyal_cdf():
     y_direct = moyal.get_cdf(x, mu, sigma)
     scipy_y = scipy_moyal.cdf(x, mu, sigma)
 
-    assert isinstance(moyal, pygama_continuous)
+    assert isinstance(moyal, PygamaContinuous)
     assert np.allclose(y, scipy_y, rtol=1e-8)
     assert np.allclose(y_direct, scipy_y, rtol=1e-8)
 

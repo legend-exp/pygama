@@ -30,14 +30,14 @@ from pygama.math.distributions import (
 )
 from pygama.math.functions.gauss import nb_gauss_amp
 from pygama.math.functions.hpge_peak import hpge_get_fwfm, hpge_get_fwhm, hpge_get_mode
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 from pygama.pargen.utils import convert_to_minuit, return_nans
 
 log = logging.getLogger(__name__)
 
 (x_lo, x_hi, n_sig, mu, sigma, n_bkg, tau) = range(7)
 par_array = [(gaussian, [mu, sigma]), (exgauss, [mu, sigma, tau])]
-aoe_peak = sum_dists(
+aoe_peak = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",
@@ -51,7 +51,7 @@ par_array = [
     (gauss_on_exgauss, [mu, sigma, frac1, tau]),
     (exgauss, [mu, sigma, tau_bkg]),
 ]
-aoe_peak_with_high_tail = sum_dists(
+aoe_peak_with_high_tail = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",
@@ -251,7 +251,8 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    Args:
+    Parameters
+    ----------
     aoe: np.array
         A/E values
     pdf: PDF
@@ -259,7 +260,9 @@ def unbinned_aoe_fit(
     display: int
         Level of display
 
-    Returns: tuple(np.array, np.array)
+    Returns
+    -------
+    tuple(np.array, np.array)
         Tuple of fit values and errors
     """
     if not isinstance(aoe, np.ndarray):
@@ -1507,7 +1510,7 @@ class CalAoE:
             )
 
             valid_fits = self.cut_fits.query(
-                f'sf_err<{(1.5 * np.nanpercentile(self.cut_fits["sf_err"],85))}&sf_err==sf_err'
+                f'sf_err<{(1.5 * np.nanpercentile(self.cut_fits["sf_err"], 85))}&sf_err==sf_err'
             )
 
             c = cost.LeastSquares(

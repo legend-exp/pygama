@@ -21,12 +21,12 @@ import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
 from pygama.math.binned_fitting import goodness_of_fit
 from pygama.math.distributions import exgauss, gaussian
-from pygama.math.functions.sum_dists import sum_dists
+from pygama.math.functions.sum_dists import SumDists
 from pygama.math.unbinned_fitting import fit_unbinned
 
 (x_lo, x_hi, n_sig, mu, sigma, n_bkg, tau) = range(7)
 par_array = [(gaussian, [mu, sigma]), (exgauss, [mu, sigma, tau])]
-gauss_on_exgauss_areas = sum_dists(
+gauss_on_exgauss_areas = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",
@@ -36,7 +36,7 @@ gauss_on_exgauss_areas = sum_dists(
 
 (x_lo, x_hi, n_sig, mu, sigma, tau1, n_bkg, tau2) = range(8)
 par_array = [(exgauss, [mu, sigma, tau1]), (exgauss, [mu, sigma, tau2])]
-double_exgauss = sum_dists(
+double_exgauss = SumDists(
     par_array,
     [n_sig, n_bkg],
     "areas",
@@ -373,58 +373,79 @@ def generate_cuts(
     Parameters
     ----------
     data : lh5 table, dictionary of arrays or pandas dataframe
-                data to calculate cuts on
+        data to calculate cuts on
+
     parameters : dict
-                dictionary of the form:
-                {
-                    "output_parameter_name": {
-                        "cut_parameter": "parameter_to_cut_on",
-                        "cut_level": number_of_sigmas,
-                        "mode": "inclusive" or "exclusive"
-                    }
+        dictionary of the form:
+
+        .. code-block:: json
+
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": "number_of_sigmas",
+                    "mode": "inclusive/exclusive"
                 }
-                number of sigmas can instead be a dictionary to specify different cut levels for low and high side
-                or to only have a one sided cut only specify one of the low or high side
-                e.g.
-                {
-                    "output_parameter_name": {
-                        "cut_parameter": "parameter_to_cut_on",
-                        "cut_level": {"low_side": 3, "high_side": 2},
-                        "mode": "inclusive" or "exclusive"
-                    }
+            }
+
+        number of sigmas can instead be a dictionary to specify different cut levels for low and high side
+        or to only have a one sided cut only specify one of the low or high side
+        e.g.
+
+        .. code-block:: json
+
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": {"low_side": "3", "high_side": "2"},
+                    "mode": "inclusive/exclusive"
                 }
-                alternatively can specify hit dict fields to just copy dict into output dict e.g.
-                {
-                    "is_valid_t0":{
-                        "expression":"(tp_0_est>a)&(tp_0_est<b)",
-                        "parameters":{"a":46000, "b":52000}
-                    }
+            }
+
+        alternatively can specify hit dict fields to just copy dict into output dict e.g.
+
+        .. code-block:: json
+
+            {
+                "is_valid_t0":{
+                    "expression":"(tp_0_est>a)&(tp_0_est<b)",
+                    "parameters":{"a":"46000", "b":"52000"}
                 }
-                or
-                {
-                    "is_valid_cal":{
-                        "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
-                    }
+            }
+
+        or
+
+        .. code-block:: json
+
+            {
+                "is_valid_cal":{
+                    "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
                 }
+            }
+
     rounding : int
-                number of decimal places to round to
+        number of decimal places to round to
+
     display : int
-                if 1 will display plots of the cuts
-                if 0 will not display plots
+        if 1 will display plots of the cuts
+        if 0 will not display plots
 
     Returns
     -------
     dict
         dictionary of the form (same as hit dicts):
-        {
-            "output_parameter_name": {
-                "expression": "cut_expression",
-                "parameters": {"a": lower_bound, "b": upper_bound}
+
+        .. code-block:: python
+
+            {
+                "output_parameter_name": {
+                    "expression": "cut_expression",
+                    "parameters": {"a": "lower_bound", "b": "upper_bound"}
+                }
             }
-        }
+
     plot_dict
         dictionary of plots
-
     """
 
     output_dict = {}
@@ -566,58 +587,79 @@ def generate_cut_classifiers(
     Parameters
     ----------
     data : lh5 table, dictionary of arrays or pandas dataframe
-                data to calculate cuts on
+        data to calculate cuts on
+
     parameters : dict
-                dictionary of the form:
-                {
-                    "output_parameter_name": {
-                        "cut_parameter": "parameter_to_cut_on",
-                        "cut_level": number_of_sigmas,
-                        "mode": "inclusive" or "exclusive"
-                    }
+        dictionary of the form:
+
+        .. code-block:: json
+
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": "number_of_sigmas",
+                     "mode": "inclusive/exclusive"
                 }
-                number of sigmas can instead be a dictionary to specify different cut levels for low and high side
-                or to only have a one sided cut only specify one of the low or high side
-                e.g.
-                {
-                    "output_parameter_name": {
-                        "cut_parameter": "parameter_to_cut_on",
-                        "cut_level": {"low_side": 3, "high_side": 2},
-                        "mode": "inclusive" or "exclusive"
-                    }
+            }
+
+        number of sigmas can instead be a dictionary to specify different cut levels for low and high side
+        or to only have a one sided cut only specify one of the low or high side
+        e.g.
+
+        .. code-block:: json
+
+            {
+                "output_parameter_name": {
+                    "cut_parameter": "parameter_to_cut_on",
+                    "cut_level": {"low_side": "3", "high_side": "2"},
+                    "mode": "inclusive/exclusive"
                 }
-                alternatively can specify hit dict fields to just copy dict into output dict e.g.
-                {
-                    "is_valid_t0":{
-                        "expression":"(tp_0_est>a)&(tp_0_est<b)",
-                        "parameters":{"a":46000, "b":52000}
-                    }
+            }
+
+        alternatively can specify hit dict fields to just copy dict into output dict e.g.
+
+        .. code-block:: json
+
+            {
+                "is_valid_t0":{
+                    "expression":"(tp_0_est>a)&(tp_0_est<b)",
+                    "parameters":{"a":"46000", "b":"52000"}
                 }
-                or
-                {
-                    "is_valid_cal":{
-                        "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
-                    }
+            }
+
+        or
+
+        .. code-block:: json
+
+            {
+                "is_valid_cal":{
+                    "expression":"(~is_pileup_tail)&(~is_pileup_baseline)"
                 }
+            }
+
     rounding : int
-                number of decimal places to round to
+        number of decimal places to round to
+
     display : int
-                if 1 will display plots of the cuts
-                if 0 will not display plots
+        if 1 will display plots of the cuts
+        if 0 will not display plots
 
     Returns
     -------
     dict
         dictionary of the form (same as hit dicts):
-        {
-            "output_parameter_name": {
-                "expression": "cut_expression",
-                "parameters": {"a": lower_bound, "b": upper_bound}
+
+        .. code-block:: python
+
+            {
+                "output_parameter_name": {
+                    "expression": "cut_expression",
+                    "parameters": {"a": lower_bound, "b": upper_bound}
+                }
             }
-        }
+
     plot_dict
         dictionary of plots
-
     """
 
     output_dict = {}
