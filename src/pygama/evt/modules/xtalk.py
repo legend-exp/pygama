@@ -8,7 +8,6 @@ import awkward as ak
 import numpy as np
 from legendmeta.catalog import Props
 from lgdo import lh5, types
-from lgdo.lh5 import ls
 
 from pygama.hit.build_hit import _remove_uneeded_operations, _reorder_table_operations
 
@@ -264,7 +263,7 @@ def calibrate_energy(
     par_files: str | list[str],
     uncal_energy_var: str = None,
     recal_energy_var: str = None,
-):  
+):
     """
     Function to recalibrate the energy
     Parameters
@@ -288,13 +287,12 @@ def calibrate_energy(
     pars = {
         chan: chan_dict["pars"]["operations"] for chan, chan_dict in par_dicts.items()
     }
-    
+
     p = uncal_energy_var.split(".")
     tier = p[0] if len(p) > 1 else "dsp"
 
     table_fmt = datainfo._asdict()[tier].table_fmt
     file = datainfo._asdict()[tier].file
-
 
     for i, chan in enumerate(xtalk_matrix_rawids):
         try:
@@ -302,7 +300,7 @@ def calibrate_energy(
             cfg, chan_inputs = _remove_uneeded_operations(
                 _reorder_table_operations(cfg), recal_energy_var.split(".")[-1]
             )
-          
+
             chan_inputs.remove(uncal_energy_var.split(".")[-1])
 
             # get the event indices
@@ -311,8 +309,9 @@ def calibrate_energy(
 
             # read the dsp data
             outtbl_obj = lh5.read(
-                    f"ch{chan}/dsp/", file,idx=idx_events ,field_mask=chan_inputs)
-             
+                f"ch{chan}/dsp/", file, idx=idx_events, field_mask=chan_inputs
+            )
+
             # add the uncalibrated energy to the table
             outtbl_obj.add_column(
                 uncal_energy_var.split(".")[-1],
