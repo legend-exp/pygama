@@ -72,14 +72,17 @@ operations:
     expression: hit.cuspEmax_ctc_cal
     initial: 0
   is_usable_aoe:
+    channels: geds_on
     aggregation_mode: keep_at_ch:evt.energy_id
     expression: "True"
     initial: false
   aoe:
+    channels: geds_on
     aggregation_mode: keep_at_ch:evt.energy_id
     expression: hit.AoE_Classifier
     initial: np.nan
   is_aoe_rejected:
+    channels: geds_on
     aggregation_mode: keep_at_ch:evt.energy_id
     expression: ~(hit.AoE_Double_Sided_Cut)
     initial: false
