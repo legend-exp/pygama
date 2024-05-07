@@ -340,7 +340,7 @@ class LQCal:
             else:
                 try:
                     pars, errs = calculate_time_means(
-                        time_df.query(f"{self.selection_string}"),
+                        df.query(f"{self.selection_string}"),
                         lq_param,
                         self.cal_energy_param,
                         peak = 1592.5,
