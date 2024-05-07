@@ -28,7 +28,7 @@ def build_tcm_index_array(
     """
 
     # initialise the output object
-    tcm_indexs_out = np.full((len(rawids), np.max(tcm.idx) + 1), np.nan)
+    tcm_indexs_out = np.full((len(rawids), len(tcm.cumulative_length)), np.nan)
 
     # parse observables string. default to hit tier
     for idx_chan, channel in enumerate(rawids):
@@ -81,7 +81,7 @@ def gather_energy(
                 tier_params.append((name, file, group, column))
 
     # initialise the output object
-    energy_out = np.full((np.max(tcm.idx) + 1, len(rawids)), np.nan)
+    energy_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
@@ -262,43 +262,60 @@ def calibrate_energy(
     energy_corr: np.ndarray,
     xtalk_matrix_rawids: np.ndarray,
     par_files: str | list[str],
-    uncal_energy_expr: str,
-    recal_var: str = None,
-):
+    uncal_energy_var: str = None,
+    recal_energy_var: str = None,
+):  
+    """
+    Function to recalibrate the energy
+    Parameters
+    ---------
+    datainfo
+        utils.DataInfo object containg the paths etc to the data
+    tcm
+        utils.TCMData object
+    energy_corr
+        cross talk corrected (uncal) energies to be recalibrated
+    par_files
+        path to the parameter files
+    uncal_energy_var
+        name of the uncalibrated energy variable
+    recal_energy_var
+        variable to be used for recalibration
+    """
 
     out_arr = np.full_like(energy_corr, np.nan)
     par_dicts = Props.read_from(par_files)
     pars = {
         chan: chan_dict["pars"]["operations"] for chan, chan_dict in par_dicts.items()
     }
-
-    p = recal_var.split(".")
-    tier = p[0] if len(p) > 1 else "hit"
+    
+    p = uncal_energy_var.split(".")
+    tier = p[0] if len(p) > 1 else "dsp"
 
     table_fmt = datainfo._asdict()[tier].table_fmt
     file = datainfo._asdict()[tier].file
 
-    keys = ls(file)
 
     for i, chan in enumerate(xtalk_matrix_rawids):
         try:
             cfg = pars[f"ch{chan}"]
             cfg, chan_inputs = _remove_uneeded_operations(
-                _reorder_table_operations(cfg), recal_var.split(".")[-1]
+                _reorder_table_operations(cfg), recal_energy_var.split(".")[-1]
             )
-            chan_inputs.remove(recal_var.split(".")[-1])
+          
+            chan_inputs.remove(uncal_energy_var.split(".")[-1])
 
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
             idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
 
-            # read the energy data
-            if f"ch{chan}" in keys:
-                outtbl_obj = lh5.read(
-                    f"ch{chan}/dsp/", file, idx=idx_events, field_mask=chan_inputs
-                )
+            # read the dsp data
+            outtbl_obj = lh5.read(
+                    f"ch{chan}/dsp/", file,idx=idx_events ,field_mask=chan_inputs)
+             
+            # add the uncalibrated energy to the table
             outtbl_obj.add_column(
-                recal_var.split(".")[-1],
+                uncal_energy_var.split(".")[-1],
                 types.Array(energy_corr[idx_events, i]),
             )
 
@@ -307,8 +324,8 @@ def calibrate_energy(
                     info["expression"], info.get("parameters", None)
                 )
                 outtbl_obj.add_column(outname, outcol)
-            out_arr[idx_events, i] = outtbl_obj[recal_var.split("")[-1]].nda
+            out_arr[idx_events, i] = outtbl_obj[recal_energy_var.split(".")[-1]].nda
         except KeyError:
-            out_arr[idx_events, i] = np.nan
+            out_arr[:, i] = np.nan
 
     return out_arr
