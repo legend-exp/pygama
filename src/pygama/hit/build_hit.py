@@ -262,6 +262,9 @@ def _reorder_table_operations(
 
 
 def _get_dependencies(config, par, pars=None):
+    """
+    Recursive func to iterate back through tree of input blocks for a given output block
+    """
     if pars is None:
         pars = []
     par_op = config[par]
@@ -277,6 +280,11 @@ def _get_dependencies(config, par, pars=None):
 
 
 def _remove_uneeded_operations(config, outpars):
+    """
+    Function that removes any operations not needed to generate outpars from the config dictionary
+    Returns the config without these blocks as well as a list of input keys from the dsp file
+    needed to generate outpars
+    """
     if not isinstance(outpars, list):
         outpars = [outpars]
     dependent_keys = [*outpars]
