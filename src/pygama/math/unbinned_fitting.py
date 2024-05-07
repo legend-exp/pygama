@@ -56,7 +56,7 @@ def fit_unbinned(func: Callable, data: np.ndarray, guess:np.ndarray =None,
         m = Minuit(cost_func, *guess)
     if bounds is not None:
         if isinstance(bounds, dict):
-            for arg, key in bounds:
+            for arg, key in bounds.items():
                 m.limits[arg] = key
         else:
             m.limits = bounds
