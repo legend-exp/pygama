@@ -27,7 +27,7 @@ def build_tcm_index_array(
     """
 
     # initialise the output object
-    tcm_indexs_out = np.full((len(rawids), len(tcm.cumulative_length)), np.nan)
+    tcm_indexs_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
 
     # parse observables string. default to hit tier
     for idx_chan, channel in enumerate(rawids):
@@ -37,11 +37,15 @@ def build_tcm_index_array(
             datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
         )
         tcm_indexs = np.where(tcm.id == table_id)[0]
-        idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
-        tcm_indexs_out[idx_chan][idx_events] = tcm_indexs
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == channel)[0],
+            "right",
+        )
+        tcm_indexs_out[evt_ids_ch, idx_chan] = tcm_indexs
 
     # transpose to return object where row is events and column rawid idx
-    return tcm_indexs_out.T
+    return tcm_indexs_out
 
 
 def gather_energy(
@@ -84,18 +88,23 @@ def gather_energy(
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
-        idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
+        hit_idx = ak.to_numpy(tcm.idx[tcm.id == channel])
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == channel)[0],
+            "right",
+        )
 
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=idx_events)
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=hit_idx)
                 tbl.add_column(name, data)
             except (lh5.exceptions.LH5DecodeError, KeyError):
-                tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
+                tbl.add_column(name, types.Array(np.full_like(evt_ids_ch, np.nan)))
 
         res = tbl.eval(observable)
-        energy_out[idx_events, idx_chan] = res.nda
+        energy_out[evt_ids_ch, idx_chan] = res.nda
 
     return energy_out
 
@@ -146,23 +155,29 @@ def filter_hits(
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
-        idx_events = ak.to_numpy(tcm.idx[tcm.id == channel])
+
+        hit_idx = ak.to_numpy(tcm.idx[tcm.id == channel])
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == channel)[0],
+            "right",
+        )
 
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=idx_events)
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=hit_idx)
 
                 tbl.add_column(name, data)
             except (lh5.exceptions.LH5DecodeError, KeyError):
-                tbl.add_column(name, types.Array(np.full_like(idx_events, np.nan)))
+                tbl.add_column(name, types.Array(np.full_like(evt_ids_ch, np.nan)))
 
         # add the corrected energy to the table
         tbl.add_column(
-            "xtalk_corr_energy", types.Array(xtalk_corr_energy[idx_events, idx_chan])
+            "xtalk_corr_energy", types.Array(xtalk_corr_energy[evt_ids_ch, idx_chan])
         )
         res = tbl.eval(filter_expr)
-        mask[idx_events, idx_chan] = res.nda
+        mask[evt_ids_ch, idx_chan] = res.nda
 
     return mask
 
@@ -269,7 +284,7 @@ def calibrate_energy(
     Parameters
     ---------
     datainfo
-        utils.DataInfo object containg the paths etc to the data
+        utils.DataInfo object containing the paths etc to the data
     tcm
         utils.TCMData object
     energy_corr
@@ -305,17 +320,23 @@ def calibrate_energy(
 
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
-            idx_events = ak.to_numpy(tcm.idx[tcm.id == table_id])
+
+            hit_idx = ak.to_numpy(tcm.idx[tcm.id == table_id])
+            evt_ids_ch = np.searchsorted(
+                tcm.cumulative_length,
+                np.where(tcm.id == table_id)[0],
+                "right",
+            )
 
             # read the dsp data
             outtbl_obj = lh5.read(
-                f"ch{chan}/dsp/", file, idx=idx_events, field_mask=chan_inputs
+                f"ch{chan}/dsp/", file, idx=hit_idx, field_mask=chan_inputs
             )
 
             # add the uncalibrated energy to the table
             outtbl_obj.add_column(
                 uncal_energy_var.split(".")[-1],
-                types.Array(energy_corr[idx_events, i]),
+                types.Array(energy_corr[evt_ids_ch, i]),
             )
 
             for outname, info in cfg.items():
@@ -323,7 +344,7 @@ def calibrate_energy(
                     info["expression"], info.get("parameters", None)
                 )
                 outtbl_obj.add_column(outname, outcol)
-            out_arr[idx_events, i] = outtbl_obj[recal_energy_var.split(".")[-1]].nda
+            out_arr[evt_ids_ch, i] = outtbl_obj[recal_energy_var.split(".")[-1]].nda
         except KeyError:
             out_arr[:, i] = np.nan
 

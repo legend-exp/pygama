@@ -132,6 +132,7 @@ def apply_xtalk_correction_and_calibrate(
     xtalk_rawid_obj: str = "xtc/rawid_index",
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
+    uncal_var: str = "dsp.cuspEmax",
     recal_var: str = "hit.cuspEmax_ctc_cal",
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
@@ -191,7 +192,7 @@ def apply_xtalk_correction_and_calibrate(
         energy_corr,
         xtalk_matrix_rawids,
         cal_par_files,
-        uncal_energy_expr,
+        uncal_var,
         recal_var,
     )
 
