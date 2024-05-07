@@ -372,7 +372,7 @@ def evaluate_at_channel_vov(
 
         else:
             length = len(np.where(ch_comp.flattened_data.nda == ch)[0])
-            res = np.full(length, np.nan)
+            res = np.full(length, default_value)
             out[ch_comp.flattened_data.nda == ch] = res
 
         if ch == ch_comp_channels[0]:
