@@ -29,6 +29,7 @@ def test_lq_cal(lgnd_test_data):
     lqcal = lq.LQCal(
         cal_dict,
         "cuspEmax_cal",
+        "dt_eff",
         lambda x: np.sqrt(1.5 + 0.1 * x),
         selection_string="index==index",
         cdf=gaussian,
