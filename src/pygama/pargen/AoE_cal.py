@@ -28,6 +28,7 @@ from pygama.math.distributions import (
     hpge_peak,
     nb_erfc,
 )
+from pygama.math.functions.gauss import nb_gauss_amp
 from pygama.math.functions.hpge_peak import hpge_get_fwfm, hpge_get_fwhm, hpge_get_mode
 from pygama.math.functions.sum_dists import SumDists
 from pygama.pargen.utils import convert_to_minuit, return_nans
@@ -877,7 +878,9 @@ class CalAoE:
         else:
             self.cal_dicts.update(update_dict)
 
-    def time_correction(self, df, aoe_param, output_name="AoE_Timecorr", display=0):
+    def time_correction(
+        self, df, aoe_param, mode="full", output_name="AoE_Timecorr", display=0
+    ):
         log.info("Starting A/E time correction")
         self.timecorr_df = pd.DataFrame()
         try:
@@ -938,11 +941,24 @@ class CalAoE:
                         )
                 self.timecorr_df.set_index("run_timestamp", inplace=True)
                 if len(self.timecorr_df) > 1:
-                    time_dict = fit_time_means(
-                        np.array(self.timecorr_df.index),
-                        np.array(self.timecorr_df["mean"]),
-                        np.array(self.timecorr_df["sigma"]),
-                    )
+                    if mode == "partial":
+                        time_dict = fit_time_means(
+                            np.array(self.timecorr_df.index),
+                            np.array(self.timecorr_df["mean"]),
+                            np.array(self.timecorr_df["sigma"]),
+                        )
+
+                    elif mode == "full":
+                        time_dict = {
+                            time: mean
+                            for time, mean in zip(
+                                np.array(self.timecorr_df.index),
+                                np.array(self.timecorr_df["mean"]),
+                            )
+                        }
+
+                    else:
+                        raise ValueError("unknown mode")
 
                     df[output_name] = df[aoe_param] / np.array(
                         [time_dict[tstamp] for tstamp in df["run_timestamp"]]
@@ -1092,7 +1108,7 @@ class CalAoE:
 
             hist, bins, var = pgh.get_hist(
                 final_df[self.dt_param],
-                dx=10,
+                dx=32,
                 range=(
                     np.nanmin(final_df[self.dt_param]),
                     np.nanmax(final_df[self.dt_param]),
@@ -1100,7 +1116,7 @@ class CalAoE:
             )
 
             bcs = pgh.get_bin_centers(bins)
-            mus = pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)
+            mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
             pk_pars, pk_covs = pgc.hpge_fit_energy_peak_tops(
                 hist,
                 bins,
@@ -1119,7 +1135,7 @@ class CalAoE:
                 )
             else:
                 ids = np.full(len(mus), True, dtype=bool)
-            mus = [bcs[int(mu)] for mu in mus[ids]]
+            mus = mus[ids]
             sigmas = sigmas[ids]
             amps = amps[ids]
 
@@ -1156,8 +1172,8 @@ class CalAoE:
                 }
 
                 try:
-                    self.alpha = (aoe_pars["mu"] - aoe_pars2["mu"]) / (
-                        (mus[0] * aoe_pars2["mu"]) - (mus[1] * aoe_pars["mu"])
+                    self.alpha = (aoe_pars2["mu"] - aoe_pars["mu"]) / (
+                        (mus[0] * aoe_pars["mu"]) - (mus[1] * aoe_pars2["mu"])
                     )
                 except ZeroDivisionError:
                     self.alpha = 0
@@ -1743,13 +1759,16 @@ class CalAoE:
         dep_acc=0.9,
         sf_nsamples=11,
         sf_cut_range=(-5, 5),
+        timecorr_mode="full",
     ):
         if peaks_of_interest is None:
             peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
         if fit_widths is None:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
-        self.time_correction(df, initial_aoe_param, output_name="AoE_Timecorr")
+        self.time_correction(
+            df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
+        )
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
@@ -1966,9 +1985,12 @@ def drifttime_corr_plot(
             label="data",
         )
         dx = np.diff(aoe_bins)
-        plt.plot(xs, aoe_class.pdf.get_pdf(xs, *aoe_pars) * dx[0], label="full fit")
+        aoe_class.pdf.components = False
+        plt.plot(
+            xs, aoe_class.pdf.get_pdf(xs, *aoe_pars.values()) * dx[0], label="full fit"
+        )
         aoe_class.pdf.components = True
-        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars)
+        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars.values())
         aoe_class.pdf.components = False
         plt.plot(xs, sig * dx[0], label="peak fit")
         plt.plot(xs, bkg * dx[0], label="bkg fit")
@@ -1988,9 +2010,11 @@ def drifttime_corr_plot(
             label="Data",
         )
         dx = np.diff(aoe_bins2)
-        plt.plot(xs, aoe_class.pdf.get_pdf(xs, *aoe_pars2) * dx[0], label="full fit")
+        plt.plot(
+            xs, aoe_class.pdf.get_pdf(xs, *aoe_pars2.values()) * dx[0], label="full fit"
+        )
         aoe_class.pdf.components = True
-        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars2)
+        sig, bkg = aoe_class.pdf.get_pdf(xs, *aoe_pars2.values())
         aoe_class.pdf.components = False
         plt.plot(xs, sig * dx[0], label="peak fit")
         plt.plot(xs, bkg * dx[0], label="bkg fit")
@@ -2017,7 +2041,7 @@ def drifttime_corr_plot(
         for mu, sigma, amp in zip(mus, sigmas, amps):
             plt.plot(
                 pgh.get_bin_centers(bins),
-                gaussian.get_pdf(pgh.get_bin_centers(bins), mu, sigma) * amp,
+                nb_gauss_amp(pgh.get_bin_centers(bins), mu, sigma, amp),
             )
         plt.xlabel("drift time (ns)")
         plt.ylabel("Counts")
