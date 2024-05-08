@@ -190,7 +190,9 @@ def l200_tc_time_pdf(
     )
 
 
-def l200_rc_amp_logpdf(n, dens_array, slope: float = -1 / 15):
+def l200_rc_amp_logpdf(
+    n, dens_array: Sequence[float] | None = None, slope: float = -1 / 15
+):
     """The L200 experimental random coincidence (RC) amplitude pdf
 
     Parameters
@@ -206,6 +208,9 @@ def l200_rc_amp_logpdf(n, dens_array, slope: float = -1 / 15):
     """
     # analytical continuation must be decaying exponential function.
     assert slope < 0
+
+    if dens_array is None:
+        dens_array = [1]
 
     # up to 15 p.e., take the experimental values from the density.
     limit = min(len(dens_array) - 1, 15)

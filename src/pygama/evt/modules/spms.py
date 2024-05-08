@@ -310,7 +310,7 @@ def geds_coincidence_classifier(
     *,
     geds_t0_ns: types.Array,
     bkg_prob: float,
-    dens_array: Sequence[float] = None,
+    dens_array: Sequence[float] | None = None,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
