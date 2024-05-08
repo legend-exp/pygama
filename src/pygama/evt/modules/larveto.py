@@ -14,8 +14,8 @@ def l200_combined_test_stat(
     t0: ak.Array,
     amp: ak.Array,
     geds_t0: ak.Array,
-    bkg_prob: float,
-    dens_array: Sequence[float],
+    ts_bkg_prob: float,
+    rc_density: Sequence[float],
 ) -> ak.Array:
     """Combined L200 LAr veto classifier.
 
@@ -33,10 +33,10 @@ def l200_combined_test_stat(
         amplitude of pulses in p.e., split by channel.
     geds_t0
         t0 (ns) of the HPGe signal.
-    bkg_prob
+    ts_bkg_prob
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution). needed for the LAr scintillation time pdf.
-    dens_array
+    rc_density
         array of densities (probabilities) of uncorrelated number of photoelectrons in a 6µs window.
     """
     # flatten the data in the last axis (i.e. merge all channels together)
@@ -48,10 +48,10 @@ def l200_combined_test_stat(
     # HACK: remove 16 when units will be fixed
     rel_t0 = 16 * t0 - geds_t0
 
-    return l200_test_stat(rel_t0, amp, bkg_prob, dens_array)
+    return l200_test_stat(rel_t0, amp, ts_bkg_prob, rc_density)
 
 
-def l200_test_stat(relative_t0, amp, bkg_prob, dens_array):
+def l200_test_stat(relative_t0, amp, ts_bkg_prob, rc_density):
     """Compute the test statistics.
 
     Parameters
@@ -70,10 +70,10 @@ def l200_test_stat(relative_t0, amp, bkg_prob, dens_array):
     n_pe_tot = np.where(n_pe_tot == 0, np.nan, n_pe_tot)
 
     # calculate the test statistic term related to the time distribution
-    transform_function = transform_wrapper(bkg_prob)
+    transform_function = transform_wrapper(ts_bkg_prob)
     ts_time = -ak.sum(ak.transform(transform_function, relative_t0, amp), axis=-1)
     # calculate the amplitude contribution
-    ts_amp = [l200_rc_amp_logpdf(n, dens_array) for n in n_pe_tot]
+    ts_amp = [l200_rc_amp_logpdf(n, rc_density) for n in n_pe_tot]
 
     # for events with no light, set the test statistic value to +inf
     t_stat = np.where(np.isnan(n_pe_tot), np.inf, ts_time / n_pe_tot + ts_amp)
@@ -81,17 +81,17 @@ def l200_test_stat(relative_t0, amp, bkg_prob, dens_array):
     return t_stat
 
 
-# need this to pass bkg_prob parameter with ak.transform()
-def transform_wrapper(bkg_prob):
+# need this to pass ts_bkg_prob parameter with ak.transform()
+def transform_wrapper(ts_bkg_prob):
     def _transform(layouts, **kwargs):
-        return _ak_l200_test_stat_time_term(layouts, bkg_prob=bkg_prob)
+        return _ak_l200_test_stat_time_term(layouts, ts_bkg_prob=ts_bkg_prob)
 
     return _transform
 
 
 # need to define this function and use it with ak.transform() because scipy
 # routines are not NumPy universal functions
-def _ak_l200_test_stat_time_term(layouts, bkg_prob, **kwargs):
+def _ak_l200_test_stat_time_term(layouts, ts_bkg_prob, **kwargs):
     """Awkward transform to compute the per-pulse terms of the test statistics.
 
     The two arguments are the pulse times `t0` relative to the HPGe trigger and
@@ -116,7 +116,7 @@ def _ak_l200_test_stat_time_term(layouts, bkg_prob, **kwargs):
     n_pes = pulse_amp_round(amp)
 
     # calculate the time term of the test statistic
-    ts_time = n_pes * np.log(l200_tc_time_pdf(t0, bkg_prob=bkg_prob))
+    ts_time = n_pes * np.log(l200_tc_time_pdf(t0, bkg_prob=ts_bkg_prob))
 
     return ak.contents.NumpyArray(ts_time)
 
@@ -191,31 +191,34 @@ def l200_tc_time_pdf(
 
 
 def l200_rc_amp_logpdf(
-    n, dens_array: Sequence[float] | None = None, slope: float = -1 / 10
+    n_pes,
+    rc_density=None,
+    logexp_cont_slope=-1 / 10,
 ):
     """The L200 experimental random coincidence (RC) amplitude pdf
 
     Parameters
     ----------
-    n
+    n_pes
         number of photoelectrons.
-    dens_array
-        density array of RC LAr energy histogram (total energy summed over all channels, in p.e.).
-        derived from forced trigger data.
-    slope
-        slope for analytical continuation.
+    rc_density
+        density array of the random coincidence LAr energy distribution (total
+        energy summed over all channels, in p.e.). Derived from forced trigger
+        data.
+    logexp_cont_slope
+        slope for exponential analytical continuation.
 
     """
     # analytical continuation must be decaying exponential function.
-    assert slope < 0
+    assert logexp_cont_slope < 0
 
-    if dens_array is None:
-        dens_array = [1]
+    if rc_density is None:
+        rc_density = [1]
 
     # up to 15 p.e., take the experimental values from the density.
-    limit = min(len(dens_array) - 1, 15)
-    if n <= limit:
-        return np.log(dens_array[int(n)])
+    limit = min(len(rc_density) - 1, 15)
+    if n_pes <= limit:
+        return np.log(rc_density[int(n_pes)])
     # analytical continuation: log of an exponential function.
     else:
-        return slope * (n - int(limit)) + np.log(dens_array[int(limit)])
+        return logexp_cont_slope * (n_pes - int(limit)) + np.log(rc_density[int(limit)])

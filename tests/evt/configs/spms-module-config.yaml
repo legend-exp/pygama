@@ -99,4 +99,4 @@ operations:
     expression: pygama.evt.modules.spms.geds_coincidence_classifier(
       <...>,
       geds_t0_ns=evt.t0,
-      bkg_prob=0.42)
+      ts_bkg_prob=0.5)

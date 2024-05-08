@@ -309,8 +309,8 @@ def geds_coincidence_classifier(
     table_names: Sequence[str],
     *,
     geds_t0_ns: types.Array,
-    bkg_prob: float,
-    dens_array: Sequence[float] | None = None,
+    ts_bkg_prob: float,
+    rc_density: Sequence[float] | None = None,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
@@ -365,7 +365,7 @@ def geds_coincidence_classifier(
         geds_t0_ns = geds_t0_ns.view_as("ak")
 
     ts_data = larveto.l200_combined_test_stat(
-        data["t0"], data["amp"], geds_t0_ns, bkg_prob, dens_array
+        data["t0"], data["amp"], geds_t0_ns, ts_bkg_prob, rc_density
     )
 
     return types.Array(ts_data)
