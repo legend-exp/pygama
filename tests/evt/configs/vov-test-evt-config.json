@@ -55,10 +55,12 @@
       "initial": 0
     },
     "aoe": {
+      "channels": "geds_on",
       "aggregation_mode": "keep_at_ch:evt.energy_id",
       "expression": "hit.AoE_Classifier"
     },
     "aoe_idx": {
+      "channels": "geds_on",
       "aggregation_mode": "keep_at_idx:evt.energy_idx",
       "expression": "hit.AoE_Classifier"
     },
@@ -71,6 +73,7 @@
       "dtype": "int16"
     },
     "is_saturated": {
+      "channels": "geds_on",
       "aggregation_mode": "keep_at_ch:evt.energy_id",
       "expression": "hit.is_saturated"
     },
