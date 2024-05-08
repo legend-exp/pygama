@@ -191,7 +191,7 @@ def l200_tc_time_pdf(
 
 
 def l200_rc_amp_logpdf(
-    n, dens_array: Sequence[float] | None = None, slope: float = -1 / 15
+    n, dens_array: Sequence[float] | None = None, slope: float = -1 / 10
 ):
     """The L200 experimental random coincidence (RC) amplitude pdf
 
