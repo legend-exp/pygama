@@ -96,4 +96,8 @@ operations:
   lar_coin_class:
     channels: spms_on
     aggregation_mode: function
-    expression: pygama.evt.modules.spms.geds_coincidence_classifier(<...>, geds_t0_ns=evt.t0, bkg_prob=0.42, dens_array=None)
+    expression: pygama.evt.modules.spms.geds_coincidence_classifier(
+      <...>,
+      geds_t0_ns=evt.t0,
+      bkg_prob=0.42,
+      dens_array=[0.5, 0.1, 0.05])

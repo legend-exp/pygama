@@ -310,7 +310,7 @@ def geds_coincidence_classifier(
     *,
     geds_t0_ns: types.Array,
     bkg_prob: float,
-    dens_array: Sequence[float],
+    dens_array: Sequence[float] = None,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
@@ -344,12 +344,12 @@ def geds_coincidence_classifier(
             tcm,
             table_names,
             observable=obs,
-            pulse_mask=pulse_mask,
-            drop_empty=True,
+            pulse_mask=None,
+            drop_empty=False,
         ).view_as("ak")
 
-        # remove pulses below noise threshold
-        data[k] = all_data[is_good_pulse]
+        # remove pulses below noise threshold and outside the HPGe trigger window
+        data[k] = all_data[is_good_pulse & pulse_mask.view_as("ak")]
 
     # load the channel info
     # rawids = spms.gather_tcm_id_data(
