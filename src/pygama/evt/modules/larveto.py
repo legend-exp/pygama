@@ -204,11 +204,11 @@ def l200_rc_amp_logpdf(n, dens_array, slope: float = -1 / 15):
         slope for analytical continuation.
 
     """
-    # analyticla continuation must be decaying exponential function.
+    # analytical continuation must be decaying exponential function.
     assert slope < 0
 
     # up to 15 p.e., take the experimental values from the density.
-    limit = min(len(dens_array), 15)
+    limit = min(len(dens_array) - 1, 15)
     if n <= limit:
         return np.log(dens_array[int(n)])
     # analytical continuation: log of an exponential function.
