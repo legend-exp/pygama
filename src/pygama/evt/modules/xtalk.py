@@ -15,6 +15,43 @@ from pygama.hit.build_hit import _remove_uneeded_operations, _reorder_table_oper
 from .. import utils
 
 
+def build_tcm_index_array(
+    tcm: utils.TCMData, datainfo: utils.DataInfo, rawids: np.ndarray
+) -> np.ndarray:
+    """Builds a TCM index array for use in the event tier.
+
+    Parameters
+    ----------
+    datainfo
+        :class:`.DataInfo` object.
+    tcm
+        time-coincidence map object.
+    rawids
+        list of channel rawids from the cross talk matrix.
+    """
+
+    # initialise the output object
+    tcm_indexs_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
+
+    # parse observables string. default to hit tier
+    for idx_chan, channel in enumerate(rawids):
+
+        # get the event indexes
+        table_id = utils.get_tcm_id_by_pattern(
+            datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
+        )
+        tcm_indexs = np.where(tcm.id == table_id)[0]
+        evt_ids_ch = np.searchsorted(
+            tcm.cumulative_length,
+            np.where(tcm.id == channel)[0],
+            "right",
+        )
+        tcm_indexs_out[evt_ids_ch, idx_chan] = tcm_indexs
+
+    # transpose to return object where row is events and column rawid idx
+    return tcm_indexs_out
+
+
 def gather_energy(
     observable: str, tcm: utils.TCMData, datainfo: utils.DataInfo, rawids: ArrayLike
 ) -> ArrayLike:
