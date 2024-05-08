@@ -742,10 +742,10 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     try:
         hist, bins = lq_class.fit_hist
         fit_pars = lq_class.cut_fit_pars
-    
+
         x_low = bins[0]
         x_high = bins[-1]
-    
+
         ax1.stairs(hist, bins, label="data")
         xs = np.linspace(round(bins[0], 3), round(bins[-1], 3), len(bins) - 1)
         ls = np.sum(hist)
@@ -755,11 +755,11 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
             gaussian.pdf_norm(xs, x_low, x_high, fit_pars[0], fit_pars[1]) * dx * ls,
             label="Gaussian Fit",
         )
-    
+
         # ax1.set_xlabel('LQ')
         ax1.set_title("Fit of LQ events in DEP")
         ax1.legend()
-    
+
         bin_centers = (bins[:-1] + bins[1:]) / 2
         reses = (
             hist
