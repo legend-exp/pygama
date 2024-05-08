@@ -8,59 +8,27 @@ import awkward as ak
 import numpy as np
 from legendmeta.catalog import Props
 from lgdo import lh5, types
+from numpy.typing import ArrayLike
 
 from pygama.hit.build_hit import _remove_uneeded_operations, _reorder_table_operations
 
 from .. import utils
 
 
-def build_tcm_index_array(
-    tcm: utils.TCMData, datainfo: utils.DataInfo, rawids: np.ndarray
-) -> np.ndarray:
-    """
-    datainfo
-        utils.DataInfo object
-    tcm
-        time-coincidence map object
-    rawids
-        list of channel rawids from the cross talk matrix.
-    """
-
-    # initialise the output object
-    tcm_indexs_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
-
-    # parse observables string. default to hit tier
-    for idx_chan, channel in enumerate(rawids):
-
-        # get the event indexes
-        table_id = utils.get_tcm_id_by_pattern(
-            datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
-        )
-        tcm_indexs = np.where(tcm.id == table_id)[0]
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == channel)[0],
-            "right",
-        )
-        tcm_indexs_out[evt_ids_ch, idx_chan] = tcm_indexs
-
-    # transpose to return object where row is events and column rawid idx
-    return tcm_indexs_out
-
-
 def gather_energy(
-    observable: str, tcm: utils.TCMData, datainfo: utils.DataInfo, rawids: np.ndarray
-) -> np.ndarray:
-    """
-    Builds the array of energies for the cross talk correction
+    observable: str, tcm: utils.TCMData, datainfo: utils.DataInfo, rawids: ArrayLike
+) -> ArrayLike:
+    """Prepares the array of energies for the cross talk correction.
+
     Parameters
     ----------
     observable
-        expression for the pulse parameter to be gathered, can be a combination of different fields.
+        expression for the pulse parameter to be gathered, can be a combination
+        of different fields.
     datainfo
-        utils.DataInfo object
+        :class:`.DataInfo` object
     tcm
-        time-coincidence map object
+        time-coincidence map object.
     rawids
         list of channel rawids from the cross talk matrix.
     """
@@ -113,25 +81,24 @@ def filter_hits(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     filter_expr: str,
-    xtalk_corr_energy: np.ndarray,
-    rawids: np.ndarray,
-) -> np.ndarray:
-    """
-    Function to which hits in an event are above threshold.
+    xtalk_corr_energy: ArrayLike,
+    rawids: ArrayLike,
+) -> ArrayLike:
+    """Function that removes hits in an event below threshold.
+
     Parameters:
     -----------
     datainfo, tcm
-        utils.DataInfo and utils.TCMData objects
+        :class:`.DataInfo` and :class:`.TCMData` objects.
     filter_expr
-        string containing the logic used to define which events are above threshold.
-        this string can also refer to the corrected energy as 'xtalk_corr_energy'
+        string containing the logic used to define which events are above
+        threshold.  this string can also refer to the corrected energy as
+        `xtalk_corr_energy`.
     xtalk_corr_energy
-        2D numpy array of correct energy, the row corresponds to the event and the column the rawid
+        2D numpy array of correct energy, the row corresponds to the event and
+        the column the rawid.
     rawids
-        1D array of the rawids corresponding to each column
-    Returns
-        a numpy array of the mask of which
-
+        1D array of the rawids corresponding to each column.
     """
 
     # find the fields in the string
@@ -142,7 +109,7 @@ def filter_hits(
         group = datainfo._asdict()[tier].group
         filter_expr = filter_expr.replace(f"{group}.", f"{group}___")
 
-    c = compile(filter_expr, "gcc -O3 -ffast-math build_hit.py", "eval")
+    c = compile(filter_expr, "toby dixon was here", "eval")
 
     tier_params = []
     for name in c.co_names:
@@ -183,34 +150,41 @@ def filter_hits(
 
 
 def xtalk_correct_energy_impl(
-    uncal_energy: np.ndarray,
-    cal_energy: np.ndarray,
-    xtalk_matrix: np.ndarray,
+    uncal_energy: ArrayLike,
+    cal_energy: ArrayLike,
+    xtalk_matrix: ArrayLike,
     xtalk_threshold: float = None,
 ):
-    """
-    Function to perform the cross talk correction on awkward arrays of energy and rawid.
-    1. The energies are converted to a sparse format where each row corresponds to a rawid
+    r"""Function to perform the actual xtalk correction of energy.
+
+    1. The energies are converted to a sparse format where each row corresponds
+       to a rawid
     2. All energy less than the threshold are set to 0
     3. The correction is computed as:
-    .. math::
-    E_{\text{cor},i}=-\times M_{i,j}E_{j}
 
-    where $M_{i,j}$ is the cross talk matrix element where i is response and j trigger channel.
+    .. math::
+
+       E_{\text{cor},i} = -\times M_{i,j}E_{j}
+
+    where $M_{i,j}$ is the cross talk matrix element where $i$ is response and
+    $j$ trigger channel.
+
     Parameters
     ----------
     uncal_energy
-        2D numpy array of the uncalibrated energies in each event, the row corresponds to an event and the column the rawid
+        2D numpy array of the uncalibrated energies in each event, the row
+        corresponds to an event and the column the rawid.
     cal_energy
-        2D numpy array of the calibrated energies in each event, the row corresponds to an event and the column the rawid
+        2D numpy array of the calibrated energies in each event, the row
+        corresponds to an event and the column the rawid.
     xtalk_matrix
-        2D numpy array of the cross talk correction matrix, the indices should correspond to rawids (with same mapping as energies)
+        2D numpy array of the cross talk correction matrix, the indices should
+        correspond to rawids (with same mapping as energies).
     xtalk_threshold
         threshold below which a hit is not used in xtalk correction.
 
     """
     # check input shapes and sizes
-
     uncal_energy_no_nan = np.nan_to_num(uncal_energy, 0)
     cal_energy_no_nan = np.nan_to_num(cal_energy, 0)
 
@@ -279,22 +253,22 @@ def calibrate_energy(
     uncal_energy_var: str = None,
     recal_energy_var: str = None,
 ):
-    """
-    Function to recalibrate the energy
+    """Function to recalibrate the energy after xtalk correction.
+
     Parameters
     ---------
     datainfo
-        utils.DataInfo object containing the paths etc to the data
+        :class:`.DataInfo` object.
     tcm
-        utils.TCMData object
+        :class:`.TCMData` object.
     energy_corr
-        cross talk corrected (uncal) energies to be recalibrated
+        cross talk corrected (uncal) energies to be recalibrated.
     par_files
-        path to the parameter files
+        path to the parameter files.
     uncal_energy_var
-        name of the uncalibrated energy variable
+        name of the uncalibrated energy variable.
     recal_energy_var
-        variable to be used for recalibration
+        variable to be used for recalibration.
     """
 
     out_arr = np.full_like(energy_corr, np.nan)

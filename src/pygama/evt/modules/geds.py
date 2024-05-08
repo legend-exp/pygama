@@ -125,10 +125,10 @@ def apply_xtalk_correction_and_calibrate(
     return_mode: str,
     uncal_energy_expr: str,
     cal_energy_expr: str,
-    cal_par_files: str | list[str],
+    cal_par_files: str | Sequence[str],
     multiplicity_expr: str,
+    xtalk_matrix_filename: str,
     xtalk_threshold: float = None,
-    xtalk_matrix_filename: str = "",
     xtalk_rawid_obj: str = "xtc/rawid_index",
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
@@ -136,39 +136,42 @@ def apply_xtalk_correction_and_calibrate(
     recal_var: str = "hit.cuspEmax_ctc_cal",
 ) -> types.VectorOfVectors:
     """Applies the cross-talk correction to the energy observable.
-    The format of `xtalk_matrix_filename` should be currently be a path to a lh5 file.
 
-    The correction is applied using matrix algebra for all triggers above the xalk threshold.
+    The correction is applied using matrix algebra for all triggers above the
+    xalk threshold.
 
     Parameters
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
     return_mode
-        string which can be either energy to return corrected energy or tcm_index
+        string which can be either ``energy`` to return corrected energy or
+        ``tcm_index``.
     uncal_energy_expr
-        expression for the pulse parameter to be gathered for the uncalibrated energy (used for correction),
-        can be a combination of different fields.
+        expression for the pulse parameter to be gathered for the uncalibrated
+        energy (used for correction), can be a combination of different fields.
     cal_energy_expr
-        expression for the pulse parameter to be gathered for the calibrated energy, used for the xtalk threshold,
-        can be a combination of different fields.
+        expression for the pulse parameter to be gathered for the calibrated
+        energy, used for the xtalk threshold, can be a combination of different
+        fields.
     cal_par_files
-        path to the generated hit tier par files used to recalibrate the data
+        path to the generated hit tier par-files defining the calibration
+        curves. Used to recalibrate the data after xtalk correction.
     multiplicity_expr:
-        string containing the logic used to define the multiplicity
+        expression defining the logic used to compute the event multiplicity.
     xtalk_threshold
-        threshold used for xtalk correction, hits below this energy will not
-        be used to correct the other hits.
+        threshold used for xtalk correction, hits below this energy will not be
+        used to correct the other hits.
     xtalk_matrix_filename
-        name of the file containing the xtalk matrices.
+        path to the file containing the xtalk matrices.
     xtalk_matrix_obj
-        name of the lh5 object containing the xtalk matrix
+        name of the lh5 object containing the xtalk matrix.
     positive_xtalk_matrix_obj
-        name of the lh5 object containing the positive polarity xtalk matrix
+        name of the lh5 object containing the positive polarity xtalk matrix.
     xtalk_matrix_rawids
-        name of the lh5 object containing the name of the rawids
+        name of the lh5 object containing the name of the rawids.
     recal_var
-        name of the energy variable to use for recalibration
+        name of the energy variable to use for re-calibration.
     """
 
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
