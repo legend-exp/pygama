@@ -1536,24 +1536,15 @@ class CalAoE:
             log.error("A/E cut determination failed")
             self.low_cut_val = np.nan
             data[output_cut_param] = False
-        if self.dt_cut_param is not None and self.dt_cut_hard is True:
-            self.update_cal_dicts(
-                {
-                    output_cut_param: {
-                        "expression": f"({aoe_param}>a) & ({self.dt_cut_param})",
-                        "parameters": {"a": self.low_cut_val},
-                    }
+
+        self.update_cal_dicts(
+            {
+                output_cut_param: {
+                    "expression": f"({aoe_param}>a)",
+                    "parameters": {"a": self.low_cut_val},
                 }
-            )
-        else:
-            self.update_cal_dicts(
-                {
-                    output_cut_param: {
-                        "expression": f"({aoe_param}>a)",
-                        "parameters": {"a": self.low_cut_val},
-                    }
-                }
-            )
+            }
+        )
 
     def calculate_survival_fractions_sweep(
         self,
@@ -1777,24 +1768,14 @@ class CalAoE:
             df["AoE_Classifier"] < self.high_cut_val
         )
 
-        if self.dt_cut_param is not None and self.dt_cut_hard is True:
-            self.update_cal_dicts(
-                {
-                    "AoE_High_Side_Cut": {
-                        "expression": f"(a>AoE_Classifier)& ({self.dt_cut_param})",
-                        "parameters": {"a": self.high_cut_val},
-                    }
+        self.update_cal_dicts(
+            {
+                "AoE_High_Side_Cut": {
+                    "expression": "(a>AoE_Classifier)",
+                    "parameters": {"a": self.high_cut_val},
                 }
-            )
-        else:
-            self.update_cal_dicts(
-                {
-                    "AoE_High_Side_Cut": {
-                        "expression": "(a>AoE_Classifier)",
-                        "parameters": {"a": self.high_cut_val},
-                    }
-                }
-            )
+            }
+        )
 
         self.update_cal_dicts(
             {
