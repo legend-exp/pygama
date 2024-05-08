@@ -475,7 +475,7 @@ class LQCal:
 
         self.update_cal_dicts(
             {
-                "LQ_Classifier": {
+                "LQ_Corrected": {
                     "expression": f"{lq_param} - dt_eff*a - b",
                     "parameters": {"a": self.dt_fit_pars[0], "b": self.dt_fit_pars[1]},
                 }
