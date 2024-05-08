@@ -254,13 +254,6 @@ def make_pulse_data_mask(
         drop_empty=False,
     )
 
-    # HACK: handle units
-    # HACK: remove me once units are fixed in the dsp tier
-    if "units" in pulse_t0.attrs and pulse_t0.attrs["units"] == "ns":
-        pulse_t0_ns = pulse_t0.view_as("ak")
-    else:
-        pulse_t0_ns = pulse_t0.view_as("ak") * 16
-
     pulse_amp = gather_pulse_data(
         datainfo,
         tcm,
@@ -283,6 +276,7 @@ def make_pulse_data_mask(
         t_loc_ns = ak.fill_none(ak.nan_to_none(t_loc_ns), t_loc_default_ns)
 
     # start with all-true mask
+    pulse_t0_ns = pulse_t0.view_as("ak")
     mask = pulse_t0_ns == pulse_t0_ns
 
     # apply p.e. threshold
@@ -334,7 +328,14 @@ def geds_coincidence_classifier(
     )
 
     # we'll need to remove pulses below noise threshold later
-    is_good_pulse = gather_is_valid_hit(datainfo, tcm, table_names).view_as("ak")
+    is_good_pulse = gather_pulse_data(
+        datainfo,
+        tcm,
+        table_names,
+        observable="hit.is_valid_hit",
+        pulse_mask=None,
+        drop_empty=False,
+    ).view_as("ak")
 
     # load the data
     data = {}
@@ -369,23 +370,3 @@ def geds_coincidence_classifier(
     )
 
     return types.Array(ts_data)
-
-
-# REMOVE ME: not needed anymore with VectorOfVectors DSP outputs
-def gather_is_valid_hit(datainfo, tcm, table_names):
-    data = {}
-    for field in ("is_valid_hit", "trigger_pos"):
-        data[field] = gather_pulse_data(
-            datainfo,
-            tcm,
-            table_names,
-            observable=f"hit.{field}",
-            pulse_mask=None,
-            drop_empty=False,
-        ).view_as("ak")
-
-    return types.VectorOfVectors(
-        data["is_valid_hit"][
-            ak.local_index(data["is_valid_hit"]) < ak.num(data["trigger_pos"], axis=-1)
-        ]
-    )

@@ -45,8 +45,7 @@ def l200_combined_test_stat(
     amp = ak.flatten(amp, axis=-1)
 
     # subtract the HPGe t0 from the SiPM pulse t0s
-    # HACK: remove 16 when units will be fixed
-    rel_t0 = 16 * t0 - geds_t0
+    rel_t0 = t0 - geds_t0
 
     return l200_test_stat(rel_t0, amp, ts_bkg_prob, rc_density)
 
