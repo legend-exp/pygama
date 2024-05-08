@@ -238,6 +238,7 @@ def evaluate_to_scalar(
 def evaluate_at_channel(
     datainfo,
     tcm,
+    channels,
     channels_skip,
     expr,
     field_list,
@@ -253,6 +254,8 @@ def evaluate_at_channel(
         input and output LH5 datainfo with HDF5 groups where tables are found.
     tcm
         TCM data arrays in an object that can be accessed by attribute.
+    channels
+        list of channels to be included for evaluation.
     channels_skip
        list of channels to be skipped from evaluation and set to default value.
     expr
@@ -281,7 +284,7 @@ def evaluate_at_channel(
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        if table_name not in channels_skip:
+        if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
                 ch=table_name,
@@ -307,6 +310,7 @@ def evaluate_at_channel_vov(
     expr,
     field_list,
     ch_comp,
+    channels,
     channels_skip,
     pars_dict=None,
     default_value=np.nan,
@@ -326,6 +330,8 @@ def evaluate_at_channel_vov(
        list of `dsp/hit/evt` parameter tuples in expression ``(tier, field)``.
     ch_comp
        array of "rawid"s at which the expression is evaluated.
+    channels
+       list of channels to be included for evaluation.
     channels_skip
        list of channels to be skipped from evaluation and set to default value.
     pars_dict
@@ -335,20 +341,19 @@ def evaluate_at_channel_vov(
     """
     f = utils.make_files_config(datainfo)
 
-    # blow up vov to aoesa
-    out = ak.Array([[] for _ in range(len(ch_comp))])
+    ch_comp_channels = np.unique(ch_comp.flattened_data.nda).astype(int)
 
-    channels = np.unique(ch_comp.flattened_data.nda).astype(int)
-    ch_comp = ch_comp.view_as("ak")
+    out = np.full(
+        len(ch_comp.flattened_data.nda), default_value, dtype=type(default_value)
+    )
 
     type_name = None
-    for ch in channels:
+    for ch in ch_comp_channels:
         table_name = utils.get_table_name_by_pattern(f.hit.table_fmt, ch)
-
         evt_ids_ch = np.searchsorted(
             tcm.cumulative_length, np.where(tcm.id == ch)[0], "right"
         )
-        if table_name not in channels_skip:
+        if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
                 ch=table_name,
@@ -357,23 +362,27 @@ def evaluate_at_channel_vov(
                 field_list=field_list,
                 pars_dict=pars_dict,
             )
+            new_evt_ids_ch = np.searchsorted(
+                ch_comp.cumulative_length,
+                np.where(ch_comp.flattened_data.nda == ch)[0],
+                "right",
+            )
+            matches = np.isin(evt_ids_ch, new_evt_ids_ch)
+            out[ch_comp.flattened_data.nda == ch] = res[matches]
+
         else:
-            idx_ch = tcm.idx[tcm.id == ch]
-            res = np.full(len(idx_ch), default_value)
+            length = len(np.where(ch_comp.flattened_data.nda == ch)[0])
+            res = np.full(length, default_value)
+            out[ch_comp.flattened_data.nda == ch] = res
 
-        # see in which events the current channel is present
-        mask = ak.to_numpy(ak.any(ch_comp == ch, axis=-1), allow_missing=False)
-        cv = np.full(len(ch_comp), np.nan)
-        cv[evt_ids_ch] = res
-        cv[~mask] = np.nan
-        cv = ak.drop_none(ak.nan_to_none(ak.Array(cv)[:, None]))
-
-        out = ak.concatenate((out, cv), axis=-1)
-
-        if ch == channels[0]:
+        if ch == ch_comp_channels[0]:
+            out = out.astype(res.dtype)
             type_name = res.dtype
 
-    return types.VectorOfVectors(ak.values_astype(out, type_name))
+    return types.VectorOfVectors(
+        flattened_data=types.Array(out, dtype=type_name),
+        cumulative_length=ch_comp.cumulative_length,
+    )
 
 
 def evaluate_to_aoesa(
