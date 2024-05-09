@@ -513,7 +513,9 @@ class LQCal:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
-            self.cut_fit_pars = pars = np.full(2, np.nan)
+            c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
+            m = Minuit(c, np.full(2, np.nan))
+            self.cut_fit_pars = pars = m.values
 
         self.update_cal_dicts(
             {
