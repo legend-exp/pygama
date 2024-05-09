@@ -2484,8 +2484,9 @@ def hpge_fit_energy_cal_func(
         for n in range(len(energy_scale_pars) - 1):
             d_mu_d_es += energy_scale_pars[n + 1] * mus ** (n + 1)
         e_weights = np.sqrt(d_mu_d_es * mu_vars)
+        mask = np.isfinite(e_weights)
         poly_pars = (
-            Polynomial.fit(mus, energies_kev, deg=deg, w=1 / e_weights).convert().coef
+            Polynomial.fit(mus[mask], energies_kev[mask], deg=deg, w=1 / e_weights[mask]).convert().coef
         )
         if fixed is not None:
             for idx, val in fixed.items():
@@ -2493,7 +2494,7 @@ def hpge_fit_energy_cal_func(
                     pass
                 else:
                     poly_pars[idx] = val
-        c = cost.LeastSquares(mus, energies_kev, e_weights, poly_wrapper)
+        c = cost.LeastSquares(mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper)
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
