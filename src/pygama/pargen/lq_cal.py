@@ -513,6 +513,7 @@ class LQCal:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
+            pars = np.full(2, np.nan)
 
         self.update_cal_dicts(
             {
