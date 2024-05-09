@@ -477,8 +477,8 @@ class HPGeCalibration:
             (Polynomial(self.pars) - i).roots()
             for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
         )
-        euc_min = euc_min[0]
-        euc_max = euc_max[0]
+        euc_min = np.nanmin(euc_min)
+        euc_max = np.nanmax(euc_max)
 
         if euc_min < 0:
             euc_min = 0
@@ -831,8 +831,8 @@ class HPGeCalibration:
                     (Polynomial(self.pars) - i).roots()
                     for i in (peaks_kev[0] * 0.9, peaks_kev[-1] * 1.1)
                 )
-                euc_min = euc_min[0]
-                euc_max = euc_max[0]
+                euc_min = np.nanmin(euc_min)
+                euc_max = np.nanmax(euc_max)
                 if euc_min < 0:
                     euc_min = 0
                 if euc_max > np.nanmax(e_uncal) * 1.1:
