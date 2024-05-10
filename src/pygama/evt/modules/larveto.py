@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 import awkward as ak
 import numpy as np
-import scipy
+import scipy.stats
 from numpy.typing import ArrayLike
 
 

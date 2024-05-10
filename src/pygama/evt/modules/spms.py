@@ -302,10 +302,11 @@ def geds_coincidence_classifier(
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
+    spms_t0: types.VectorOfVectors,
+    spms_amp: types.VectorOfVectors,
     geds_t0_ns: types.Array,
     ts_bkg_prob: float,
     rc_density: Sequence[float] | None = None,
-    pulse_mask: types.VectorOfVectors | None = None,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
@@ -316,6 +317,10 @@ def geds_coincidence_classifier(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
+    t0
+        arrival times of pulses in ns, split by channel.
+    amp
+        amplitude of pulses in p.e., split by channel.
     geds_t0_ns
         t0 (ns) of the HPGe signal.
     ts_bkg_prob
@@ -325,8 +330,6 @@ def geds_coincidence_classifier(
         density array of the random coincidence LAr energy distribution (total
         energy summed over all channels, in p.e.). Derived from forced trigger
         data.
-    pulse_mask
-        optional user mask to filter pulses before classifier computation.
     """
     # mask for windowing data around the HPGe t0
     geds_t0_mask = make_pulse_data_mask(
@@ -337,42 +340,17 @@ def geds_coincidence_classifier(
         t_loc_ns=geds_t0_ns,
         dt_range_ns=(-1_000, 5_000),
         t_loc_default_ns=48_000,
-    )
+    ).view_as("ak")
 
-    # load the data
-    data = {}
-    for k, obs in {"amp": "hit.energy_in_pe", "t0": "hit.trigger_pos"}.items():
-        all_data = gather_pulse_data(
-            datainfo,
-            tcm,
-            table_names,
-            observable=obs,
-            pulse_mask=None,
-            drop_empty=False,
-        ).view_as("ak")
+    # remove pulses outside the HPGe trigger window
+    spms_t0 = spms_t0.view_as("ak")[geds_t0_mask]
+    spms_amp = spms_amp.view_as("ak")[geds_t0_mask]
 
-        # remove pulses outside the HPGe trigger window
-        data[k] = all_data[geds_t0_mask.view_as("ak")]
-
-        # remove pulses as required by user
-        if pulse_mask is not None:
-            data[k] = data[pulse_mask.view_as("ak")]
-
-    # load the channel info
-    # rawids = spms.gather_tcm_id_data(
-    #     datainfo,
-    #     tcm,
-    #     table_names,
-    #     pulse_mask=pulse_mask,
-    #     drop_empty=True,
-    # )
-
-    # (HPGe) trigger position can vary among events!
-    if isinstance(geds_t0_ns, types.Array):
-        geds_t0_ns = geds_t0_ns.view_as("ak")
+    # get the (HPGe) trigger position
+    geds_t0_ns = geds_t0_ns.view_as("ak")
 
     ts_data = larveto.l200_combined_test_stat(
-        data["t0"], data["amp"], geds_t0_ns, ts_bkg_prob, rc_density
+        spms_amp, spms_amp, geds_t0_ns, ts_bkg_prob, rc_density
     )
 
     return types.Array(ts_data)
