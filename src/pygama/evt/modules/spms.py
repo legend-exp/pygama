@@ -305,6 +305,7 @@ def geds_coincidence_classifier(
     geds_t0_ns: types.Array,
     ts_bkg_prob: float,
     rc_density: Sequence[float] | None = None,
+    pulse_mask: types.VectorOfVectors | None = None,
 ) -> types.Array:
     """Calculate the HPGe / SiPMs coincidence classifier.
 
@@ -315,9 +316,20 @@ def geds_coincidence_classifier(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
+    geds_t0_ns
+        t0 (ns) of the HPGe signal.
+    ts_bkg_prob
+        probability for a pulse coming from some uncorrelated physics (uniform
+        distribution). needed for the LAr scintillation time pdf.
+    rc_density
+        density array of the random coincidence LAr energy distribution (total
+        energy summed over all channels, in p.e.). Derived from forced trigger
+        data.
+    pulse_mask
+        optional user mask to filter pulses before classifier computation.
     """
     # mask for windowing data around the HPGe t0
-    pulse_mask = make_pulse_data_mask(
+    geds_t0_mask = make_pulse_data_mask(
         datainfo,
         tcm,
         table_names,
@@ -326,16 +338,6 @@ def geds_coincidence_classifier(
         dt_range_ns=(-1_000, 5_000),
         t_loc_default_ns=48_000,
     )
-
-    # we'll need to remove pulses below noise threshold later
-    is_good_pulse = gather_pulse_data(
-        datainfo,
-        tcm,
-        table_names,
-        observable="hit.is_valid_hit",
-        pulse_mask=None,
-        drop_empty=False,
-    ).view_as("ak")
 
     # load the data
     data = {}
@@ -349,8 +351,12 @@ def geds_coincidence_classifier(
             drop_empty=False,
         ).view_as("ak")
 
-        # remove pulses below noise threshold and outside the HPGe trigger window
-        data[k] = all_data[is_good_pulse & pulse_mask.view_as("ak")]
+        # remove pulses outside the HPGe trigger window
+        data[k] = all_data[geds_t0_mask.view_as("ak")]
+
+        # remove pulses as required by user
+        if pulse_mask is not None:
+            data[k] = data[pulse_mask.view_as("ak")]
 
     # load the channel info
     # rawids = spms.gather_tcm_id_data(

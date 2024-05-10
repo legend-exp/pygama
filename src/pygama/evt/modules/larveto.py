@@ -37,7 +37,9 @@ def l200_combined_test_stat(
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution). needed for the LAr scintillation time pdf.
     rc_density
-        array of densities (probabilities) of uncorrelated number of photoelectrons in a 6µs window.
+        density array of the random coincidence LAr energy distribution (total
+        energy summed over all channels, in p.e.). Derived from forced trigger
+        data.
     """
     # flatten the data in the last axis (i.e. merge all channels together)
     # TODO: implement channel distinction
