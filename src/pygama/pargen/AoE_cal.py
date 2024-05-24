@@ -957,6 +957,15 @@ class CalAoE:
                             )
                         }
 
+                    elif mode == "none":
+                        time_dict = {
+                            time: mean
+                            for time, mean in zip(
+                                np.array(self.timecorr_df.index),
+                                np.nanmean(self.timecorr_df["mean"]),
+                            )
+                        }
+
                     else:
                         raise ValueError("unknown mode")
 
@@ -2005,7 +2014,7 @@ def drifttime_corr_plot(
 
         hist, bins, var = pgh.get_hist(
             final_df[aoe_class.dt_param],
-            dx=10,
+            dx=32,
             range=(
                 np.nanmin(final_df[aoe_class.dt_param]),
                 np.nanmax(final_df[aoe_class.dt_param]),
