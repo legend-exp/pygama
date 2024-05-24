@@ -210,7 +210,7 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         # We need to ditch the x_lo and x_hi columns and rows
         if cov is not None:
             cov = np.array(cov)
-            dropped_cov = cov[:, 2:][2:, :]
+            dropped_cov = cov[2:, 2:]
 
             return hpge_peak_mode(
                 pars[mu_idx],
@@ -228,7 +228,7 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         if cov is None:
             return pars[mu_idx]
         else:
-            return np.sqrt(cov[mu_idx][mu_idx])
+            return pars[mu_idx], np.sqrt(cov[mu_idx][mu_idx])
 
 
 # hpge_peak.get_fwhm = hpge_get_fwhm
