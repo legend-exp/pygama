@@ -723,6 +723,9 @@ class HPGeCalibration:
                 fixed=self.fixed,
             )
             self.pars = np.array(pars)
+            results_dict["calibration_parameters"] = pars
+            results_dict["calibration_uncertainties"] = errs
+            results_dict["calibration_covariance"] = cov
 
         except ValueError:
             log.error("Failed to fit enough peaks to get accurate calibration")
@@ -1102,6 +1105,9 @@ class HPGeCalibration:
                 fixed=self.fixed,
             )
             self.pars = np.array(pars)
+            results_dict["calibration_parameters"] = pars
+            results_dict["calibration_uncertainties"] = errs
+            results_dict["calibration_covariance"] = cov
 
         except ValueError:
             log.error("Failed to fit enough peaks to get accurate calibration")
