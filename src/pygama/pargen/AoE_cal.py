@@ -343,6 +343,10 @@ def unbinned_aoe_fit(
 
     bounds = aoe_peak_bounds(pdf, x0)
 
+    gof_hist, gof_bins, gof_var = pgh.get_hist(
+        aoe[(aoe < fmax) & (aoe > fmin)], bins=100, range=(fmin, fmax)
+    )
+
     # Full fit using Gaussian signal with Gaussian tail background
     c = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax) & (aoe > fmin)], pdf.pdf_ext)
     m = Minuit(c, *x0)
@@ -354,12 +358,72 @@ def unbinned_aoe_fit(
     m.migrad()
     m.hesse()
 
-    if np.isnan(m.errors).all():
-        try:
-            m.simplex.migrad()
-            m.hesse()
-        except Exception:
-            return return_nans(pdf)
+    valid1 = (
+        m.valid
+        & (~np.isnan(np.array(m.errors)[mask]).any())
+        & (~(np.array(m.errors)[mask] == 0).all())
+    )
+
+    cs = pgf.goodness_of_fit(
+        gof_hist,
+        gof_bins,
+        gof_var,
+        pdf.get_pdf,
+        m.values,
+        method="Pearson",
+        scale_bins=True,
+    )
+    cs = (cs[0], cs[1] + len(np.where(mask)[0]))
+
+    fit1 = (m.values, m.errors, m.covariance, cs, pdf, mask, valid1, m)
+
+    m2 = Minuit(c, *x0)
+    for arg, val in bounds.items():
+        m2.limits[arg] = val
+    fixed, mask = aoe_peak_fixed(pdf)
+    for fix in fixed:
+        m2.fixed[fix] = True
+    m2.simplex().migrad()
+    m2.hesse()
+
+    valid2 = (
+        m2.valid
+        & (~np.isnan(np.array(m2.errors)[mask]).any())
+        & (~(np.array(m2.errors)[mask] == 0).all())
+    )
+    cs2 = pgf.goodness_of_fit(
+        gof_hist,
+        gof_bins,
+        gof_var,
+        pdf.get_pdf,
+        m2.values,
+        method="Pearson",
+        scale_bins=True,
+    )
+    cs2 = (cs2[0], cs2[1] + len(np.where(mask)[0]))
+
+    fit2 = (m2.values, m2.errors, m2.covariance, cs2, pdf, mask, valid2, m2)
+
+    frac_errors1 = np.sum(np.abs(np.array(m.errors)[mask] / np.array(m.values)[mask]))
+    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
+
+    if valid2 is False:
+        fit = fit1
+    elif valid1 is False:
+        fit = fit2
+    elif cs[0] * 1.05 < cs2[0]:
+        fit = fit1
+
+    elif cs2[0] * 1.05 < cs[0]:
+        fit = fit2
+
+    elif frac_errors1 < frac_errors2:
+        fit = fit1
+
+    elif frac_errors1 > frac_errors2:
+        fit = fit2
+    else:
+        fit = fit1
 
     if display > 1:
         aoe = aoe[(aoe < fmax) & (aoe > fmin)]
@@ -374,9 +438,9 @@ def unbinned_aoe_fit(
         xs = np.linspace(fmin, fmax, 1000)
         counts, bins, bars = plt.hist(aoe, bins=nbins, histtype="step", label="Data")
         dx = np.diff(bins)
-        plt.plot(xs, pdf.get_pdf(xs, *m.values) * dx[0], label="Full fit")
+        plt.plot(xs, pdf.get_pdf(xs, *fit[0]) * dx[0], label="Full fit")
         pdf.components = True
-        sig, bkg = pdf.get_pdf(xs, *m.values)
+        sig, bkg = pdf.get_pdf(xs, *fit[0])
         pdf.components = False
         plt.plot(xs, sig * dx[0], label="Signal")
         plt.plot(xs, bkg * dx[0], label="Background")
@@ -391,7 +455,7 @@ def unbinned_aoe_fit(
 
         plt.figure()
         bin_centers = (bins[1:] + bins[:-1]) / 2
-        res = (pdf.pdf(bin_centers, *m.values) * dx[0]) - counts
+        res = (pdf.pdf(bin_centers, *fit[0]) * dx[0]) - counts
         plt.plot(
             bin_centers,
             [re / count if count != 0 else re for re, count in zip(res, counts)],
@@ -399,10 +463,10 @@ def unbinned_aoe_fit(
         )
         plt.legend(loc="upper left")
         plt.show()
-        return m.values, m.errors, m.covariance
+        return fit[0], fit[1], fit[2]
 
     else:
-        return m.values, m.errors, m.covariance
+        return fit[0], fit[1], fit[2]
 
 
 def fit_time_means(tstamps, means, sigmas):
@@ -1873,6 +1937,7 @@ def plot_aoe_mean_time(
             aoe_class.timecorr_df["mean"],
             yerr=aoe_class.timecorr_df["mean_err"],
             linestyle=" ",
+            marker="x",
         )
 
         grouped_means = [
@@ -1932,6 +1997,7 @@ def plot_aoe_res_time(
             aoe_class.timecorr_df["res"],
             yerr=aoe_class.timecorr_df["res_err"],
             linestyle=" ",
+            marker="x",
         )
     except Exception:
         pass
