@@ -1023,11 +1023,8 @@ class CalAoE:
 
                     elif mode == "none":
                         time_dict = {
-                            time: mean
-                            for time, mean in zip(
-                                np.array(self.timecorr_df.index),
-                                np.nanmean(self.timecorr_df["mean"]),
-                            )
+                            time: np.nanmean(self.timecorr_df["mean"])
+                            for time in np.array(self.timecorr_df.index)
                         }
 
                     else:
