@@ -254,13 +254,6 @@ def make_pulse_data_mask(
         drop_empty=False,
     )
 
-    # HACK: handle units
-    # HACK: remove me once units are fixed in the dsp tier
-    if "units" in pulse_t0.attrs and pulse_t0.attrs["units"] == "ns":
-        pulse_t0_ns = pulse_t0.view_as("ak")
-    else:
-        pulse_t0_ns = pulse_t0.view_as("ak") * 16
-
     pulse_amp = gather_pulse_data(
         datainfo,
         tcm,
@@ -283,6 +276,7 @@ def make_pulse_data_mask(
         t_loc_ns = ak.fill_none(ak.nan_to_none(t_loc_ns), t_loc_default_ns)
 
     # start with all-true mask
+    pulse_t0_ns = pulse_t0.view_as("ak")
     mask = pulse_t0_ns == pulse_t0_ns
 
     # apply p.e. threshold
@@ -308,6 +302,8 @@ def geds_coincidence_classifier(
     tcm: utils.TCMData,
     table_names: Sequence[str],
     *,
+    spms_t0: types.VectorOfVectors,
+    spms_amp: types.VectorOfVectors,
     geds_t0_ns: types.Array,
     ts_bkg_prob: float,
     rc_density: Sequence[float] | None = None,
@@ -321,71 +317,26 @@ def geds_coincidence_classifier(
     ----------
     datainfo, tcm, table_names
         positional arguments automatically supplied by :func:`.build_evt`.
+    t0
+        arrival times of pulses in ns, split by channel.
+    amp
+        amplitude of pulses in p.e., split by channel.
+    geds_t0_ns
+        t0 (ns) of the HPGe signal.
+    ts_bkg_prob
+        probability for a pulse coming from some uncorrelated physics (uniform
+        distribution). needed for the LAr scintillation time pdf.
+    rc_density
+        density array of the random coincidence LAr energy distribution (total
+        energy summed over all channels, in p.e.). Derived from forced trigger
+        data.
     """
-    # mask for windowing data around the HPGe t0
-    pulse_mask = make_pulse_data_mask(
-        datainfo,
-        tcm,
-        table_names,
-        a_thr_pe=None,
-        t_loc_ns=geds_t0_ns,
-        dt_range_ns=(-1_000, 5_000),
-        t_loc_default_ns=48_000,
-    )
-
-    # we'll need to remove pulses below noise threshold later
-    is_good_pulse = gather_is_valid_hit(datainfo, tcm, table_names).view_as("ak")
-
-    # load the data
-    data = {}
-    for k, obs in {"amp": "hit.energy_in_pe", "t0": "hit.trigger_pos"}.items():
-        all_data = gather_pulse_data(
-            datainfo,
-            tcm,
-            table_names,
-            observable=obs,
-            pulse_mask=None,
-            drop_empty=False,
-        ).view_as("ak")
-
-        # remove pulses below noise threshold and outside the HPGe trigger window
-        data[k] = all_data[is_good_pulse & pulse_mask.view_as("ak")]
-
-    # load the channel info
-    # rawids = spms.gather_tcm_id_data(
-    #     datainfo,
-    #     tcm,
-    #     table_names,
-    #     pulse_mask=pulse_mask,
-    #     drop_empty=True,
-    # )
-
-    # (HPGe) trigger position can vary among events!
-    if isinstance(geds_t0_ns, types.Array):
-        geds_t0_ns = geds_t0_ns.view_as("ak")
-
-    ts_data = larveto.l200_combined_test_stat(
-        data["t0"], data["amp"], geds_t0_ns, ts_bkg_prob, rc_density
-    )
-
-    return types.Array(ts_data)
-
-
-# REMOVE ME: not needed anymore with VectorOfVectors DSP outputs
-def gather_is_valid_hit(datainfo, tcm, table_names):
-    data = {}
-    for field in ("is_valid_hit", "trigger_pos"):
-        data[field] = gather_pulse_data(
-            datainfo,
-            tcm,
-            table_names,
-            observable=f"hit.{field}",
-            pulse_mask=None,
-            drop_empty=False,
-        ).view_as("ak")
-
-    return types.VectorOfVectors(
-        data["is_valid_hit"][
-            ak.local_index(data["is_valid_hit"]) < ak.num(data["trigger_pos"], axis=-1)
-        ]
+    return types.Array(
+        larveto.l200_combined_test_stat(
+            spms_t0.view_as("ak"),
+            spms_amp.view_as("ak"),
+            geds_t0_ns.view_as("ak"),
+            ts_bkg_prob,
+            rc_density,
+        )
     )

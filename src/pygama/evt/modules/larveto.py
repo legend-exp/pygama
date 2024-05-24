@@ -6,7 +6,7 @@ from collections.abc import Sequence
 
 import awkward as ak
 import numpy as np
-import scipy
+import scipy.stats
 from numpy.typing import ArrayLike
 
 
@@ -37,7 +37,9 @@ def l200_combined_test_stat(
         probability for a pulse coming from some uncorrelated physics (uniform
         distribution). needed for the LAr scintillation time pdf.
     rc_density
-        array of densities (probabilities) of uncorrelated number of photoelectrons in a 6µs window.
+        density array of the random coincidence LAr energy distribution (total
+        energy summed over all channels, in p.e.). Derived from forced trigger
+        data.
     """
     # flatten the data in the last axis (i.e. merge all channels together)
     # TODO: implement channel distinction
@@ -45,8 +47,7 @@ def l200_combined_test_stat(
     amp = ak.flatten(amp, axis=-1)
 
     # subtract the HPGe t0 from the SiPM pulse t0s
-    # HACK: remove 16 when units will be fixed
-    rel_t0 = 16 * t0 - geds_t0
+    rel_t0 = t0 - geds_t0
 
     return l200_test_stat(rel_t0, amp, ts_bkg_prob, rc_density)
 

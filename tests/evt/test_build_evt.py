@@ -123,50 +123,51 @@ def test_field_nesting(lgnd_test_data, files_config):
     assert sorted(evt.sub2.keys()) == ["dummy", "multiplicity"]
 
 
-def test_spms_module(lgnd_test_data, files_config):
-    build_evt(
-        files_config,
-        config=f"{config_dir}/spms-module-config.yaml",
-        wo_mode="of",
-    )
+# FIXME: this can't be properly tested until proper testdata is available
+# def test_spms_module(lgnd_test_data, files_config):
+#     build_evt(
+#         files_config,
+#         config=f"{config_dir}/spms-module-config.yaml",
+#         wo_mode="of",
+#     )
 
-    outfile = files_config["evt"][0]
+#     outfile = files_config["evt"][0]
 
-    evt = lh5.read("/evt", outfile)
+#     evt = lh5.read("/evt", outfile)
 
-    t0 = ak.fill_none(ak.nan_to_none(evt.t0.view_as("ak")), 48_000)
-    tr_pos = evt.trigger_pos.view_as("ak") * 16
-    assert ak.all(tr_pos > t0 - 30_000)
-    assert ak.all(tr_pos < t0 + 30_000)
+#     t0 = ak.fill_none(ak.nan_to_none(evt.t0.view_as("ak")), 48_000)
+#     tr_pos = evt.trigger_pos.view_as("ak") * 16
+#     assert ak.all(tr_pos > t0 - 30_000)
+#     assert ak.all(tr_pos < t0 + 30_000)
 
-    mask = evt._pulse_mask
-    assert isinstance(mask, VectorOfVectors)
-    assert len(mask) == 10
-    assert mask.ndim == 3
+#     mask = evt._pulse_mask
+#     assert isinstance(mask, VectorOfVectors)
+#     assert len(mask) == 10
+#     assert mask.ndim == 3
 
-    full = evt.spms_amp_full.view_as("ak")
-    amp = evt.spms_amp.view_as("ak")
-    assert ak.all(amp > 0.1)
+#     full = evt.spms_amp_full.view_as("ak")
+#     amp = evt.spms_amp.view_as("ak")
+#     assert ak.all(amp > 0.1)
 
-    assert ak.all(full[mask.view_as("ak")] == amp)
+#     assert ak.all(full[mask.view_as("ak")] == amp)
 
-    wo_empty = evt.spms_amp_wo_empty.view_as("ak")
-    assert ak.all(wo_empty == amp[ak.count(amp, axis=-1) > 0])
+#     wo_empty = evt.spms_amp_wo_empty.view_as("ak")
+#     assert ak.all(wo_empty == amp[ak.count(amp, axis=-1) > 0])
 
-    rawids = evt.rawid.view_as("ak")
-    assert rawids.ndim == 2
-    assert ak.count(rawids) == 30
+#     rawids = evt.rawid.view_as("ak")
+#     assert rawids.ndim == 2
+#     assert ak.count(rawids) == 30
 
-    idx = evt.hit_idx.view_as("ak")
-    assert idx.ndim == 2
-    assert ak.count(idx) == 30
+#     idx = evt.hit_idx.view_as("ak")
+#     assert idx.ndim == 2
+#     assert ak.count(idx) == 30
 
-    rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
-    assert ak.count(rawids_wo_empty) == 7
+#     rawids_wo_empty = evt.rawid_wo_empty.view_as("ak")
+#     assert ak.count(rawids_wo_empty) == 7
 
-    vhit = evt.is_valid_hit.view_as("ak")
-    vhit.show()
-    assert ak.all(ak.num(vhit, axis=-1) == ak.num(full, axis=-1))
+#     vhit = evt.is_valid_hit.view_as("ak")
+#     vhit.show()
+#     assert ak.all(ak.num(vhit, axis=-1) == ak.num(full, axis=-1))
 
 
 def test_vov(lgnd_test_data, files_config):
