@@ -1719,6 +1719,8 @@ class HPGeCalibration:
                     ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
 
             ax1.set_xlim(erange)
+            if np.isnan(low_lim):
+                low_lim = 0
             ax1.set_ylim([low_lim, None])
             ax1.set_ylabel("FWHM energy resolution (keV)")
             for _, fwhm_dict in fwhm_dicts.items():
