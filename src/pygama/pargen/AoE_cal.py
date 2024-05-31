@@ -718,10 +718,9 @@ def get_survival_fraction(
     surv_err = surv_errs["n_sig"]
 
     pc_n = ct_n + surv_n
-    pc_err = np.sqrt(surv_err**2 + ct_err**2)
 
     sf = (surv_n / pc_n) * 100
-    err = sf * np.sqrt((pc_err / pc_n) ** 2 + (surv_err / surv_n) ** 2)
+    err = sf * np.sqrt((ct_err / pc_n**2) ** 2 + (surv_err / pc_n**2) ** 2)
     return sf, err, cut_pars, surv_pars
 
 
@@ -835,10 +834,9 @@ def compton_sf(cut_param, low_cut_val, high_cut_val=None, mode="greater", dt_mas
     surv_err = np.sqrt(len(cut_param[mask]))
 
     pc_n = ct_n + surv_n
-    pc_err = np.sqrt(surv_err**2 + ct_err**2)
 
     sf = (surv_n / pc_n) * 100
-    err = sf * np.sqrt((pc_err / pc_n) ** 2 + (surv_err / surv_n) ** 2)
+    err = sf * np.sqrt((ct_err / pc_n**2) ** 2 + (surv_err / pc_n**2) ** 2)
 
     return {
         "low_cut": low_cut_val,
@@ -1954,8 +1952,8 @@ def plot_aoe_mean_time(
                 datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
                 for tstamp in aoe_class.cal_dicts
             ],
-            y1=np.array(grouped_means) - 0.2 * np.array(aoe_class.timecorr_df["res"]),
-            y2=np.array(grouped_means) + 0.2 * np.array(aoe_class.timecorr_df["res"]),
+            y1=np.array(grouped_means) - 0.2 * np.array(aoe_class.timecorr_df["sigma"]),
+            y2=np.array(grouped_means) + 0.2 * np.array(aoe_class.timecorr_df["sigma"]),
             color="green",
             alpha=0.2,
         )
@@ -1964,8 +1962,8 @@ def plot_aoe_mean_time(
                 datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
                 for tstamp in aoe_class.cal_dicts
             ],
-            y1=np.array(grouped_means) - 0.4 * np.array(aoe_class.timecorr_df["res"]),
-            y2=np.array(grouped_means) + 0.4 * np.array(aoe_class.timecorr_df["res"]),
+            y1=np.array(grouped_means) - 0.4 * np.array(aoe_class.timecorr_df["sigma"]),
+            y2=np.array(grouped_means) + 0.4 * np.array(aoe_class.timecorr_df["sigma"]),
             color="yellow",
             alpha=0.2,
         )
