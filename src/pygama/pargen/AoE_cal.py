@@ -719,8 +719,10 @@ def get_survival_fraction(
 
     pc_n = ct_n + surv_n
 
-    sf = (surv_n / pc_n) * 100
-    err = sf * np.sqrt((ct_err / pc_n**2) ** 2 + (surv_err / pc_n**2) ** 2)
+    sf = surv_n / pc_n
+    err = 100 * sf * (1 - sf) * np.sqrt((ct_err / ct_n) ** 2 + (surv_err / surv_n) ** 2)
+    sf *= 100
+
     return sf, err, cut_pars, surv_pars
 
 
@@ -835,8 +837,9 @@ def compton_sf(cut_param, low_cut_val, high_cut_val=None, mode="greater", dt_mas
 
     pc_n = ct_n + surv_n
 
-    sf = (surv_n / pc_n) * 100
-    err = sf * np.sqrt((ct_err / pc_n**2) ** 2 + (surv_err / pc_n**2) ** 2)
+    sf = surv_n / pc_n
+    err = 100 * sf * (1 - sf) * np.sqrt((ct_err / ct_n) ** 2 + (surv_err / surv_n) ** 2)
+    sf *= 100
 
     return {
         "low_cut": low_cut_val,
