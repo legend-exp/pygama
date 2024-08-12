@@ -5,7 +5,8 @@ sphinx:
 
 formats:
   - epub
-  - pdf
+  # FIXME: latex failure
+  # - pdf
 
 build:
   os: "ubuntu-22.04"
