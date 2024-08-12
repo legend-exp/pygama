@@ -19,7 +19,7 @@ def nb_step_int(x: float, mu: float, sigma: float, hstep: float) -> np.ndarray:
 
 
     .. math::
-        \int cdf(x, hstep, \mu, \sigma)\, dx = \sigma\left(\frac{x-\mu}{\sigma} + hstep \left(\frac{x-\mu}{\sigma}\text{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right) + \sqrt{\frac{2}{\pi}}\exp\left(-(\frac{x-\mu}{\sigma})^2/2\right) \right)\right)
+        \int cdf(x, hstep, \mu, \sigma)\, dx = \sigma\left(\frac{x-\mu}{\sigma} + hstep \left(\frac{x-\mu}{\sigma}\mathrm{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right) + \sqrt{\frac{2}{\pi}}\exp\left(-(\frac{x-\mu}{\sigma})^2/2\right) \right)\right)
 
 
     As a Numba JIT function, it runs slightly faster than
@@ -62,7 +62,7 @@ def nb_unnorm_step_pdf(x: float, mu: float, sigma: float, hstep: float) -> float
 
 
     .. math::
-        pdf(x, hstep, \mu, \sigma) = 1+ hstep\text{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right)
+        pdf(x, hstep, \mu, \sigma) = 1+ hstep\mathrm{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right)
 
 
 
@@ -99,10 +99,10 @@ def nb_step_pdf(
 
 
     .. math::
-        pdf(x, \text{x_lo}, \text{x_hi}, \mu, \sigma, hstep) = pdf(y=\frac{x-\mu}{\sigma}, step, \text{x_lo}, \text{x_hi}) = \frac{1+hstep\text{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right)}{\sigma\left[(y-y_{min}) +hstep\left(y\text{erf}(\frac{y}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y^2/2}-y_{min}\text{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)\right]}
+        pdf(x, \mathrm{x}_\mathrm{lo}, \mathrm{x}_\mathrm{hi}, \mu, \sigma, hstep) = pdf(y=\frac{x-\mu}{\sigma}, step, \mathrm{x}_\mathrm{lo}, \mathrm{x}_\mathrm{hi}) = \frac{1+hstep\mathrm{erf}\left(\frac{x-\mu}{\sigma\sqrt{2}}\right)}{\sigma\left[(y-y_{min}) +hstep\left(y\mathrm{erf}(\frac{y}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y^2/2}-y_{min}\mathrm{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)\right]}
 
 
-    Where :math:`y_{max} = \frac{\text{x_hi} - \mu}{\sigma}, y_{min} = \frac{\text{x_lo} - \mu}{\sigma}`.
+    Where :math:`y_{max} = \frac{\mathrm{x}_\mathrm{hi} - \mu}{\sigma}, y_{min} = \frac{\mathrm{x}_\mathrm{lo} - \mu}{\sigma}`.
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
 
@@ -147,10 +147,10 @@ def nb_step_cdf(
 
 
     .. math::
-        cdf(x, \text{x_lo}, \text{x_hi}, \mu, \sigma, hstep) = cdf(y=\frac{x-\mu}{\sigma}, hstep, \text{x_lo}, \text{x_hi}) = \frac{(y-y_{min}) +hstep\left(y\text{erf}(\frac{y}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y^2/2}-y_{min}\text{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)}{\sigma\left[(y_{max}-y_{min}) +hstep\left(y_{max}\text{erf}(\frac{y_{max}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{max}^2/2}-y_{min}\text{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)\right] }
+        cdf(x, \mathrm{x}_\mathrm{lo}, \mathrm{x}_\mathrm{hi}, \mu, \sigma, hstep) = cdf(y=\frac{x-\mu}{\sigma}, hstep, \mathrm{x}_\mathrm{lo}, \mathrm{x}_\mathrm{hi}) = \frac{(y-y_{min}) +hstep\left(y\mathrm{erf}(\frac{y}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y^2/2}-y_{min}\mathrm{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)}{\sigma\left[(y_{max}-y_{min}) +hstep\left(y_{max}\mathrm{erf}(\frac{y_{max}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{max}^2/2}-y_{min}\mathrm{erf}(\frac{y_{min}}{\sqrt{2}})+\sqrt{\frac{2}{\pi}}e^{-y_{min}^2/2}\right)\right] }
 
 
-    Where :math:`y_{max} = \frac{\text{x_hi} - \mu}{\sigma}, y_{min} = \frac{\text{x_lo} - \mu}{\sigma}`.
+    Where :math:`y_{max} = \frac{\mathrm{x}_\mathrm{hi} - \mu}{\sigma}, y_{min} = \frac{\mathrm{x}_\mathrm{lo} - \mu}{\sigma}`.
     As a Numba JIT function, it runs slightly faster than
     'out of the box' functions.
 
