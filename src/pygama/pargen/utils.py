@@ -81,17 +81,18 @@ def load_data(
                 threshold,
                 return_selection_mask,
             )
-            file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
 
             if return_selection_mask:
+                file_df[0]["run_timestamp"] = np.full(len(file_df[0]), tstamp, dtype=object)
                 df.append(file_df[0])
                 masks.append(file_df[1])
             else:
+                file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
                 df.append(file_df)
 
         df = pd.concat(df)
         if return_selection_mask:
-            masks = np.concat(masks)
+            masks = np.concatenate(masks)
 
     elif isinstance(files, list):
         # Get set of available fields between input table and cal_dict
@@ -113,7 +114,11 @@ def load_data(
         lh5_it = lh5.iterator.LH5Iterator(
             files, lh5_path, field_mask=fields, buffer_len=100000
         )
-        df = pd.DataFrame(columns=list(params))
+        df_fields = params & (fields | set(cal_dict))
+        if df_fields != params:
+            log.debug(f"load_data(): params not found in data files or cal_dict: {params-df_fields}")
+        df = pd.DataFrame(columns=list(df_fields))
+        
         for table, entry, n_rows in lh5_it:
             # Evaluate all provided expressions and add to table
             for outname, info in cal_dict.items():
@@ -122,7 +127,7 @@ def load_data(
                 )
 
             # Copy params in table into dataframe
-            for par in params:
+            for par in df:
                 # First set of entries: allocate enough memory for all entries
                 if entry == 0:
                     df[par] = np.resize(table[par], len(lh5_it))
