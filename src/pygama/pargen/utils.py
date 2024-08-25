@@ -83,7 +83,9 @@ def load_data(
             )
 
             if return_selection_mask:
-                file_df[0]["run_timestamp"] = np.full(len(file_df[0]), tstamp, dtype=object)
+                file_df[0]["run_timestamp"] = np.full(
+                    len(file_df[0]), tstamp, dtype=object
+                )
                 df.append(file_df[0])
                 masks.append(file_df[1])
             else:
@@ -116,9 +118,11 @@ def load_data(
         )
         df_fields = params & (fields | set(cal_dict))
         if df_fields != params:
-            log.debug(f"load_data(): params not found in data files or cal_dict: {params-df_fields}")
+            log.debug(
+                f"load_data(): params not found in data files or cal_dict: {params-df_fields}"
+            )
         df = pd.DataFrame(columns=list(df_fields))
-        
+
         for table, entry, n_rows in lh5_it:
             # Evaluate all provided expressions and add to table
             for outname, info in cal_dict.items():
