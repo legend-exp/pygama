@@ -103,8 +103,8 @@ def load_data(
         # Get set of keys in calibration expressions that show up in file
         cal_keys = {
             name
-            for expr in cal_dict.values()
-            for name in compile(expr, "0vbb is real!", "eval").co_names
+            for info in cal_dict.values()
+            for name in compile(info["expression"], "0vbb is real!", "eval").co_names
         } & file_keys
 
         # Get set of fields to read from files
@@ -118,7 +118,7 @@ def load_data(
             # Evaluate all provided expressions and add to table
             for outname, info in cal_dict.items():
                 table[outname] = table.eval(
-                    info["expression"], local_dict=info.get("parameters", None)
+                    info["expression"], info.get("parameters", None)
                 )
 
             # Copy params in table into dataframe
