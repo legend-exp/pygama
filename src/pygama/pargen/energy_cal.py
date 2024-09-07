@@ -1967,7 +1967,7 @@ def get_hpge_energy_peak_par_guess(
             if (
                 sigma <= 0
                 or abs(sigma / sigma_guess) > 5
-                or sigma > (fit_range[1] - fit_range[0]) / 4
+                or sigma > (fit_range[1] - fit_range[0]) / 2
             ):
                 raise ValueError
         except ValueError:
@@ -1983,11 +1983,15 @@ def get_hpge_energy_peak_par_guess(
                 )[0]
             except RuntimeError:
                 sigma = -1
-            if sigma <= 0 or sigma > 1000 or abs(sigma / sigma_guess) > 5:
+            if (
+                sigma <= 0
+                or sigma > (fit_range[1] - fit_range[0]) / 2
+                or abs(sigma / sigma_guess) > 5
+            ):
                 if (
                     sigma_guess is not None
                     and sigma_guess > 0
-                    and sigma_guess < (fit_range[1] - fit_range[0]) / 4
+                    and sigma_guess < (fit_range[1] - fit_range[0]) / 2
                 ):
                     sigma = sigma_guess
                 else:
@@ -1995,7 +1999,7 @@ def get_hpge_energy_peak_par_guess(
                     if (
                         sigma is not None
                         and sigma_guess > 0
-                        and sigma_guess < (fit_range[1] - fit_range[0]) / 4
+                        and sigma_guess < (fit_range[1] - fit_range[0]) / 2
                     ):
                         pass
                     else:
@@ -2088,7 +2092,7 @@ def get_hpge_energy_bounds(func, parguess):
         return {
             "n_sig": (0, None),
             "mu": (parguess["x_lo"], parguess["x_hi"]),
-            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 4),
+            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 2),
             "n_bkg": (0, None),
             "hstep": (-1, 1),
             "x_lo": (None, None),
@@ -2099,7 +2103,7 @@ def get_hpge_energy_bounds(func, parguess):
         return {
             "n_sig": (0, None),
             "mu": (parguess["x_lo"], parguess["x_hi"]),
-            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 4),
+            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 2),
             "htail": (0, 0.5),
             "tau": (0.1 * parguess["sigma"], 5 * parguess["sigma"]),
             "n_bkg": (0, None),
@@ -2112,7 +2116,7 @@ def get_hpge_energy_bounds(func, parguess):
         return {
             "n_sig": (0, None),
             "mu": (parguess["x_lo"], parguess["x_hi"]),
-            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 4),
+            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 2),
             "n_bkg": (0, None),
             "x_lo": (None, None),
             "x_hi": (None, None),
@@ -2121,7 +2125,7 @@ def get_hpge_energy_bounds(func, parguess):
         return {
             "n_sig": (0, None),
             "mu": (parguess["x_lo"], parguess["x_hi"]),
-            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 4),
+            "sigma": (0, (parguess["x_hi"] - parguess["x_lo"]) / 2),
             "n_bkg": (0, None),
             "m": (None, None),
             "b": (None, None),
