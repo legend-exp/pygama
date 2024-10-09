@@ -182,7 +182,9 @@ def get_data_at_channel(
 
         new_expr = expr
         for name in f._asdict():
-            if name not in ["tcm", "raw"]:
+            if name == "evt":
+                new_expr = new_expr.replace(f"{name}.", "")
+            elif name not in ["tcm", "raw"]:
                 new_expr = new_expr.replace(f"{name}.", f"{name}_")
 
         res = eval(
