@@ -16,13 +16,19 @@ from numpy.typing import NDArray
 H5DataLoc = namedtuple(
     "H5DataLoc", ("file", "group", "table_fmt"), defaults=3 * (None,)
 )
-DataInfo = namedtuple("DataInfo", ("raw"), defaults=1 * (None,))
+DataInfo = namedtuple("DataInfo", ("raw", "tcm", "evt"), defaults=3 * (None,))
 
 TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
 
 
 def make_files_config(data: dict):
     if not isinstance(data, tuple):
+        if "raw" not in data:
+            data["raw"] = (None,)
+        if "tcm" not in data:
+            data["tcm"] = (None,)
+        if "evt" not in data:
+            data["evt"] = (None,)
         DataInfo = namedtuple(
             "DataInfo", tuple(data.keys()), defaults=len(data.keys()) * (None,)
         )
