@@ -608,24 +608,55 @@ def get_peak_label(peak: float) -> str:
         return "Tl FEP @"
 
 
+def pass_pdf_gos(
+    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2
+):
+    return gauss_on_step.pdf_ext(
+        x, x_lo, x_hi, n_sig * epsilon_sig, mu, sigma, n_bkg * epsilon_bkg, hstep1
+    )
+
+
+def fail_pdf_gos(
+    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2
+):
+    return gauss_on_step.pdf_ext(
+        x,
+        x_lo,
+        x_hi,
+        n_sig * (1 - epsilon_sig),
+        mu,
+        sigma,
+        n_bkg * (1 - epsilon_bkg),
+        hstep2,
+    )
+
+
 def pass_pdf_hpge(
     x,
     x_lo,
     x_hi,
-    n_sig1,
-    n_sig2,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
     mu,
     sigma,
     htail,
     tau,
-    n_bkg1,
-    n_bkg2,
     hstep1,
     hstep2,
-    hstep3,
 ):
     return hpge_peak.pdf_ext(
-        x, x_lo, x_hi, n_sig1, mu, sigma, htail, tau, n_bkg1, hstep1
+        x,
+        x_lo,
+        x_hi,
+        n_sig * epsilon_sig,
+        mu,
+        sigma,
+        htail,
+        tau,
+        n_bkg * epsilon_bkg,
+        hstep1,
     )
 
 
@@ -633,61 +664,28 @@ def fail_pdf_hpge(
     x,
     x_lo,
     x_hi,
-    n_sig1,
-    n_sig2,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
     mu,
     sigma,
     htail,
     tau,
-    n_bkg1,
-    n_bkg2,
     hstep1,
     hstep2,
-    hstep3,
 ):
     return hpge_peak.pdf_ext(
-        x, x_lo, x_hi, n_sig2, mu, sigma, htail, tau, n_bkg2, hstep2
-    )
-
-
-def tot_pdf_hpge(
-    x,
-    x_lo,
-    x_hi,
-    n_sig1,
-    n_sig2,
-    mu,
-    sigma,
-    htail,
-    tau,
-    n_bkg1,
-    n_bkg2,
-    hstep1,
-    hstep2,
-    hstep3,
-):
-    return hpge_peak.pdf_ext(
-        x, x_lo, x_hi, n_sig1 + n_sig2, mu, sigma, htail, tau, n_bkg1 + n_bkg2, hstep3
-    )
-
-
-def pass_pdf_gos(
-    x, x_lo, x_hi, n_sig1, n_sig2, mu, sigma, n_bkg1, n_bkg2, hstep1, hstep2, hstep3
-):
-    return gauss_on_step.pdf_ext(x, x_lo, x_hi, n_sig1, mu, sigma, n_bkg1, hstep1)
-
-
-def fail_pdf_gos(
-    x, x_lo, x_hi, n_sig1, n_sig2, mu, sigma, n_bkg1, n_bkg2, hstep1, hstep2, hstep3
-):
-    return gauss_on_step.pdf_ext(x, x_lo, x_hi, n_sig2, mu, sigma, n_bkg2, hstep2)
-
-
-def tot_pdf_gos(
-    x, x_lo, x_hi, n_sig1, n_sig2, mu, sigma, n_bkg1, n_bkg2, hstep1, hstep2, hstep3
-):
-    return gauss_on_step.pdf_ext(
-        x, x_lo, x_hi, n_sig1 + n_sig2, mu, sigma, n_bkg1 + n_bkg2, hstep3
+        x,
+        x_lo,
+        x_hi,
+        n_sig * (1 - epsilon_sig),
+        mu,
+        sigma,
+        htail,
+        tau,
+        n_bkg * (1 - epsilon_bkg),
+        hstep2,
     )
 
 
@@ -730,6 +728,7 @@ def get_survival_fraction(
     fit_range=None,
     high_cut=None,
     pars=None,
+    errs=None,
     dt_mask=None,
     mode="greater",
     func=hpge_peak,
@@ -758,8 +757,8 @@ def get_survival_fraction(
         else:
             raise ValueError("mode not recognised")
 
-    if pars is None:
-        (pars, _, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
+    if pars is None or errs is None:
+        (pars, errs, cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
             energy,
             func,
             guess_func=energy_guess,
@@ -768,11 +767,9 @@ def get_survival_fraction(
             fit_range=fit_range,
         )
 
-    guess_pars_cut = copy.deepcopy(pars)
     guess_pars_surv = copy.deepcopy(pars)
 
     # add update guess here for n_sig and n_bkg
-    guess_pars_cut = update_guess(func, guess_pars_cut, energy[(~nan_idxs) & (~idxs)])
     guess_pars_surv = update_guess(func, guess_pars_surv, energy[(~nan_idxs) & (idxs)])
 
     parguess = {
@@ -780,50 +777,44 @@ def get_survival_fraction(
         "x_hi": pars["x_hi"],
         "mu": pars["mu"],
         "sigma": pars["sigma"],
-        "n_sig1": guess_pars_surv["n_sig"],
-        "n_bkg1": guess_pars_surv["n_bkg"],
-        "n_sig2": guess_pars_cut["n_sig"],
-        "n_bkg2": guess_pars_cut["n_bkg"],
         "hstep1": pars["hstep"],
         "hstep2": pars["hstep"],
-        "hstep3": pars["hstep"],
+        "n_sig": pars["n_sig"],
+        "n_bkg": pars["n_bkg"],
+        "epsilon_sig": guess_pars_surv["n_sig"] / pars["n_sig"],
+        "epsilon_bkg": guess_pars_surv["n_bkg"] / pars["n_bkg"],
     }
 
     bounds = {
-        "n_sig1": (0, pars["n_sig"] + pars["n_bkg"]),
-        "n_sig2": (0, pars["n_sig"] + pars["n_bkg"]),
-        "n_bkg1": (0, pars["n_bkg"] + pars["n_sig"]),
-        "n_bkg2": (0, pars["n_bkg"] + pars["n_sig"]),
+        "n_sig": (0, pars["n_sig"] + pars["n_bkg"]),
+        "epsilon_sig": (0, 1),
+        "n_bkg": (0, pars["n_bkg"] + pars["n_sig"]),
+        "epsilon_bkg": (0, 1),
         "hstep1": (-1, 1),
         "hstep2": (-1, 1),
-        "hstep3": (-1, 1),
     }
 
     if func == hpge_peak:
         parguess.update({"htail": pars["htail"], "tau": pars["tau"]})
 
     if func == hpge_peak:
-        lh = (
-            cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (idxs)], pass_pdf_hpge)
-            + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_hpge)
-            + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs)], tot_pdf_hpge)
-        )
+        lh = cost.ExtendedUnbinnedNLL(
+            energy[(~nan_idxs) & (idxs)], pass_pdf_hpge
+        ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_hpge)
     elif func == gauss_on_step:
-        lh = (
-            cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (idxs)], pass_pdf_gos)
-            + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_gos)
-            + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs)], tot_pdf_gos)
-        )
+        lh = cost.ExtendedUnbinnedNLL(
+            energy[(~nan_idxs) & (idxs)], pass_pdf_gos
+        ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_gos)
 
     else:
         raise ValueError("Unknown func")
 
     m = Minuit(lh, **parguess)
-    fixed = ["x_lo", "x_hi", "mu", "sigma"]
+    fixed = ["x_lo", "x_hi", "n_sig", "n_bkg", "mu", "sigma"]  # "hstep"
     if func == hpge_peak:
         fixed += ["tau", "htail"]
     if fix_step is True:
-        fixed += ["hstep1", "hstep2", "hstep3"]
+        fixed += ["hstep1", "hstep2"]
 
     m.fixed[fixed] = True
     for arg, val in bounds.items():
@@ -832,36 +823,22 @@ def get_survival_fraction(
     m.simplex().migrad()
     m.hesse()
 
-    ct_n = m.values["n_sig2"]
-    ct_err = m.errors["n_sig2"]
-    surv_n = m.values["n_sig1"]
-    surv_err = m.errors["n_sig1"]
-
-    pc_n = ct_n + surv_n
-
-    sf = surv_n / pc_n
-    err = 100 * sf * (1 - sf) * np.sqrt((ct_err / ct_n) ** 2 + (surv_err / surv_n) ** 2)
-    sf *= 100
+    sf = m.values["epsilon_sig"] * 100
+    err = m.errors["epsilon_sig"] * 100
 
     if display > 1:
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+        fig, (ax1, ax2) = plt.subplots(1, 2)
         bins = np.arange(1552, 1612, 1)
         ax1.hist(energy[(~nan_idxs) & (idxs)], bins=bins, histtype="step")
 
         ax2.hist(energy[(~nan_idxs) & (~idxs)], bins=bins, histtype="step")
 
-        ax3.hist(energy[(~nan_idxs)], bins=bins, histtype="step")
-
         if func == hpge_peak:
             ax1.plot(bins, pass_pdf_hpge(bins, **m.values.to_dict())[1])
             ax2.plot(bins, fail_pdf_hpge(bins, **m.values.to_dict())[1])
-
-            ax3.plot(bins, tot_pdf_hpge(bins, **m.values.to_dict())[1])
         elif func == gauss_on_step:
             ax1.plot(bins, pass_pdf_gos(bins, **m.values.to_dict())[1])
             ax2.plot(bins, fail_pdf_gos(bins, **m.values.to_dict())[1])
-
-            ax3.plot(bins, tot_pdf_gos(bins, **m.values.to_dict())[1])
 
         plt.show()
 
