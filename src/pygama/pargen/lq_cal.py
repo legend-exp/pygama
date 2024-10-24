@@ -16,6 +16,7 @@ from scipy.stats import linregress
 import pygama.math.histogram as pgh
 import pygama.pargen.AoE_cal as AoE
 from pygama.math.distributions import gaussian
+from pygama.pargen.survival_fractions import compton_sf_sweep, get_sf_sweep
 
 log = logging.getLogger(__name__)
 
@@ -564,12 +565,10 @@ class LQCal:
                         f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
                     )
 
-                    cut_df, sf, sf_err = AoE.compton_sf_sweep(
+                    cut_df, sf, sf_err = compton_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
                         peak_df[final_lq_param].to_numpy(),
                         self.cut_val,
-                        peak,
-                        fwhm,
                         cut_range=(0, 5),
                         n_samples=30,
                         mode="less",
@@ -587,7 +586,7 @@ class LQCal:
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{fit_range[0]})&({self.cal_energy_param}<{fit_range[1]})"
                     )
-                    cut_df, sf, sf_err = AoE.get_sf_sweep(
+                    cut_df, sf, sf_err = get_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
                         peak_df[final_lq_param].to_numpy(),
                         self.cut_val,
