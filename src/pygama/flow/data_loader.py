@@ -1411,7 +1411,7 @@ class DataLoader:
                             )
                             for file in gb.groups.keys()
                         ]
-                        tb_names += [ [self.filedb.get_table_name(tier, tb)] ]* len(gb)
+                        tb_names += [[self.filedb.get_table_name(tier, tb)]] * len(gb)
                         idx_list += [
                             list(entry_list.loc[i, f"{level}_idx"])
                             for i in gb.groups.values()
@@ -1509,7 +1509,7 @@ class DataLoader:
                     )
                     for file in gb.groups.keys()
                 ]
-                tb_names += [ [self.filedb.get_table_name(tier, tb)] ]* len(gb)
+                tb_names += [[self.filedb.get_table_name(tier, tb)]] * len(gb)
                 idx_list += [
                     list(entry_list.loc[i, f"{parent}_idx"]) for i in gb.groups.values()
                 ]
