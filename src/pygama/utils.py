@@ -51,7 +51,7 @@ class NumbaPygamaDefaults(MutableMapping):
     """
 
     def __init__(self) -> None:
-        self.parallel: bool = getenv_bool("PYGAMA_PARALLEL", default=True)
+        self.parallel: bool = getenv_bool("PYGAMA_PARALLEL", default=False)
         self.fastmath: bool = getenv_bool("PYGAMA_FASTMATH", default=True)
 
     def __getitem__(self, item: str) -> Any:
