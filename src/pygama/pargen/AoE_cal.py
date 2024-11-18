@@ -78,7 +78,12 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     mu = bin_centers[np.argmax(hist)]
     pars, _ = pgf.gauss_mode_width_max(hist, bins, var, mode_guess=mu, n_bins=5)
     bin_centres = pgh.get_bin_centers(bins)
-    if pars is None:
+    if pars is None or (
+        pars[0] > bins[-1]
+        or pars[0] < bins[0]
+        or pars[-1] < (0.5 * np.nanmax(hist))
+        or pars[-1] > (2 * np.nanmax(hist))
+    ):
         i_0 = np.argmax(hist)
         mu = bin_centres[i_0]
         (_, sigma, _) = pgh.get_gaussian_guess(hist, bins)
@@ -156,7 +161,10 @@ def aoe_peak_bounds(func, guess, **kwargs):
             "x_hi": (None, None),
             "n_sig": (0, None),
             "mu": ((guess["x_lo"] + guess["x_hi"]) / 2, guess["x_hi"]),
-            "sigma": (0, (guess["x_hi"] - guess["x_lo"]) / 4),
+            "sigma": (
+                (guess["x_hi"] - guess["x_lo"]) / 50,
+                (guess["x_hi"] - guess["x_lo"]) / 4,
+            ),
             "n_bkg": (0, None),
             "tau": (0, 1),
         }
@@ -166,7 +174,10 @@ def aoe_peak_bounds(func, guess, **kwargs):
             "x_hi": (None, None),
             "n_sig": (0, None),
             "mu": ((guess["x_lo"] + guess["x_hi"]) / 2, guess["x_hi"]),
-            "sigma": (0, (guess["x_hi"] - guess["x_lo"]) / 4),
+            "sigma": (
+                (guess["x_hi"] - guess["x_lo"]) / 50,
+                (guess["x_hi"] - guess["x_lo"]) / 4,
+            ),
             "htail": (0, 0.5),
             "tau_sig": (None, 0),
             "n_bkg": (0, None),
@@ -278,7 +289,10 @@ def unbinned_aoe_fit(
         * len(aoe) ** (-1 / 3)
     )
     nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))
-    hist, bins, var = pgh.get_hist(aoe, bins=500)
+    hist, bins, var = pgh.get_hist(
+        aoe[(aoe < np.nanpercentile(aoe, 99)) & (aoe > np.nanpercentile(aoe, 1))],
+        bins=500,
+    )
 
     gpars = aoe_peak_guess(gaussian, hist, bins, var)
     c1_min = gpars["mu"] - 0.5 * gpars["sigma"]
@@ -333,23 +347,27 @@ def unbinned_aoe_fit(
     mbkg.simplex().migrad()
     mbkg.hesse()
 
+    nsig_guess = (
+        msig.values["area"]
+        - np.diff(
+            exgauss.cdf_ext(
+                np.array([msig.values["mu"] - 2 * msig.values["sigma"], fmax]),
+                mbkg.values["area"],
+                msig.values["mu"],
+                msig.values["sigma"],
+                mbkg.values["tau"],
+            )
+        )[0]
+    )
+    if nsig_guess < 0:
+        nsig_guess = 0
+
     x0 = aoe_peak_guess(
         pdf,
         hist,
         bins,
         var,
-        n_sig=(
-            msig.values["area"]
-            - np.diff(
-                exgauss.cdf_ext(
-                    np.array([msig.values["mu"] - 2 * msig.values["sigma"], fmax]),
-                    mbkg.values["area"],
-                    msig.values["mu"],
-                    msig.values["sigma"],
-                    mbkg.values["tau"],
-                )
-            )[0]
-        ),
+        n_sig=nsig_guess,
         mu=msig.values["mu"],
         sigma=msig.values["sigma"],
         n_bkg=mbkg.values["area"],
