@@ -76,11 +76,16 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
     mu = bin_centers[np.argmax(hist)]
-    try:
-        _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
-    except Exception:
-        pars, cov = pgf.gauss_mode_width_max(hist, bins, var, mode_guess=mu, n_bins=20)
-        _, sigma, _ = pars
+    pars, _ = pgf.gauss_mode_width_max(hist, bins, var, mode_guess=mu, n_bins=5)
+    bin_centres = pgh.get_bin_centers(bins)
+    if pars is None:
+        i_0 = np.argmax(hist)
+        mu = bin_centres[i_0]
+        (_, sigma, _) = pgh.get_gaussian_guess(hist, bins)
+    else:
+        mu = pars[0]
+        sigma = pars[1]
+
     ls_guess = 2 * np.sum(hist[(bin_centers > mu) & (bin_centers < (mu + 2.5 * sigma))])
 
     if func == aoe_peak:
@@ -150,22 +155,22 @@ def aoe_peak_bounds(func, guess, **kwargs):
             "x_lo": (None, None),
             "x_hi": (None, None),
             "n_sig": (0, None),
-            "mu": (guess["x_lo"], guess["x_hi"]),
+            "mu": ((guess["x_lo"] + guess["x_hi"]) / 2, guess["x_hi"]),
             "sigma": (0, (guess["x_hi"] - guess["x_lo"]) / 4),
             "n_bkg": (0, None),
-            "tau": (0, None),
+            "tau": (0, 1),
         }
     elif func == aoe_peak_with_high_tail:
         bounds_dict = {
             "x_lo": (None, None),
             "x_hi": (None, None),
             "n_sig": (0, None),
-            "mu": (guess["x_lo"], guess["x_hi"]),
+            "mu": ((guess["x_lo"] + guess["x_hi"]) / 2, guess["x_hi"]),
             "sigma": (0, (guess["x_hi"] - guess["x_lo"]) / 4),
             "htail": (0, 0.5),
             "tau_sig": (None, 0),
             "n_bkg": (0, None),
-            "tau": (0, None),
+            "tau": (0, 1),
         }
     elif func == exgauss:
         bounds_dict = {
@@ -174,7 +179,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
             "area": (0, None),
             "mu": (guess["x_lo"], guess["x_hi"]),
             "sigma": (0, (guess["x_hi"] - guess["x_lo"]) / 4),
-            "tau": (0, None),
+            "tau": (0, 1),
         }
     elif func == gaussian:
         bounds_dict = {
@@ -196,7 +201,7 @@ def aoe_peak_fixed(func, **kwargs):
     elif func == aoe_peak_with_high_tail:
         fixed = ["x_lo", "x_hi"]
     elif func == exgauss:
-        fixed = ["x_lo", "x_hi"]
+        fixed = ["x_lo", "x_hi", "mu", "sigma"]
     elif func == gaussian:
         fixed = ["x_lo", "x_hi"]
     mask = ~np.in1d(func.required_args(), fixed)
@@ -261,8 +266,8 @@ def unbinned_aoe_fit(
 
     Returns
     -------
-    tuple(np.array, np.array)
-        Tuple of fit values and errors
+    tuple(np.array, np.array, np.ndarray, tuple)
+        Tuple of fit values, errors, covariance matrix and full fit info
     """
     if not isinstance(aoe, np.ndarray):
         aoe = np.array(aoe)
@@ -276,31 +281,31 @@ def unbinned_aoe_fit(
     hist, bins, var = pgh.get_hist(aoe, bins=500)
 
     gpars = aoe_peak_guess(gaussian, hist, bins, var)
-    c1_min = gpars["mu"] - 2 * gpars["sigma"]
+    c1_min = gpars["mu"] - 0.5 * gpars["sigma"]
     c1_max = gpars["mu"] + 3 * gpars["sigma"]
-
+    gpars["x_lo"] = c1_min
+    gpars["x_hi"] = c1_max
     # Initial fit just using Gaussian
-    c1 = cost.ExtendedUnbinnedNLL(
+    csig = cost.ExtendedUnbinnedNLL(
         aoe[(aoe < c1_max) & (aoe > c1_min)], gaussian.pdf_ext
     )
 
-    m1 = Minuit(c1, *gpars)
+    msig = Minuit(csig, *gpars)
 
     bounds = aoe_peak_bounds(gaussian, gpars)
     for arg, val in bounds.items():
-        m1.limits[arg] = val
+        msig.limits[arg] = val
     for fix in aoe_peak_fixed(gaussian)[0]:
-        m1.fixed[fix] = True
-    m1.migrad()
+        msig.fixed[fix] = True
+    msig.migrad()
 
     # Range to fit over, below this tail behaviour more exponential, few events above
-    fmin = m1.values["mu"] - 15 * m1.values["sigma"]
+    fmin = msig.values["mu"] - 15 * msig.values["sigma"]
     if fmin < np.nanmin(aoe):
         fmin = np.nanmin(aoe)
-    fmax_bkg = m1.values["mu"] - 5 * m1.values["sigma"]
-    fmax = m1.values["mu"] + 5 * m1.values["sigma"]
-
-    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - m1.values["area"]
+    fmax_bkg = msig.values["mu"] - 5 * msig.values["sigma"]
+    fmax = msig.values["mu"] + 5 * msig.values["sigma"]
+    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - msig.values["area"]
 
     bkg_guess = aoe_peak_guess(
         exgauss,
@@ -308,34 +313,47 @@ def unbinned_aoe_fit(
         bins,
         var,
         area=n_bkg_guess,
-        mu=m1.values["mu"],
-        sigma=m1.values["sigma"],
+        mu=msig.values["mu"],
+        sigma=msig.values["sigma"] * 0.9,
         x_lo=fmin,
         x_hi=fmax_bkg,
     )
 
-    c2 = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax_bkg) & (aoe > fmin)], exgauss.pdf_ext)
-    m2 = Minuit(c2, *bkg_guess)
+    cbkg = cost.ExtendedUnbinnedNLL(
+        aoe[(aoe < fmax_bkg) & (aoe > fmin)], exgauss.pdf_ext
+    )
+    mbkg = Minuit(cbkg, *bkg_guess)
 
     bounds = aoe_peak_bounds(exgauss, bkg_guess)
 
     for arg, val in bounds.items():
-        m2.limits[arg] = val
+        mbkg.limits[arg] = val
     for fix in aoe_peak_fixed(exgauss)[0]:
-        m2.fixed[fix] = True
-    m2.simplex().migrad()
-    m2.hesse()
+        mbkg.fixed[fix] = True
+    mbkg.simplex().migrad()
+    mbkg.hesse()
 
     x0 = aoe_peak_guess(
         pdf,
         hist,
         bins,
         var,
-        n_sig=m1.values["area"],
-        mu=m1.values["mu"],
-        sigma=m1.values["sigma"],
-        n_bkg=m2.values["area"],
-        tau=m2.values["tau"],
+        n_sig=(
+            msig.values["area"]
+            - np.diff(
+                exgauss.cdf_ext(
+                    np.array([msig.values["mu"] - 2 * msig.values["sigma"], fmax]),
+                    mbkg.values["area"],
+                    msig.values["mu"],
+                    msig.values["sigma"],
+                    mbkg.values["tau"],
+                )
+            )[0]
+        ),
+        mu=msig.values["mu"],
+        sigma=msig.values["sigma"],
+        n_bkg=mbkg.values["area"],
+        tau=mbkg.values["tau"],
         x_lo=fmin,
         x_hi=fmax,
     )
@@ -416,7 +434,7 @@ def unbinned_aoe_fit(
     elif cs2[0] * 1.05 < cs[0]:
         fit = fit2
 
-    elif frac_errors1 < frac_errors2:
+    elif frac_errors1 <= frac_errors2:
         fit = fit1
 
     elif frac_errors1 > frac_errors2:
@@ -426,27 +444,23 @@ def unbinned_aoe_fit(
 
     if display > 1:
         aoe = aoe[(aoe < fmax) & (aoe > fmin)]
-        bin_width = (
-            2
-            * (np.nanpercentile(aoe, 75) - np.nanpercentile(aoe, 25))
-            * len(aoe) ** (-1 / 3)
-        )
-        nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))  # *5
+        nbins = 100
 
         plt.figure()
         xs = np.linspace(fmin, fmax, 1000)
         counts, bins, bars = plt.hist(aoe, bins=nbins, histtype="step", label="Data")
         dx = np.diff(bins)
-        plt.plot(xs, pdf.get_pdf(xs, *fit[0]) * dx[0], label="Full fit")
+        plt.plot(xs, pdf.get_pdf(xs, *x0) * dx[0], label="Guess")
+        plt.plot(xs, pdf.get_pdf(xs, *fit[0]) * dx[0], label="Full Fit")
         pdf.components = True
         sig, bkg = pdf.get_pdf(xs, *fit[0])
         pdf.components = False
         plt.plot(xs, sig * dx[0], label="Signal")
         plt.plot(xs, bkg * dx[0], label="Background")
         plt.plot(
-            xs, gaussian.pdf_ext(xs, *m1.values)[1] * dx[0], label="Initial Gaussian"
+            xs, gaussian.pdf_ext(xs, *msig.values)[1] * dx[0], label="Initial Gaussian"
         )
-        plt.plot(xs, exgauss.pdf_ext(xs, *m2.values)[1] * dx[0], label="Bkg guess")
+        plt.plot(xs, exgauss.pdf_ext(xs, *mbkg.values)[1] * dx[0], label="Bkg guess")
         plt.xlabel("A/E")
         plt.ylabel("Counts")
         plt.legend(loc="upper left")
@@ -462,10 +476,9 @@ def unbinned_aoe_fit(
         )
         plt.legend(loc="upper left")
         plt.show()
-        return fit[0], fit[1], fit[2]
-
+        return fit[0], fit[1], fit[2], fit
     else:
-        return fit[0], fit[1], fit[2]
+        return fit[0], fit[1], fit[2], fit
 
 
 def fit_time_means(tstamps, means, sigmas):
@@ -676,7 +689,7 @@ class CalAoE:
             if "run_timestamp" in df:
                 for tstamp, time_df in df.groupby("run_timestamp", sort=True):
                     try:
-                        pars, errs, cov = unbinned_aoe_fit(
+                        pars, errs, _, _ = unbinned_aoe_fit(
                             time_df.query(
                                 f"{self.fit_selection} & ({self.cal_energy_param}>1000) & ({self.cal_energy_param}<1300)"
                             )[aoe_param],
@@ -786,7 +799,7 @@ class CalAoE:
                 log.info("A/E time correction finished")
             else:
                 try:
-                    pars, errs, _ = unbinned_aoe_fit(
+                    pars, errs, _, _ = unbinned_aoe_fit(
                         df.query(
                             f"{self.fit_selection} & {self.cal_energy_param}>1000 & {self.cal_energy_param}<1300"
                         )[aoe_param],
@@ -964,7 +977,7 @@ class CalAoE:
                     f"{self.dt_param}>{mus[1] - 2 * sigmas[1]} & {self.dt_param}<{mus[1] + 2 * sigmas[1]}"
                 )
 
-                aoe_pars, aoe_errs, _ = unbinned_aoe_fit(
+                aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
                     final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
                 )
 
@@ -973,7 +986,7 @@ class CalAoE:
                     "errs": aoe_errs.to_dict(),
                 }
 
-                aoe_pars2, aoe_errs2, _ = unbinned_aoe_fit(
+                aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
                     final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
                 )
 
@@ -1076,7 +1089,7 @@ class CalAoE:
             # Fit each compton band
             for band in compt_bands:
                 try:
-                    pars, errs, cov = unbinned_aoe_fit(
+                    pars, errs, cov, _ = unbinned_aoe_fit(
                         select_df.query(
                             f"{self.cal_energy_param}>{band}&{self.cal_energy_param}< {self.compt_bands_width+band}"
                         )[aoe_param],
@@ -1216,7 +1229,7 @@ class CalAoE:
             emin = peak - n_sigma * sigma
             emax = peak + n_sigma * sigma
             try:
-                dep_pars, dep_err, _ = unbinned_aoe_fit(
+                dep_pars, dep_err, _, _ = unbinned_aoe_fit(
                     select_df.query(
                         f"{self.cal_energy_param}>{emin}&{self.cal_energy_param}<{emax}"
                     )[aoe_param],
@@ -1775,19 +1788,6 @@ class CalAoE:
             self.two_side_sfs_by_run = None
 
 
-def get_peak_label(peak: float) -> str:
-    if peak == 2039:
-        return "CC @"
-    elif peak == 1592.5:
-        return "Tl DEP @"
-    elif peak == 1620.5:
-        return "Bi FEP @"
-    elif peak == 2103.53:
-        return "Tl SEP @"
-    elif peak == 2614.5:
-        return "Tl FEP @"
-
-
 # below are a few plotting functions that can be used to plot the results of the A/E calibration
 
 
@@ -2281,6 +2281,19 @@ def plot_cut_fit(
     plt.ylabel("survival percentage")
     plt.close()
     return fig
+
+
+def get_peak_label(peak: float) -> str:
+    if peak == 2039:
+        return "CC @"
+    elif peak == 1592.5:
+        return "Tl DEP @"
+    elif peak == 1620.5:
+        return "Bi FEP @"
+    elif peak == 2103.53:
+        return "Tl SEP @"
+    elif peak == 2614.5:
+        return "Tl FEP @"
 
 
 def plot_survival_fraction_curves(
