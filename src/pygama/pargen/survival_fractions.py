@@ -227,7 +227,7 @@ def get_survival_fraction(
     data_mask: np.ndarray = None,
     mode: str = "greater",
     func=hpge_peak,
-    fix_step=False,
+    fix_step=True,
     display=0,
 ):
     """
