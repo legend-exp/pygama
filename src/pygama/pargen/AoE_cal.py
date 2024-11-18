@@ -421,8 +421,18 @@ def unbinned_aoe_fit(
 
     fit2 = (m2.values, m2.errors, m2.covariance, cs2, pdf, mask, valid2, m2)
 
-    frac_errors1 = np.sum(np.abs(np.array(m.errors)[mask] / np.array(m.values)[mask]))
-    frac_errors2 = np.sum(np.abs(np.array(m2.errors)[mask] / np.array(m2.values)[mask]))
+    frac_errors1 = np.sum(
+        np.abs(
+            np.array(m.errors)[mask & (np.array(m.values) > 0)]
+            / np.array(m.values)[mask & (np.array(m.values) > 0)]
+        )
+    )
+    frac_errors2 = np.sum(
+        np.abs(
+            np.array(m2.errors)[mask & (np.array(m2.values) > 0)]
+            / np.array(m2.values)[mask & (np.array(m2.values) > 0)]
+        )
+    )
 
     if valid2 is False:
         fit = fit1
@@ -542,6 +552,73 @@ def fit_time_means(tstamps, means, sigmas):
             )
     for tstamp in current_tstamps:
         out_dict[tstamp] = rolling_mean
+    return out_dict
+
+
+def average_consecutive(tstamps, means):
+    """
+    Fit the time dependence of the means of the A/E distribution by average consecutive entries
+
+    Parameters
+    ----------
+    tstamps: np.array
+        Timestamps of the data
+    means: np.array
+        Means of the A/E distribution
+    sigmas: np.array
+        Sigmas of the A/E distribution
+
+    Returns: dict
+        Dictionary of the time dependence of the means
+    """
+    out_dict = {}
+    for i, tstamp in enumerate(tstamps):
+        if i + 1 == len(means):
+            out_dict[tstamp] = means[i]
+        else:
+            out_dict[tstamp] = np.mean([means[i], means[i + 1]])
+    return out_dict
+
+
+def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
+    """
+    Fit the time dependence of the means of the A/E distribution by average consecutive entries
+
+    Parameters
+    ----------
+    tstamps: np.array
+        Timestamps of the data
+    means: np.array
+        Means of the A/E distribution
+    sigmas: np.array
+        Sigmas of the A/E distribution
+    times: np.array
+        Times of the mean samples in unix time format
+
+    Returns: dict
+        Dictionary of the time dependence of the means
+    """
+    out_dict = {}
+    for i, tstamp in enumerate(tstamps):
+        if i + 1 == len(means):
+            out_dict[tstamp] = {
+                output_name: {
+                    "expression": f"{aoe_param}/a",
+                    "parameters": {"a": means[i]},
+                }
+            }
+        else:
+            out_dict[tstamp] = {
+                output_name: {
+                    "expression": f"{aoe_param} / ((timestamp - a ) * b + c) ",
+                    "parameters": {
+                        "a": times[i],
+                        "b": (means[i + 1] - means[i]) / (times[i + 1] - times[i]),
+                        "c": means[i],
+                    },
+                }
+            }
+
     return out_dict
 
 
@@ -677,6 +754,8 @@ class CalAoE:
                      then group and take mean otherwise when a run higher than 0.4 sigma
                      is found if it is a single run set to nan otherwise start a new block
             full : each run will be corrected individually
+            average_consecutive: average the consecutive centroids
+            interpolate_consecutive: interpolate between the consecutive centroids
         output_name: str
             Name of the output parameter for the time corrected A/E in the dataframe and to
             be added to the calibration dictionary
@@ -749,6 +828,15 @@ class CalAoE:
                             np.array(self.timecorr_df["mean"]),
                             np.array(self.timecorr_df["sigma"]),
                         )
+                        final_time_dict = {
+                            tstamp: {
+                                output_name: {
+                                    "expression": f"{aoe_param}/a",
+                                    "parameters": {"a": t_dict},
+                                }
+                            }
+                            for tstamp, t_dict in time_dict.items()
+                        }
 
                     elif mode == "full":
                         time_dict = {
@@ -758,21 +846,7 @@ class CalAoE:
                                 np.array(self.timecorr_df["mean"]),
                             )
                         }
-
-                    elif mode == "none":
-                        time_dict = {
-                            time: np.nanmean(self.timecorr_df["mean"])
-                            for time in np.array(self.timecorr_df.index)
-                        }
-
-                    else:
-                        raise ValueError("unknown mode")
-
-                    df[output_name] = df[aoe_param] / np.array(
-                        [time_dict[tstamp] for tstamp in df["run_timestamp"]]
-                    )
-                    self.update_cal_dicts(
-                        {
+                        final_time_dict = {
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
@@ -781,7 +855,74 @@ class CalAoE:
                             }
                             for tstamp, t_dict in time_dict.items()
                         }
+
+                    elif mode == "none":
+                        time_dict = {
+                            time: np.nanmean(self.timecorr_df["mean"])
+                            for time in np.array(self.timecorr_df.index)
+                        }
+                        final_time_dict = {
+                            tstamp: {
+                                output_name: {
+                                    "expression": f"{aoe_param}/a",
+                                    "parameters": {"a": t_dict},
+                                }
+                            }
+                            for tstamp, t_dict in time_dict.items()
+                        }
+
+                    elif mode == "average_consecutive":
+                        time_dict = average_consecutive(
+                            np.array(self.timecorr_df.index),
+                            np.array(self.timecorr_df["mean"]),
+                        )
+                        final_time_dict = {
+                            tstamp: {
+                                output_name: {
+                                    "expression": f"{aoe_param}/a",
+                                    "parameters": {"a": t_dict},
+                                }
+                            }
+                            for tstamp, t_dict in time_dict.items()
+                        }
+
+                    elif mode == "interpolate_consecutive":
+                        if "timestamp" in df:
+                            times = []
+                            for tstamp in np.array(self.timecorr_df.index):
+                                times.append(
+                                    np.nanmedian(
+                                        df.query(f"run_timestamp=='{tstamp}'")[
+                                            "timestamp"
+                                        ]
+                                    )
+                                )
+                            final_time_dict = interpolate_consecutive(
+                                np.array(self.timecorr_df.index),
+                                np.array(self.timecorr_df["mean"]),
+                                times,
+                                aoe_param,
+                                output_name,
+                            )
+                            time_dict = {
+                                time: mean
+                                for time, mean in zip(
+                                    np.array(self.timecorr_df.index),
+                                    np.array(self.timecorr_df["mean"]),
+                                )
+                            }
+                        else:
+                            raise ValueError(
+                                "need timestamp column in dataframe for interpolation"
+                            )
+
+                    else:
+                        raise ValueError("unknown mode")
+
+                    df[output_name] = df[aoe_param] / np.array(
+                        [time_dict[tstamp] for tstamp in df["run_timestamp"]]
                     )
+                    self.update_cal_dicts(final_time_dict)
                 else:
                     df[output_name] = (
                         df[aoe_param] / np.array(self.timecorr_df["mean"])[0]
