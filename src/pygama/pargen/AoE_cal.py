@@ -78,15 +78,19 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     mu = bin_centers[np.argmax(hist)]
     pars, _ = pgf.gauss_mode_width_max(hist, bins, var, mode_guess=mu, n_bins=5)
     bin_centres = pgh.get_bin_centers(bins)
+    _, fallback_sigma, _ = pgh.get_gaussian_guess(hist, bins)
+
     if pars is None or (
         pars[0] > bins[-1]
         or pars[0] < bins[0]
         or pars[-1] < (0.5 * np.nanmax(hist))
         or pars[-1] > (2 * np.nanmax(hist))
+        or pars[1] > 2 * fallback_sigma
+        or pars[1] < 0.5 * fallback_sigma
     ):
         i_0 = np.argmax(hist)
         mu = bin_centres[i_0]
-        (_, sigma, _) = pgh.get_gaussian_guess(hist, bins)
+        sigma = fallback_sigma
     else:
         mu = pars[0]
         sigma = pars[1]
@@ -236,7 +240,11 @@ class Pol1:
 class SigmaFit:
     @staticmethod
     def func(x, a, b, c):
-        return np.sqrt(a + (b / (x + 10**-99)) ** c)
+        return np.where(
+            (x > 0) & ((a + (b / (x + 10**-99)) ** c) > 0),
+            np.sqrt(a + (b / (x + 10**-99)) ** c),
+            np.nan,
+        )
 
     @staticmethod
     def string_func(input_param):
@@ -283,14 +291,14 @@ def unbinned_aoe_fit(
     if not isinstance(aoe, np.ndarray):
         aoe = np.array(aoe)
 
-    bin_width = (
-        2
-        * (np.nanpercentile(aoe, 75) - np.nanpercentile(aoe, 25))
-        * len(aoe) ** (-1 / 3)
-    )
-    nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))
+    # bin_width = (
+    #     2
+    #     * (np.nanpercentile(aoe, 75) - np.nanpercentile(aoe, 25))
+    #     * len(aoe) ** (-1 / 3)
+    # )
+    # nbins = int(np.ceil((np.nanmax(aoe) - np.nanmin(aoe)) / bin_width))
     hist, bins, var = pgh.get_hist(
-        aoe[(aoe < np.nanpercentile(aoe, 99)) & (aoe > np.nanpercentile(aoe, 1))],
+        aoe[(aoe < np.nanpercentile(aoe, 99)) & (aoe > np.nanpercentile(aoe, 10))],
         bins=500,
     )
 
