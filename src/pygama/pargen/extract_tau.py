@@ -54,6 +54,7 @@ class ExtractTau:
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]
         tau = f"{tau*sampling_rate}*{units}"
+        err = f"{err*sampling_rate}*{units}"
 
         if "pz" in self.output_dict:
             self.output_dict["pz"].update({"tau": tau, "tau_err": err})
