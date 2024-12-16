@@ -1,5 +1,5 @@
 """
-This module is for extracting a single pole zero constant from the decay tail
+This module is for extracting the pole zero constants from the decay tail
 """
 
 from __future__ import annotations
@@ -7,19 +7,321 @@ from __future__ import annotations
 import logging
 
 import lgdo
-import lgdo.lh5 as lh5
 import matplotlib.pyplot as plt
 import numpy as np
+from iminuit import Minuit
+from scipy.stats import linregress
 
-import pygama.math.binned_fitting as pgf
-import pygama.math.histogram as pgh
 import pygama.pargen.dsp_optimize as opt
-import pygama.pargen.energy_optimisation as om
 from pygama.pargen.data_cleaning import get_mode_stdev
 
-log = logging.getLogger(__name__)
-sto = lh5.LH5Store()
+def one_exp(ts: np.array, tau2: float, f: float) -> np.array:
+    """
+    This function computes a decaying exponential. Used to subtract off the estimated long-time constant in :func:`linear_dpz_fit`
 
+    Parameters
+    ----------
+    ts
+        Array of time point values, in samples
+    tau2
+        A guess for the long time constant in HPGe waveforms
+    f
+        A guess for the fraction of the long time constant exponential present in an HPGe waveform
+    """
+    return f * np.exp(-ts / tau2)
+
+
+def line(ts: np.array, m: float, b: float) -> np.array:
+    """
+    Computes a line. Used to subtract off the estimated long-time constant in :func:`linear_dpz_fit`
+
+    Parameters
+    ----------
+    ts
+        Array of time point values, in samples
+    m
+        The slope
+    b
+        The y-intercept
+    """
+    return m * ts + b
+
+
+def dpz_model(ts: np.array, A: float, tau1: float, tau2: float, f2: float) -> np.array:
+    """
+    Models the double pole zero function as A*[(1-f2)*exp(-t/tau1) + f2*exp(-t/tau2)],
+    this is the expected shape of an HPGe waveform. Used in performing fits in :func:`dpz_model_fit`
+
+    Parameters
+    ----------
+    ts
+        Array of time point values, in samples
+    A
+        The overall amplitude of the waveform
+    tau1
+        The short time constant present
+    tau2
+        The long time constant present
+    f2
+        The fraction of the long time constant present in the overall waveform
+    """
+    return A * (1 - f2) * np.exp(-ts / tau1) + A * f2 * np.exp(-ts / tau2)
+
+
+def linear_dpz_fit(
+    waveform: np.array,
+    percent_tau1_fit: float,
+    percent_tau2_fit: float,
+    idx_shift: int,
+    plot: int,
+) -> tuple[float, float, float, dict]:
+    """
+    Parameters
+    ----------
+    waveform
+        An array containing waveform data
+    percent_tau1_fit
+        The fractional percent of the length of the tail of the waveform to fit, used to fit the start of the tail.
+    percent_tau2_fit
+        The fractional percent of the length of the tail of the waveform to fit, used to fit the end of the tail.
+    idx_shift
+        The number of indices off the maximum of the waveform to start the fit of the tail. Usually ~100 samples works fine.
+    plot
+        An integer, if greater than 1 plots and shows the fit results, if greater than 0 saves the plot to a dictionary.
+
+    Returns
+    -------
+    tau1
+        A guess of the shorter double pole zero time constant
+    tau2
+        A guess of the longer double pole zero time constant
+    frac
+        A guess of the fraction in the double pole zero of the longer time constant
+    out_plot_dict
+        A dictionary containing the output plots if requested
+
+    Notes
+    -----
+    Extracts an initial guess of the double pole zero parameters by performing two linear fits to the log of the waveform.
+    The first log-fit is to long time scales, and fits the long time constant tau2. This piece is subtracted off the waveform,
+    and then the shorter time constant is fit. The average of the fractions returned by the intercepts of these fits is returned.
+
+    The waveform must be baseline subtracted to provide accurate fit results!
+    """
+    out_plot_dict = {}
+    # Get the indices to start the fit from
+    wf_max_idx = np.argmax(waveform)
+    tau2_idx = -int((len(waveform) - wf_max_idx) * percent_tau2_fit)
+    tau1_idx = int((len(waveform) - wf_max_idx) * percent_tau1_fit)
+
+    # Rescale the waveform to ensure fitting converges
+    fit_start_idx = (
+        np.argmax(waveform) + idx_shift
+    )  # shifting from the max of the waveform helps the convervence
+    scaled_pulse = waveform / np.amax(waveform)
+    scaled_pulse = scaled_pulse[fit_start_idx:]
+
+    # Fit the long time constant
+    ts = np.arange(0, len(scaled_pulse))
+    slope_2, intercept_2, *_ = linregress(
+        ts[tau2_idx:], np.log(scaled_pulse[tau2_idx:])
+    )
+
+    if plot > 0:
+        fig = plt.figure(figsize=(12, 8))
+        plt.plot(ts[tau2_idx:], np.log(scaled_pulse[tau2_idx:]))
+        plt.plot(ts[tau2_idx:], line(ts[tau2_idx:], slope_2, intercept_2))
+        plt.ylabel("ADC")
+        plt.xlabel("Time [Samples]")
+        plt.title("Long Time Constant Fitted")
+        plt.grid(True)
+        out_plot_dict["long_tau_linear"] = fig
+        if plot > 1:
+            plt.show()
+        else:
+            plt.close()
+
+    # Subtract off the long time constant
+    sub_pulse = np.abs(scaled_pulse - one_exp(ts, -1 / slope_2, np.exp(intercept_2)))
+
+    # Fit the short time constant
+    slope_1, intercept_1, *_ = linregress(ts[:tau1_idx], np.log(sub_pulse[:tau1_idx]))
+    # If the fit fails, just return an arbitrary good-enough guess. All detectors have a roughly ~130 sample short time constant for presumming of 8.
+    if slope_1 > 0:
+        slope_1 = -1 / 130
+        intercept_1 = np.log(1 - np.exp(intercept_2))
+
+    if plot > 0:
+        fig = plt.figure(figsize=(12, 8))
+        plt.plot(ts[:tau1_idx], np.log(sub_pulse[:tau1_idx]))
+        plt.plot(ts[:tau1_idx], line(ts[:tau1_idx], slope_1, intercept_1))
+        plt.ylabel("ADC")
+        plt.xlabel("Time [Samples]")
+        plt.title("Short Time Constant Fitted")
+        plt.grid(True)
+        out_plot_dict["short_tau_linear"] = fig
+        if plot > 1:
+            plt.show()
+        else:
+            plt.close()
+
+    return (
+        -1 / slope_1,
+        -1 / slope_2,
+        np.mean([np.exp(intercept_2), 1 - np.exp(intercept_1)]),
+        out_plot_dict,
+    )
+
+
+def dpz_model_fit(
+    waveform: np.array,
+    percent_tau1_fit: float,
+    percent_tau2_fit: float,
+    idx_shift: int,
+    plot: int,
+) -> tuple[float, float, float, dict]:
+    """
+    Parameters
+    ----------
+    waveform
+        An array containing waveform data that has been baseline subtracted
+    percent_tau1_fit
+        The fractional percent of the length of the tail of the waveform to fit, used to fit the start of the tail.
+    percent_tau2_fit
+        The fractional percent of the length of the tail of the waveform to fit, used to fit the end of the tail.
+    idx_shift
+        The number of indices off the maximum of the waveform to start the fit of the tail. Usually ~100 samples works fine.
+    plot
+        An integer, that if greater than 1 plots and shows the fit results, if greater than 0 saves the plots to a dictionary
+
+    Returns
+    -------
+    tau1
+        A guess of the shorter double pole zero time constant
+    tau2
+        A guess of the longer double pole zero time constant
+    frac2
+        A guess of the fraction in the double pole zero of the longer time constant
+    out_plot_dict
+        A dictionary containing the output plots if requested
+
+    Notes
+    -----
+    Extracts the double pole zero parameters by fitting to an analytic model, utilizing the best-guess from linear fitting.
+    Fits to the function
+    f(t) = A*[(1-f2)*exp(-t/tau1)+f2*exp(-t/tau2)]
+    It fits from the maximum of the waveform onwards to the end of the tail.
+    The waveform must be baseline subtracted in order to get the best fit results
+    """
+    out_plot_dict = {}
+    # Get the initial guess of the DPZ constants using a quick linear fit to the start and end of the tail
+    tau1_guess, tau2_guess, f2_guess, linear_plot_dict = linear_dpz_fit(
+        waveform, percent_tau1_fit, percent_tau2_fit, idx_shift, plot
+    )
+    out_plot_dict |= linear_plot_dict  # merge dictionary in place
+
+    # Select the data to fit, from the maximum plus some offset
+    fit_start_idx = np.argmax(waveform) + idx_shift
+    waveform = waveform[fit_start_idx:]
+
+    # Create the Iminuit cost function using least squares
+    ts = np.arange(0, len(waveform))
+
+    def cost_function(A, tau1, tau2, f2):
+        output = dpz_model(ts, A, tau1, tau2, f2)
+        res = 0
+        for i in range(len(output)):
+            res += (output[i] - waveform[i]) ** 2
+
+        return res
+
+    # Perform the fit
+    m = Minuit(
+        cost_function,
+        A=np.amax(waveform),
+        tau1=tau1_guess,
+        tau2=tau2_guess,
+        f2=f2_guess,
+    )
+    m.errordef = Minuit.LEAST_SQUARES
+    m.limits[0] = (0, None)
+    m.limits[1] = (0, None)
+    m.limits[2] = (0, None)
+    m.limits[3] = (0, 1)  # the fraction MUST be between 0 and 1
+    m.migrad()
+
+    if plot > 0:
+        fig = plt.figure(figsize=(12, 8))
+        plt.scatter(ts, waveform)
+        plt.plot(ts, dpz_model(ts, *m.values), c="r")
+        plt.ylabel("ADC")
+        plt.xlabel("Time [Samples]")
+        plt.title("DPZ Model Fit to Waveform")
+        plt.grid(True)
+        out_plot_dict["dpz_model_fit"] = fig
+    if plot > 1:
+        plt.show()
+    else:
+        plt.close()
+        
+    if plot > 0:
+        fig = plt.figure(figsize=(12, 8))
+        plt.scatter(ts, waveform - dpz_model(ts, *m.values), c="r")
+        plt.ylabel("ADC")
+        plt.xlabel("Time [Samples]")
+        plt.title("DPZ Model Waveform Fit Residuals")
+        plt.grid(True)
+        out_plot_dict["dpz_model_fit_residuals"] = fig
+    if plot > 1:
+        plt.show()
+    else:
+        plt.close()
+
+    return m.values[1], m.values[2], m.values[3], out_plot_dict
+
+
+def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.array:
+    """
+    Align provided waveforms at their maximum, so that an average over all the waveforms creates a valid superpulse to fit using :func:`dpz_model_fit`.
+    Do this without sacrificing too much of the length of the decaying tail
+
+    Parameters
+    ----------
+    wfs
+        An array of arrays containing waveforms
+    tp100_window_width
+        The window of acceptance, with a center set at the median tp100 value. If a tp100 falls outside this window, ignore this waveform for the superpulse
+    tp100s
+        An array containing the indices of the maximums of the waveforms, in samples
+
+    Returns
+    -------
+    time_aligned_wfs
+        An array of waveforms that are all aligned at their maximal values
+    """
+    tp100_window_width = (
+        13  # If tp100 isn't in +/- this window of the median, forget about it
+    )
+    median_tp100 = int(np.nanmedian(tp100s))  # in samples
+    wf_len = len(wfs[0])
+    time_aligned_wfs = []
+
+    for i, wf in enumerate(wfs):
+        if np.isnan(tp100s[i]):
+            pass
+        elif (
+            median_tp100 - tp100_window_width
+            <= tp100s[i]
+            <= median_tp100 + tp100_window_width
+        ):
+            wf_win = wf[
+                tp100s[i]
+                - (median_tp100 - tp100_window_width) : wf_len
+                - (-1 * tp100s[i] + median_tp100 + tp100_window_width)
+            ]
+            time_aligned_wfs.append(wf_win)
+
+    return time_aligned_wfs
 
 class ExtractTau:
     def __init__(self, dsp_config, wf_field, debug_mode=False):
@@ -29,9 +331,9 @@ class ExtractTau:
         self.results_dict = {}
         self.debug_mode = debug_mode
 
-    def get_decay_constant(
-        self, slopes: np.array, wfs: lgdo.WaveformTable, display: int = 0
-    ) -> dict:
+    def get_single_decay_constant(
+        self, slopes: np.array, wfs: lgdo.WaveformTable
+    ):
         """
         Finds the decay constant from the modal value of the tail slope after cuts
         and saves it to the specified json. Updates self.output_dict with tau value
@@ -40,11 +342,7 @@ class ExtractTau:
         ----------
         - slopes: numpy array of tail slopes
         - wfs: WaveformTable object containing waveform data
-        - display: integer indicating the level of display (0: no display, 1: plot histogram, 2: show histogram)
 
-        Returns
-        -------
-        - out_plot_dict: dictionary containing the plot figure (only returned if display > 0)
         """
 
         mode, stdev = get_mode_stdev(slopes)
@@ -64,74 +362,125 @@ class ExtractTau:
         self.results_dict.update(
             {"single_decay_constant": {"slope_pars": {"mode": mode, "stdev": stdev}}}
         )
-        if display <= 0:
+
+        if disply <= 0:
             return
         else:
             out_plot_dict = {}
-
             return out_plot_dict
 
-    def get_dpz_consts(self, grid_out, opt_dict):
-        std_grid = np.ndarray(shape=grid_out.shape)
-        for i in range(grid_out.shape[0]):
-            for j in range(grid_out.shape[1]):
-                std_grid[i, j] = grid_out[i, j]["y_val"]
-        min_point = np.where(std_grid == np.amin(std_grid))
+    def get_dpz_decay_constants(
+        self,
+        tb_data: lgdo.Table,
+        percent_tau1_fit: float = 0.1,
+        percent_tau2_fit: float = 0.2,
+        offset_from_wf_max: int = 10,
+        superpulse_bl_idx: int = 25,
+        superpulse_window_width: int = 13,
+        display: int = 0,
+    ) -> dict:
+        """
+        Gets values for the DPZ time constants in 3 stages:
 
-        opt_name = list(opt_dict.keys())[0]
-        keys = list(opt_dict[opt_name].keys())
-        param_list = []
-        shape = []
-        db_dict = {}
-        for key in keys:
-            param_dict = opt_dict[opt_name][key]
-            grid_axis = np.arange(
-                param_dict["start"], param_dict["end"], param_dict["spacing"]
+        1. Perform a linear fit to the start and end of the decaying tail of a superpulse
+        2. Use those initial guesses to seed a LSQ fit to a DPZ model of the sum of two decaying exponentials
+        3. Use the results of the model fit as initial guesses in a DSP routine that optimizes the flatness of the decaying tail
+
+        The first step in this process is to generate a superpulse from high-energy waveforms.
+
+
+        Parameters
+        ----------
+        tb_data
+            Table containing high-energy event waveforms and daqenergy. Pulser events must have already been removed from this table
+        percent_tau1_fit
+            The fractional percent of the length of the tail of the waveform to fit, used to fit the start of the tail.
+        percent_tau2_fit
+            The fractional percent of the length of the tail of the waveform to fit, used to fit the end of the tail.
+        offset_from_wf_max
+            The number of indices off the maximum of the waveform to start the fit of the tail. Usually ~100 samples works fine.
+        superpulse_bl_idx
+            The index at which to stop when computing the mean value of a baseline, used for DPZ
+        superpulse_window_width
+            The window of acceptance for tp100s while selecting waveforms to make a superpulse, with a center set at the median tp100 value. If a tp100 falls outside this window, ignore this waveform for the superpulse
+        display
+            An integer. If greater than 1, plots and shows the attempts to fit the long and short time constants. If greater than 0, saves the plot to a dictionary.
+
+
+        Returns
+        -------
+        tau_dict
+            dictionary of form {'dpz': {'tau1': decay_constant1, 'tau2': decay_constant2, 'frac': fraction}}
+        out_plot_dict
+            A dictionary containing monitoring plots
+
+
+        Notes
+        -----
+        tau1 is the shorter time constant, tau2 is the longer, and frac is the amount of the larger time constant present in the sum of the two exponentials
+        """
+        n_events = 10000
+
+        # Get high energy waveforms to create a superpulse. Eventually allow user which peak to select? For now, use the 2615 keV peak
+        
+        high_E_wfs = tb_data[self.wf_field]["values"].nda[:]
+        
+        # Time align the waveforms to their maximum
+        tp100s = []
+        for wf in high_E_wfs:
+            tp100s.append(np.argmax(wf))
+        
+        time_aligned_wfs = tp100_align(high_E_wfs, superpulse_window_width, tp100s)
+        
+        # Baseline subtract the time aligned waveforms
+        bl_sub_time_aligned_wfs = []
+        
+        for i in range(len(time_aligned_wfs)):
+            bl_sub_time_aligned_wfs.append(
+                time_aligned_wfs[i] - np.mean(time_aligned_wfs[i][:superpulse_bl_idx])
             )
-            unit = param_dict.get("unit")
-            param_list.append(grid_axis)
-            shape.append(len(grid_axis))
-        for i, key in enumerate(keys):
-            unit = opt_dict[opt_name][key].get("unit")
+        
+        # Create a superpulse
+        superpulse = np.mean(bl_sub_time_aligned_wfs, axis=0)
 
-            if unit is not None:
-                try:
-                    db_dict[opt_name].update(
-                        {key: f"{param_list[i][min_point[i]][0]}*{unit}"}
-                    )
-                except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
-                        raise (e)
-                    db_dict[opt_name] = {
-                        key: f"{param_list[i][min_point[i]][0]}*{unit}"
-                    }
-            else:
-                try:
-                    db_dict[opt_name].update({key: f"{param_list[i][min_point[i]][0]}"})
-                except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
-                        raise (e)
-                    db_dict[opt_name] = {key: f"{param_list[i][min_point[i]][0]}"}
-        return db_dict
-
-    def calculate_dpz(self, tb_data, opt_dict):
-        log.debug("Calculating double pz constants")
-        pspace = om.set_par_space(opt_dict)
-        grid_out = opt.run_grid(
-            tb_data, self.dsp_config, pspace, fom_dpz, self.output_dict, fom_kwargs=None
+        # Fit the superpulse and get rough DPZ constants
+        tau1s_fit, tau2s_fit, f2s_fit, out_plot_dict = dpz_model_fit(
+            superpulse,
+            percent_tau1_fit=percent_tau1_fit,
+            percent_tau2_fit=percent_tau2_fit,
+            idx_shift=offset_from_wf_max,
+            plot=display,
         )
-        out_dict = self.get_dpz_consts(grid_out, opt_dict)
-        if "pz" in self.output_dict:
-            self.output_dict["pz"].update(out_dict["pz"])
+
+        # Optimize the flatness of high energy waveforms to get optimal DPZ constants
+        dpz_opt_tb_out = opt.run_one_dsp(
+            tb_data,
+            self.dsp_config,
+            db_dict=dict({"dpz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}),
+        )
+
+        # Update tau_dict with the dpz constants
+        tau1 = np.nanmedian(dpz_opt_tb_out["tau1"].nda)
+        tau2 = np.nanmedian(dpz_opt_tb_out["tau2"].nda)
+        frac = np.nanmedian(dpz_opt_tb_out["frac"].nda)
+
+        sampling_rate = tb_data[self.wf_field]["dt"].nda[0]
+        units = tb_data[self.wf_field]["dt"].attrs["units"]
+        tau1 = f"{tau1*sampling_rate}*{units}"
+        tau2 = f"{tau2*sampling_rate}*{units}"
+
+        if "dpz" in self.output_dict:
+            self.output_dict["dpz"].update({"tau1": tau1, "tau2": tau2, "frac": frac})
         else:
-            self.output_dict["pz"] = out_dict["pz"]
+            self.output_dict["dpz"] = {"tau1": tau1, "tau2": tau2, "frac": frac}
+
+        if display <= 0:
+            return
+        else:
+            return out_plot_dict
 
     def plot_waveforms_after_correction(
-        self, tb_data, wf_field, norm_param=None, display=0
+        self, tb_data, wf_field, xlim = (0, 1024), norm_param=None, display=0
     ):
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
@@ -141,11 +490,14 @@ class ExtractTau:
             wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
         else:
             wfs = wfs[wf_idxs]
+        plt.rcParams["figure.figsize"] = (10, 4)
+        plt.rcParams["font.size"] = 8
         fig = plt.figure()
         for wf in wfs:
             plt.plot(np.arange(0, len(wf), 1), wf)
         plt.axhline(1, color="black")
         plt.axhline(0, color="black")
+        plt.xlim(xlim)
         plt.xlabel("Samples")
         plt.ylabel("ADU")
         plot_dict = {"waveforms": fig}
@@ -187,27 +539,3 @@ class ExtractTau:
         else:
             plt.close()
         return out_plot_dict
-
-
-def fom_dpz(tb_data, verbosity=0, rand_arg=None):
-    std = tb_data["pz_std"].nda
-    counts, start_bins, var = pgh.get_hist(std, dx=0.1, range=(0, 400))
-    max_idx = np.argmax(counts)
-    mu = start_bins[max_idx]
-    try:
-        pars, cov = pgf.gauss_mode_width_max(
-            counts,
-            start_bins,
-            mode_guess=mu,
-            n_bins=10,
-            cost_func="Least Squares",
-            inflate_errors=False,
-            gof_method="var",
-        )
-
-        mu = pars[0]
-
-    except Exception:
-        mu = start_bins[max_idx]
-
-    return {"y_val": np.abs(mu)}
