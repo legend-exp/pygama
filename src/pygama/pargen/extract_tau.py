@@ -4,7 +4,6 @@ This module is for extracting the pole zero constants from the decay tail
 
 from __future__ import annotations
 
-import logging
 
 import lgdo
 import matplotlib.pyplot as plt
@@ -14,6 +13,7 @@ from scipy.stats import linregress
 
 import pygama.pargen.dsp_optimize as opt
 from pygama.pargen.data_cleaning import get_mode_stdev
+
 
 def one_exp(ts: np.array, tau2: float, f: float) -> np.array:
     """
@@ -263,7 +263,7 @@ def dpz_model_fit(
         plt.show()
     else:
         plt.close()
-        
+
     if plot > 0:
         fig = plt.figure(figsize=(12, 8))
         plt.scatter(ts, waveform - dpz_model(ts, *m.values), c="r")
@@ -323,6 +323,7 @@ def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.
 
     return time_aligned_wfs
 
+
 class ExtractTau:
     def __init__(self, dsp_config, wf_field, debug_mode=False):
         self.dsp_config = dsp_config
@@ -331,9 +332,7 @@ class ExtractTau:
         self.results_dict = {}
         self.debug_mode = debug_mode
 
-    def get_single_decay_constant(
-        self, slopes: np.array, wfs: lgdo.WaveformTable
-    ):
+    def get_single_decay_constant(self, slopes: np.array, wfs: lgdo.WaveformTable):
         """
         Finds the decay constant from the modal value of the tail slope after cuts
         and saves it to the specified json. Updates self.output_dict with tau value
@@ -421,24 +420,24 @@ class ExtractTau:
         n_events = 10000
 
         # Get high energy waveforms to create a superpulse. Eventually allow user which peak to select? For now, use the 2615 keV peak
-        
+
         high_E_wfs = tb_data[self.wf_field]["values"].nda[:]
-        
+
         # Time align the waveforms to their maximum
         tp100s = []
         for wf in high_E_wfs:
             tp100s.append(np.argmax(wf))
-        
+
         time_aligned_wfs = tp100_align(high_E_wfs, superpulse_window_width, tp100s)
-        
+
         # Baseline subtract the time aligned waveforms
         bl_sub_time_aligned_wfs = []
-        
+
         for i in range(len(time_aligned_wfs)):
             bl_sub_time_aligned_wfs.append(
                 time_aligned_wfs[i] - np.mean(time_aligned_wfs[i][:superpulse_bl_idx])
             )
-        
+
         # Create a superpulse
         superpulse = np.mean(bl_sub_time_aligned_wfs, axis=0)
 
@@ -455,7 +454,9 @@ class ExtractTau:
         dpz_opt_tb_out = opt.run_one_dsp(
             tb_data,
             self.dsp_config,
-            db_dict=dict({"dpz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}),
+            db_dict=dict(
+                {"dpz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}
+            ),
         )
 
         # Update tau_dict with the dpz constants
@@ -479,7 +480,7 @@ class ExtractTau:
             return out_plot_dict
 
     def plot_waveforms_after_correction(
-        self, tb_data, wf_field, xlim = (0, 1024), norm_param=None, display=0
+        self, tb_data, wf_field, xlim=(0, 1024), norm_param=None, display=0
     ):
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda

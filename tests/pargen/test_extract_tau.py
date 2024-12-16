@@ -73,7 +73,6 @@ def test_get_dpz_decay_constants():
     # for peak in peaks:
     #     daq_energies.extend(np.random.normal(peak, 10, num_wfs_per_peak).astype(int))
 
-
     daq_energies = np.random.normal(2614.553, 10, num_wfs).astype(int)
 
     wfs = []
@@ -143,7 +142,7 @@ def test_get_dpz_decay_constants():
             },
         }
     )
-    
+
     wf_field = "waveform"
     percent_tau1_fit = 0.1
     percent_tau2_fit = 0.2
