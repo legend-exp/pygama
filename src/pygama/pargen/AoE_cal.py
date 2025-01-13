@@ -693,8 +693,10 @@ class CalAoE:
         dep_correct: bool
             Whether to correct the double escape peak into the single site band before cut determination
         dt_cut: dict
-            Dictionary of the drift time cut parameters in the form:
-            {"out_param": "dt_cut", "hard": False}
+            Dictionary of the drift time cut parameters in the form::
+
+                {"out_param": "dt_cut", "hard": False}
+
             where the out_param is the name of the parameter to cut on in the dataframe (should have been precalculated)
             and "hard" is whether to remove these events completely for survival fraction calculations
             or whether they they should only be removed in the cut determination/ A/E calibration steps
@@ -777,8 +779,8 @@ class CalAoE:
 
             none: just use the mean of the a/e centroids to shift all the data
             partial: iterate through the centroids if vary by less than 0.4 sigma
-                     then group and take mean otherwise when a run higher than 0.4 sigma
-                     is found if it is a single run set to nan otherwise start a new block
+            then group and take mean otherwise when a run higher than 0.4 sigma
+            is found if it is a single run set to nan otherwise start a new block
             full : each run will be corrected individually
             average_consecutive: average the consecutive centroids
             interpolate_consecutive: interpolate between the consecutive centroids
@@ -787,6 +789,7 @@ class CalAoE:
             be added to the calibration dictionary
         display: int
             plot level
+
         """
         log.info("Starting A/E time correction")
         self.timecorr_df = pd.DataFrame()
@@ -1070,6 +1073,7 @@ class CalAoE:
             be added to the calibration dictionary
         display: int
             plot level
+
         """
         log.info("Starting A/E drift time correction")
         self.dt_res_dict = {}
@@ -1512,6 +1516,7 @@ class CalAoE:
             be added to the calibration dictionary
         display: int
             plot level
+
         """
 
         log.info("Starting A/E low cut determination")
@@ -1628,6 +1633,7 @@ class CalAoE:
         mode: str
             mode to use for the cut determination, can be "greater" or "less" i.e. do we want to
             keep events with A/E greater or less than the cut value
+
         """
         sfs = pd.DataFrame()
         peak_dfs = {}
@@ -1744,6 +1750,7 @@ class CalAoE:
         mode: str
             mode to use for the cut determination, can be "greater" or "less" i.e. do we want to
             keep events with A/E greater or less than the cut value
+
         """
         sfs = pd.DataFrame()
         for i, peak in enumerate(peaks):
