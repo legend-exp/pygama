@@ -88,10 +88,29 @@ def gather_pulse_data(
         lgdo_obj = lh5.read(
             f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=idx
         )
-        data = lgdo_obj.view_as(library="ak")
+        data = lgdo_obj.view_as(library="np")
 
         # remove nans (this happens when SiPM data is stored as ArrayOfEqualSizedArrays)
         data = ak.drop_none(ak.nan_to_none(data))
+
+        # number of channels per event
+        evt_length = np.diff(np.insert(tcm.cumulative_length, 0, 0))
+
+        # construct global event ID's
+        glob_ids = np.repeat(
+            np.arange(0, tcm.cumulative_length.shape[0], 1), evt_length
+        )
+        glob_ids_ch = glob_ids[
+            tcm.id == table_id
+        ]  # global ID's where channel had a trigger
+
+        # count number of hits per channel for global events with trigger in channel, else 0
+        glob_ids_cts = np.zeros(tcm.cumulative_length.shape[0], dtype=int)
+        glob_ids_cts[glob_ids_ch] = ak.count(data, axis=1)
+
+        # insert empty row [] for global events with no trigger in channel
+        # unflatten to the number of hits in channel otherwise
+        data = ak.unflatten(ak.flatten(data), glob_ids_cts)
 
         # increase the dimensionality by one (events)
         data = ak.unflatten(data, np.full(data.layout.length, 1, dtype="uint8"))
@@ -121,7 +140,7 @@ def gather_pulse_data(
             pulse_mask = pulse_mask.view_as("ak")
 
         # apply the mask
-        data = data[pulse_mask]
+        data = data[ak.values_astype(pulse_mask, bool)]
 
     # remove empty arrays = table_names with no pulses
     if drop_empty:
@@ -161,17 +180,18 @@ def gather_tcm_data(
     for field in ("id", "idx"):
         tcm_vov[field] = types.VectorOfVectors(
             flattened_data=tcm._asdict()[field], cumulative_length=tcm.cumulative_length
-        ).view_as("ak")
+        )
 
     # list user wanted table names
     table_ids = [
         utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) for id in table_names
     ]
     # find them in tcm.id (we'll filter the rest out)
-    locs = np.isin(tcm_vov["id"], table_ids)
+    tcm_id_padded = tcm_vov["id"].to_aoesa().view_as("np")
+    locs = np.isin(tcm_id_padded, table_ids)
 
     # select tcm field requested by the user
-    data = tcm_vov[tcm_field]
+    data = tcm_vov[tcm_field].view_as("ak")
 
     # apply mask
     # NOTE: need to cast to irregular axes, otherwise the masking result is
@@ -201,6 +221,7 @@ def gather_tcm_data(
             raise ValueError(msg)
 
         # convert the 3D mask to a 2D mask (can be used to filter table_ids)
+        pulse_mask = pulse_mask[ak.num(pulse_mask, axis=2) > 0]
         ch_mask = ak.sum(pulse_mask, axis=-1) > 0
 
         # apply the mask
