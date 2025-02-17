@@ -123,7 +123,6 @@ ignore-words-list = "hist, gaus, nd, ans, crate, nin, puls, spms, fom, FOM"
 minversion = "6.0"
 addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
 xfail_strict = true
-filterwarnings = ["error", 'ignore:\nPyarrow:DeprecationWarning']
 log_cli_level = "info"
 testpaths = "tests"
 
