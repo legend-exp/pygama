@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import awkward as ak
 import numpy as np
-from legendmeta.catalog import Props
+from dbetto import Props
 from lgdo import lh5, types
 from numpy.typing import ArrayLike
 
