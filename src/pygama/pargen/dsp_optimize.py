@@ -119,7 +119,7 @@ class ParGrid:
         """iterate given indices [i1, i2, ...] by one.
         For easier iteration. The convention here is arbitrary, but its the
         order the arrays would be traversed in a series of nested for loops in
-        the order appearin in dims (first dimension is first for loop, etc):
+        the order appearing in dims (first dimension is first for loop, etc):
         Return False when the grid runs out of indices. Otherwise returns True.
         """
         for dim in reversed(range(self.get_n_dimensions())):
