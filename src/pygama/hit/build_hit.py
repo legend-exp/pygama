@@ -109,8 +109,8 @@ def build_hit(
             # sanitize config
             hit_config = utils.load_dict(hit_config)
 
+        lh5_tables_config = {}
         if lh5_tables is None:
-            lh5_tables_config = {}
             if "dsp" in ls(infile):
                 log.debug("found candidate table /dsp")
                 lh5_tables_config["dsp"] = hit_config
