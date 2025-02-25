@@ -414,7 +414,12 @@ def evaluate_expression(
         #     pygama.evt.modules.spms.my_func([...], arg1=val, arg2=val)
 
         # get arguments list passed to the function (outermost parentheses)
-        args_str = re.search(r"\((.*)\)$", expr.strip()).group(1)
+        result = re.search(r"\((.*)\)$", expr.strip(), re.DOTALL)
+        if result is None:
+            msg = f"could not parse the function arguments in '{expr}'"
+            raise RuntimeError(msg)
+
+        args_str = result.group(1)
 
         # handle tier scoping: evt.<>
         args_str = args_str.replace("evt.", "")
