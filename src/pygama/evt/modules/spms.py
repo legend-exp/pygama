@@ -140,7 +140,7 @@ def gather_pulse_data(
             pulse_mask = pulse_mask.view_as("ak")
 
         # apply the mask
-        data = data[ak.values_astype(pulse_mask, bool)]
+        data = data[pulse_mask]
 
     # remove empty arrays = table_names with no pulses
     if drop_empty:
