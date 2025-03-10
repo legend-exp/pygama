@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+from collections import namedtuple
+
 import numpy as np
 import pandas as pd
+from lgdo.types import Table, VectorOfVectors
 
 # later on we might want a tcm class, or interface / inherit from an entry list
 # class. For now we just need the key clustering functionality
 
 
+coin_groups = namedtuple("coin_groups", ["name", "window", "ref"])
+
+
 def generate_tcm_cols(
-    coin_data: list[np.ndarray],
-    coin_window: float = 0,
-    window_ref: str = "last",
+    iterators: list,
+    coin_windows: float = 0,
     array_ids: list[int] = None,
     array_idxs: list[int] = None,
+    fields: list[str] = None,
 ) -> dict[np.ndarray]:
     r"""Generate the columns of a time coincidence map.
 
@@ -38,7 +44,7 @@ def generate_tcm_cols(
     correspond to event 1, and so on.
 
     Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
-    and :meth:`pandas.DataFrame.diff` functions:
+        and :meth:`pandas.DataFrame.diff` functions:
 
     - pull data into a :class:`pandas.DataFrame`
     - sort events by strictly ascending value of `coin_col`
@@ -77,40 +83,115 @@ def generate_tcm_cols(
         ``array_idx`` specify the location in ``coin_data`` of each datum
         belonging to the coincidence event.
     """
-    dfs = []
-    for ii, array in enumerate(coin_data):
-        array = np.array(array)
-        array_id = array_ids[ii] if array_ids is not None else ii
-        array_id = np.full_like(array, array_id, dtype=int)
-        col_dict = {"array_id": array_id, "coin_data": array}
-        if array_idxs is not None:
-            col_dict["array_idx"] = array_idxs.astype(int)[ii]
-        dfs.append(pd.DataFrame(col_dict, copy=False))  # don't copy the data!
+    if isinstance(iterators, list):
+        iterators = np.array(iterators)
 
-    # concat and sort
-    tcm = pd.concat(dfs).sort_values(["coin_data", "array_id"])
+    tcm = None
+    at_end = np.zeros(len(iterators), dtype=bool)
+    skip_mask = np.zeros(len(iterators), dtype=bool)
 
-    # compute coin_data diffs
-    tcm["dcoin"] = tcm["coin_data"].diff()
+    if array_ids is None:
+        array_ids = np.arange(0, len(iterators))
 
-    # window into coincidences
-    # In the future, can add more options, like mean/median/mode
-    if window_ref == "last":
-        # create the event column by comparing the time since last event to the coincindence window
-        tcm["coin_idx"] = (tcm.dcoin > coin_window).cumsum()
-    else:
-        raise NotImplementedError(f"window_ref {window_ref}")
+    while not at_end.any():
+        curr_mask = ~skip_mask & ~at_end
+        dfs = []
+        for _ii, it in enumerate(iterators[curr_mask]):
+            ii = np.where(curr_mask)[0][_ii]
+            try:
+                buffer, start, buf_len = it.__next__()
+            except StopIteration:
+                at_end[ii] = True
+                continue
+            if buf_len < it.buffer_len:
+                at_end[ii] = True
+            array_id = array_ids[ii]
+            array_id = np.full(buf_len, array_id, dtype=int)
+            buffer = buffer.view_as("pd")[:buf_len]
+            buffer["array_id"] = array_id
+            if array_idxs is not None:
+                buffer["array_idx"] = array_idxs.astype(int)[ii][
+                    start : start + buf_len
+                ]
+            else:
+                buffer["array_idx"] = np.arange(start, start + buf_len, dtype=int)
+            dfs.append(buffer)  # don't copy the data!
 
-    # now build the outputs
-    cumulative_length = np.where(tcm.coin_idx.diff().to_numpy() != 0)[0]
-    cumulative_length[:-1] = cumulative_length[1:]
-    cumulative_length[-1] = len(tcm.coin_idx)
-    array_id = tcm.array_id.to_numpy()
-    array_idx = (
-        tcm.array_idx.to_numpy() if "array_idx" in tcm else tcm.index.to_numpy()
-    )  # beautiful!
-    return {
-        "cumulative_length": cumulative_length,
-        "array_id": array_id,
-        "array_idx": array_idx,
-    }
+        if tcm is None:
+            tcm = pd.concat(dfs).sort_values(
+                [entry.name for entry in coin_windows] + ["array_id"]
+            )
+        else:
+            tcm = pd.concat([tcm] + dfs).sort_values(
+                [entry.name for entry in coin_windows] + ["array_id"]
+            )
+
+        mask = np.zeros(len(tcm) - 1, dtype=bool)
+        for entry in coin_windows:
+            diffs = np.diff(tcm[entry.name])
+            if entry.window_ref == "last":
+                mask = mask | (diffs > entry.window)
+            else:
+                raise NotImplementedError(f"window_ref {entry.window_ref}")
+        # grab up to last instance of a channel to know that all channels have been included in evts
+        last_instance = {
+            arr_id: index for index, arr_id in enumerate(tcm.array_id.to_numpy())
+        }
+
+        for entry in array_ids:
+            if entry not in last_instance:
+                last_instance[entry] = np.inf
+
+        # in next iteration read any channels < first otherwise read all
+        skip_mask = np.array(
+            [(last_instance[arr] > last_instance[array_ids[0]]) for arr in array_ids]
+        )
+
+        # want to write entries only up to last entry of a channel to ensure all included in evt
+        if at_end.all():
+            write_mask = mask
+            last_entry = None
+        else:
+            last_instance = np.nanmin([int(last_instance[arr]) for arr in array_ids])
+            last_entry = np.where(mask[last_instance:])[0]
+            if len(last_entry) == 0:
+                last_entry = None
+                write_mask = mask
+            else:
+                last_entry = last_instance + last_entry[0]
+                write_mask = mask[:last_entry]
+
+        # get cumulative_length
+        cumulative_length = np.array(np.where(write_mask)[0]) + 1
+        cumulative_length = np.append(cumulative_length, len(write_mask) + 1)
+
+        out_tbl = Table(size=len(cumulative_length))
+        out_tbl.add_field(
+            "array_id",
+            VectorOfVectors(
+                cumulative_length=cumulative_length,
+                flattened_data=tcm["array_id"].to_numpy()[:last_entry],
+            ),
+        )
+        out_tbl.add_field(
+            "array_idx",
+            VectorOfVectors(
+                cumulative_length=cumulative_length,
+                flattened_data=tcm["array_idx"].to_numpy()[:last_entry],
+            ),
+        )
+        if fields is not None:
+            for f in fields:
+                out_tbl.add_field(
+                    f,
+                    VectorOfVectors(
+                        cumulative_length=cumulative_length,
+                        flattened_data=tcm[f].to_numpy()[:last_entry],
+                    ),
+                )
+
+        if last_entry is None:
+            tcm = None
+        else:
+            tcm = tcm[last_entry:]
+        yield out_tbl

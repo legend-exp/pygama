@@ -3,17 +3,46 @@ from __future__ import annotations
 import re
 
 import lgdo
+import numpy as np
 from lgdo import lh5
+from lgdo.types import Table, VectorOfVectors
 
 from . import tcm as ptcm
 
 
+def _join_vov(vov1, vov2):
+    flattened = np.concatenate([vov1.flattened_data.nda, vov2.flattened_data.nda])
+    cumulative_length = np.concatenate(
+        [
+            vov1.cumulative_length.nda,
+            vov2.cumulative_length.nda + vov1.cumulative_length.nda[-1],
+        ]
+    )
+    return VectorOfVectors(
+        cumulative_length=cumulative_length, flattened_data=flattened, attrs=vov1.attrs
+    )
+
+
+def _join_table(tbl1, tbl2):
+    final_table = Table(size=len(tbl1) + len(tbl2))
+    for field in tbl1:
+        final_table.add_field(field, _join_vov(tbl1[field], tbl2[field]))
+    return final_table
+
+
+def _concat_tables(tbls):
+    out_tbl = tbls[0]
+    for tbl in tbls[1:]:
+        out_tbl = _join_table(out_tbl, tbl)
+    return out_tbl
+
+
 def build_tcm(
     input_tables: list[tuple[str, str | list[str]]],
-    coin_col: str,
+    coin_cols: str,
     hash_func: str = r"\d+",
-    coin_window: float = 0,
-    window_ref: str = "last",
+    coin_windows: float = 0,
+    window_refs: str = "last",
     out_file: str = None,
     out_name: str = "tcm",
     wo_mode: str = "write_safe",
@@ -58,10 +87,17 @@ def build_tcm(
     """
     # hash_func: later can add list or dict or a function(str) --> int.
 
-    store = lh5.LH5Store()
-    coin_data = []
+    if not isinstance(coin_cols, list):
+        coin_cols = [coin_cols]
+    if not isinstance(coin_windows, list):
+        coin_windows = [coin_windows]
+    if not isinstance(window_refs, list):
+        window_refs = [window_refs]
+
+    iterators = []
     array_ids = []
     all_tables = []
+
     for filename, patterns in input_tables:
         if isinstance(patterns, str):
             patterns = [patterns]
@@ -79,22 +115,34 @@ def build_tcm(
                         )
                 else:
                     array_id = len(all_tables) - 1
-                table = table + "/" + coin_col
-                coin_data.append(store.read(table, filename)[0].nda)
+                iterators.append(
+                    lh5.LH5Iterator(
+                        filename, table, field_mask=coin_cols, buffer_len=10
+                    )
+                )
                 array_ids.append(array_id)
 
-    tcm_cols = ptcm.generate_tcm_cols(
-        coin_data, coin_window=coin_window, window_ref=window_ref, array_ids=array_ids
-    )
+    coin_windows = [
+        ptcm.coin_groups(n, w, r)
+        for n, w, r in zip(coin_cols, coin_windows, window_refs)
+    ]
 
-    for key in tcm_cols:
-        tcm_cols[key] = lgdo.Array(nda=tcm_cols[key])
-    tcm = lgdo.Struct(
-        obj_dict=tcm_cols,
-        attrs={"tables": str(all_tables), "hash_func": str(hash_func)},
+    tcm_gen = ptcm.generate_tcm_cols(
+        iterators, coin_windows=coin_windows, array_ids=array_ids
     )
 
     if out_file is not None:
-        store.write(tcm, out_name, out_file, wo_mode=wo_mode)
-
-    return tcm
+        sto = lh5.LH5Store()
+        while True:
+            try:
+                sto.write(tcm_gen.__next__(), out_name, out_file, wo_mode=wo_mode)
+            except StopIteration:
+                break
+    else:
+        tcm = []
+        while True:
+            try:
+                tcm.append(tcm_gen.__next__())
+            except StopIteration:
+                break
+        return _concat_tables(tcm)
