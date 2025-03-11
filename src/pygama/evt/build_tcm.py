@@ -46,6 +46,8 @@ def build_tcm(
     out_file: str = None,
     out_name: str = "tcm",
     wo_mode: str = "write_safe",
+    buffer_len: int = None,
+    out_fields=None,
 ) -> lgdo.Table:
     r"""Build a Time Coincidence Map (TCM).
 
@@ -98,6 +100,21 @@ def build_tcm(
     array_ids = []
     all_tables = []
 
+    if buffer_len is None:
+        ntables = 0
+        for filename, patterns in input_tables:
+            if isinstance(patterns, str):
+                patterns = [patterns]
+            for pattern in patterns:
+                ntables += len(lh5.ls(filename, lh5_group=pattern))
+
+        n_fields = (
+            2 + len(set(coin_cols + out_fields))
+            if out_fields is not None
+            else 2 + len(set(coin_cols))
+        )
+        buffer_len = int(10**7 / (ntables * n_fields))
+
     for filename, patterns in input_tables:
         if isinstance(patterns, str):
             patterns = [patterns]
@@ -117,7 +134,7 @@ def build_tcm(
                     array_id = len(all_tables) - 1
                 iterators.append(
                     lh5.LH5Iterator(
-                        filename, table, field_mask=coin_cols, buffer_len=10
+                        filename, table, field_mask=coin_cols, buffer_len=buffer_len
                     )
                 )
                 array_ids.append(array_id)
@@ -128,7 +145,7 @@ def build_tcm(
     ]
 
     tcm_gen = ptcm.generate_tcm_cols(
-        iterators, coin_windows=coin_windows, array_ids=array_ids
+        iterators, coin_windows=coin_windows, array_ids=array_ids, fields=out_fields
     )
 
     if out_file is not None:

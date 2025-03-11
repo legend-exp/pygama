@@ -10,7 +10,7 @@ from lgdo.types import Table, VectorOfVectors
 # class. For now we just need the key clustering functionality
 
 
-coin_groups = namedtuple("coin_groups", ["name", "window", "ref"])
+coin_groups = namedtuple("coin_groups", ["name", "window", "window_ref"])
 
 
 def generate_tcm_cols(

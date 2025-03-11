@@ -15,6 +15,7 @@ import pandas as pd
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
+import awkward as ak
 
 import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
@@ -984,33 +985,11 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
             mask = np.append(mask, file_mask)
         ids = np.where(mask)[0]
     else:
-        data = pd.DataFrame(
-            {
-                "array_id": sto.read("hardware_tcm_1/array_id", tcm_file)[0].view_as(
-                    "np"
-                ),
-                "array_idx": sto.read("hardware_tcm_1/array_idx", tcm_file)[0].view_as(
-                    "np"
-                ),
-            }
-        )
-        cumulength = sto.read("hardware_tcm_1/cumulative_length", tcm_file)[0].view_as(
-            "np"
-        )
-        cumulength = np.append(np.array([0]), cumulength)
-        n_channels = np.diff(cumulength)
-        evt_numbers = np.repeat(np.arange(0, len(cumulength) - 1), np.diff(cumulength))
-        evt_mult = np.repeat(np.diff(cumulength), np.diff(cumulength))
-        data["evt_number"] = evt_numbers
-        data["evt_mult"] = evt_mult
-        high_mult_events = np.where(n_channels > multiplicity_threshold)[  # noqa: F841
-            0
-        ]
-
-        ids = data.query(f"array_id=={channel} and evt_number in @high_mult_events")[
-            "array_idx"
-        ].to_numpy()
-        mask = np.zeros(len(data.query(f"array_id=={channel}")), dtype="bool")
+        array_ids = lh5.read("hardware_tcm_1/array_id", tcm_file).view_as("ak")
+        chan_evts = ak.any(array_ids == chan, axis=-1)
+        multiplicity = ak.count(array_ids[chan_evts], axis=-1)
+        ids = np.where(multiplicity > multiplicity_threshold)[0]
+        mask = np.zeros(len(array_ids[chan_evts]), dtype=bool)
         mask[ids] = True
     return ids, mask
 

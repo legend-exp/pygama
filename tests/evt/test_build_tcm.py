@@ -3,7 +3,7 @@ import os
 import lgdo
 import numpy as np
 from lgdo import lh5
-from lgdo.types import VectorOfVectors
+from lgdo.types import VectorOfVectors, Table
 
 from pygama import evt
 
@@ -13,12 +13,51 @@ def test_generate_tcm_cols(lgnd_test_data):
         "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
     )
 
-    tcm_cols = evt.generate_tcm_cols(
-        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)], "timestamp"
+    tcm_cols = evt.build_tcm(
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)], "timestamp",buffer_len=100,
     )
 
-    assert isinstance(tcm_cols, VectorOfVectors)
-    for v in tcm_cols:
+    assert isinstance(tcm_cols, Table)
+    assert isinstance(tcm_cols.array_id, VectorOfVectors)
+    assert isinstance(tcm_cols.array_idx, VectorOfVectors)
+    for v in tcm_cols.values():
+        assert np.issubdtype(v.flattened_data.nda.dtype, np.integer)
+
+    # fmt: off
+    assert np.array_equal(
+        tcm_cols.array_id.cumulative_length.nda,
+        [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+        ],
+    )
+    assert np.array_equal(
+        tcm_cols.array_id.flattened_data.nda,
+        [
+            1084804, 1084803, 1121600, 1084804, 1121600, 1084804, 1121600,
+            1084804, 1084804, 1084804, 1084803, 1084804, 1084804, 1121600,
+            1121600, 1084804, 1121600, 1084804, 1121600, 1084803, 1084803,
+            1121600, 1121600, 1121600, 1084803, 1084803, 1084803, 1084803,
+            1084803, 1084803,
+        ],
+    )
+    assert np.array_equal(
+        tcm_cols.array_idx.flattened_data.nda,
+        [
+            0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 1, 6, 7, 3, 4, 8, 5, 9, 6, 2, 3, 7,
+            8, 9, 4, 5, 6, 7, 8, 9,
+        ],
+    )
+    # fmt: on
+    # test with small buffer len
+    tcm_cols = evt.build_tcm(
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)], "timestamp",buffer_len=1,
+    )
+
+    assert isinstance(tcm_cols, Table)
+    assert isinstance(tcm_cols.array_id, VectorOfVectors)
+    assert isinstance(tcm_cols.array_idx, VectorOfVectors)
+    for v in tcm_cols.values():
         assert np.issubdtype(v.flattened_data.nda.dtype, np.integer)
 
     # fmt: off
