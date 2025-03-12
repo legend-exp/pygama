@@ -85,7 +85,7 @@ class FileDB:
                 "raw": ["baseline", "waveform", "daqenergy"],
                 "dsp": ["trapEftp", "AoE", "trapEmax"],
                 "hit": ["trapEftp_cal", "trapEmax_cal"],
-                "tcm": ["cumulative_length", "array_id", "array_idx"],
+                "tcm": ["array_id", "array_idx"],
                 "evt": ["lar_veto", "muon_veto", "ge_mult"]
             }
         }

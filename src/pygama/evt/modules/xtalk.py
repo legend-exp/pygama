@@ -31,7 +31,7 @@ def build_tcm_index_array(
     """
 
     # initialise the output object
-    tcm_indexs_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
+    tcm_indexs_out = np.full((len(tcm.array_id), len(rawids)), np.nan)
 
     # parse observables string. default to hit tier
     for idx_chan, channel in enumerate(rawids):
@@ -40,13 +40,9 @@ def build_tcm_index_array(
         table_id = utils.get_tcm_id_by_pattern(
             datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
         )
-        tcm_indexs = np.where(tcm.id == table_id)[0]
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == channel)[0],
-            "right",
-        )
-        tcm_indexs_out[evt_ids_ch, idx_chan] = tcm_indexs
+        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        tcm_indexs_out[tbl_idxs_ch, idx_chan] = chan_tcm_indexs
 
     # transpose to return object where row is events and column rawid idx
     return tcm_indexs_out
@@ -89,21 +85,18 @@ def gather_energy(
                 tier_params.append((name, file, group, column))
 
     # initialise the output object
-    energy_out = np.full((len(tcm.cumulative_length), len(rawids)), np.nan)
+    energy_out = np.full((len(tcm.array_id), len(rawids)), np.nan)
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
-        hit_idx = ak.to_numpy(tcm.idx[tcm.id == channel])
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == channel)[0],
-            "right",
-        )
+        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        evt_ids_ch = ak.any(tcm.array_id == channel, axis=1)
 
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=hit_idx)
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=tbl_idxs_ch)
                 tbl.add_column(name, data)
             except (lh5.exceptions.LH5DecodeError, KeyError):
                 tbl.add_column(name, types.Array(np.full_like(evt_ids_ch, np.nan)))
@@ -160,17 +153,14 @@ def filter_hits(
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
 
-        hit_idx = ak.to_numpy(tcm.idx[tcm.id == channel])
-        evt_ids_ch = np.searchsorted(
-            tcm.cumulative_length,
-            np.where(tcm.id == channel)[0],
-            "right",
-        )
+        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        evt_ids_ch = ak.any(tcm.array_id == channel, axis=1)
 
         for name, file, group, column in tier_params:
             try:
                 # read the energy data
-                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=hit_idx)
+                data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=tbl_idxs_ch)
 
                 tbl.add_column(name, data)
             except (lh5.exceptions.LH5DecodeError, KeyError):
@@ -332,16 +322,15 @@ def calibrate_energy(
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
 
-            hit_idx = ak.to_numpy(tcm.idx[tcm.id == table_id])
-            evt_ids_ch = np.searchsorted(
-                tcm.cumulative_length,
-                np.where(tcm.id == table_id)[0],
-                "right",
-            )
+            chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[
+                0
+            ].to_numpy()
+            tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+            evt_ids_ch = ak.any(tcm.array_id == table_id, axis=1)
 
             # read the dsp data
             outtbl_obj = lh5.read(
-                f"ch{chan}/dsp/", file, idx=hit_idx, field_mask=chan_inputs
+                f"ch{chan}/dsp/", file, idx=tbl_idxs_ch, field_mask=chan_inputs
             )
 
             # add the uncalibrated energy to the table

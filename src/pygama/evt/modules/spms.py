@@ -82,11 +82,12 @@ def gather_pulse_data(
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
 
         # determine list of indices found in the TCM that we want to load for channel
-        idx = tcm.idx[tcm.id == table_id]
+        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
 
         # read the data in
         lgdo_obj = lh5.read(
-            f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=idx
+            f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=tbl_idxs_ch
         )
         data = lgdo_obj.view_as(library="np")
 
@@ -94,18 +95,16 @@ def gather_pulse_data(
         data = ak.drop_none(ak.nan_to_none(data))
 
         # number of channels per event
-        evt_length = np.diff(np.insert(tcm.cumulative_length, 0, 0))
+        evt_length = np.diff(np.insert(tcm.array_id.cumulative_length, 0, 0))
 
         # construct global event ID's
-        glob_ids = np.repeat(
-            np.arange(0, tcm.cumulative_length.shape[0], 1), evt_length
-        )
+        glob_ids = np.repeat(np.arange(0, len(tcm.array_id), 1), evt_length)
         glob_ids_ch = glob_ids[
-            tcm.id == table_id
+            chan_tcm_indexs
         ]  # global ID's where channel had a trigger
 
         # count number of hits per channel for global events with trigger in channel, else 0
-        glob_ids_cts = np.zeros(tcm.cumulative_length.shape[0], dtype=int)
+        glob_ids_cts = np.zeros(len(tcm.array_id), dtype=int)
         glob_ids_cts[glob_ids_ch] = ak.count(data, axis=1)
 
         # insert empty row [] for global events with no trigger in channel
@@ -175,23 +174,17 @@ def gather_tcm_data(
     See :func:`gather_pulse_data` for documentation about the other function
     arguments.
     """
-    # unflatten the tcm data with cumulative_length, i.e. make a VoV
-    tcm_vov = {}
-    for field in ("id", "idx"):
-        tcm_vov[field] = types.VectorOfVectors(
-            flattened_data=tcm._asdict()[field], cumulative_length=tcm.cumulative_length
-        )
 
     # list user wanted table names
     table_ids = [
         utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) for id in table_names
     ]
     # find them in tcm.id (we'll filter the rest out)
-    tcm_id_padded = tcm_vov["id"].to_aoesa().view_as("np")
+    tcm_id_padded = types.VectorOfVectors(tcm.array_id).to_aoesa().view_as("np")
     locs = np.isin(tcm_id_padded, table_ids)
 
     # select tcm field requested by the user
-    data = tcm_vov[tcm_field].view_as("ak")
+    data = tcm[tcm_field]
 
     # apply mask
     # NOTE: need to cast to irregular axes, otherwise the masking result is

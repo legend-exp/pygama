@@ -13,11 +13,12 @@ from typing import Iterator
 
 import numpy as np
 import pandas as pd
+from awkward_pandas import AwkwardDtype
 from dspeed.vis import WaveformBrowser
 from lgdo.lh5 import LH5Iterator, LH5Store
 from lgdo.lh5.utils import expand_vars
 from lgdo.types import Array, Struct, Table
-from lgdo.types.vovutils import build_cl, explode_arrays, explode_cl
+from lgdo.types.vovutils import build_cl, explode_arrays
 from tqdm.auto import tqdm
 
 from . import utils
@@ -588,15 +589,16 @@ class DataLoader:
             except KeyError:
                 log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
                 continue
+            # vector of tables should have a better explode method
             # Have to do some hacky stuff until I get a view_as("pd") method
-            tcm_lgdo[self.tcms[tcm_level]["tcm_cols"]["child_idx"]] = Array(
-                nda=explode_cl(tcm_lgdo["cumulative_length"].nda)
-            )
-            tcm_lgdo.pop("cumulative_length")
-            tcm_tb = Table(col_dict=tcm_lgdo)
-            f_entries = tcm_tb.view_as("pd")
+            f_entries = tcm_lgdo.view_as("pd")
+            for col in f_entries:
+                if isinstance(f_entries[col].dtype, AwkwardDtype):
+                    f_entries[col] = f_entries[col].to_list()
+            f_entries = f_entries.explode(list(f_entries.columns))
+            f_entries.reset_index(inplace=True)
             renaming = {
-                self.tcms[tcm_level]["tcm_cols"]["child_idx"]: f"{child}_idx",
+                "index": f"{child}_idx",
                 self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
                 self.tcms[tcm_level]["tcm_cols"]["parent_idx"]: f"{parent}_idx",
             }

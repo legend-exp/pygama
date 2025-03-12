@@ -49,16 +49,13 @@ def test_xtalk_corrected_energy(lgnd_test_data, files_config):
 def test_gather_energy(lgnd_test_data, files_config):
     f = utils.make_files_config(files_config)
     tcm = utils.TCMData(
-        id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
-        idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
-        cumulative_length=lh5.read_as(
-            f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
-        ),
+        array_id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="ak"),
+        array_idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="ak"),
     )
     energy = xtalk.gather_energy(
         "hit.cuspEmax_ctc_cal", tcm, f, np.array([1084803, 1084804])
     )
-    n_rows = np.max(tcm.idx) + 1
+    n_rows = np.max(tcm.array_idx) + 1
     assert isinstance(energy, np.ndarray)
     assert energy.ndim == 2
     assert np.shape(energy) == (n_rows, 2)
@@ -67,13 +64,10 @@ def test_gather_energy(lgnd_test_data, files_config):
 def test_filter_hits(lgnd_test_data, files_config):
     f = utils.make_files_config(files_config)
     tcm = utils.TCMData(
-        id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
-        idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
-        cumulative_length=lh5.read_as(
-            f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
-        ),
+        array_id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="ak"),
+        array_idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="ak"),
     )
-    n_rows = np.max(tcm.idx) + 1
+    n_rows = np.max(tcm.array_idx) + 1
 
     filter = xtalk.filter_hits(
         f,
