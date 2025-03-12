@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import re
 
+import awkward as ak
 import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -15,7 +16,6 @@ import pandas as pd
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
-import awkward as ak
 
 import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
