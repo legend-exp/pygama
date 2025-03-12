@@ -23,6 +23,13 @@ def test_generate_tcm_cols(lgnd_test_data):
     for v in tcm_cols.values():
         assert np.issubdtype(v.flattened_data.nda.dtype, np.integer)
 
+    # test attrs
+    assert set(tcm_cols.attrs.keys()) == {"datatype", "hash_func", "tables"}
+    assert tcm_cols.attrs["hash_func"] == r"\d+"
+    assert set(eval(tcm_cols.attrs["tables"])) == {
+        f"{chan}/raw" for chan in lh5.ls(f_raw)
+    }
+
     # fmt: off
     assert np.array_equal(
         tcm_cols.array_id.cumulative_length.nda,

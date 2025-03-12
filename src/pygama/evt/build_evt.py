@@ -8,7 +8,7 @@ import importlib
 import itertools
 import logging
 import re
-from collections.abc import Mapping, Sequence, namedtuple
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import awkward as ak
@@ -198,7 +198,7 @@ def build_evt_cols(
     buffer_len=10**4,
 ) -> None | Table:
 
-    if not isinstance(file_config, namedtuple):
+    if not isinstance(file_config, utils.DataInfo):
         file_config = utils.make_files_config(file_config)
 
     evt_tables = []

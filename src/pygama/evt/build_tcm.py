@@ -5,9 +5,24 @@ import re
 import awkward as ak
 import lgdo
 from lgdo import lh5
-from lgdo.types import Table
+from lgdo.types import Struct, Table, VectorOfVectors
 
 from . import tcm as ptcm
+
+
+def readd_attrs(final_table, input_table):
+    if hasattr(input_table, "attrs"):
+        final_table.attrs = input_table.attrs
+    for key in input_table:
+        if hasattr(input_table[key], "attrs"):
+            final_table[key].attrs = input_table[key].attrs
+    if isinstance(final_table[key], (Table, Struct)):
+        readd_attrs(final_table[key], input_table[key])
+    if isinstance(input_table, VectorOfVectors):
+        final_table[key].flattened_data.attrs = input_table[key].flattened_data.attrs
+        final_table[key].cumulative_length.attrs = input_table[
+            key
+        ].cumulative_length.attrs
 
 
 def _concat_tables(tbls):
@@ -15,7 +30,9 @@ def _concat_tables(tbls):
     out_tbl = tbls[0].view_as("ak")
     for tbl in tbls[1:]:
         out_tbl = ak.concatenate([out_tbl, tbl.view_as("ak")], axis=0)
-    return Table(col_dict=out_tbl)
+    out_tbl = Table(col_dict=out_tbl)
+    readd_attrs(out_tbl, tbls[0])
+    return out_tbl
 
 
 def build_tcm(
@@ -128,25 +145,19 @@ def build_tcm(
     tcm_gen = ptcm.generate_tcm_cols(
         iterators, coin_windows=coin_windows, array_ids=array_ids, fields=out_fields
     )
-
-    if out_file is not None:
-        sto = lh5.LH5Store()
-        while True:
-            try:
-                out_tbl = tcm_gen.__next__()
-                out_tbl.attrs.update(
-                    {"tables": str(all_tables), "hash_func": str(hash_func)}
-                )
-                sto.write(out_tbl, out_name, out_file, wo_mode=wo_mode)
-            except StopIteration:
-                break
-    else:
-        tcm = []
-        while True:
-            try:
-                tcm.append(tcm_gen.__next__())
-            except StopIteration:
-                break
+    tcm = []
+    while True:
+        try:
+            out_tbl = tcm_gen.__next__()
+            out_tbl.attrs.update(
+                {"tables": str(all_tables), "hash_func": str(hash_func)}
+            )
+            if out_file is not None:
+                lh5.write(out_tbl, out_name, out_file, wo_mode=wo_mode)
+            else:
+                tcm.append(out_tbl)
+        except StopIteration:
+            break
+    if out_file is None:
         out_tbl = _concat_tables(tcm)
-        out_tbl.attrs.update({"tables": str(all_tables), "hash_func": str(hash_func)})
         return out_tbl
