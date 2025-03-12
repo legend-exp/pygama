@@ -5,12 +5,10 @@ import awkward as ak
 import numpy as np
 import pytest
 from lgdo import Array, Table, VectorOfVectors, lh5
-from lgdo.lh5 import LH5Store
 
 from pygama.evt import build_evt
 
 config_dir = Path(__file__).parent / "configs"
-store = LH5Store()
 
 
 @pytest.fixture(scope="module")
@@ -61,16 +59,16 @@ def test_basics(lgnd_test_data, files_config):
 
     assert ak.all(ak_evt.energy_sum == ak.sum(ak_evt.energy, axis=-1))
 
-    eid = store.read("/evt/energy_id", outfile)[0].view_as("np")
-    eidx = store.read("/evt/energy_idx", outfile)[0].view_as("np")
+    eid = lh5.read_as("/evt/energy_id", outfile, library="np")
+    eidx = lh5.read_as("/evt/energy_idx", outfile, library="np")
     eidx = eidx[eidx != 999999999999]
 
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("np")
+    ids = lh5.read("hardware_tcm_1/array_id", f_tcm).flattened_data.nda
     ids = ids[eidx]
     assert ak.all(ids == eid[eid != 0])
 
-    ehidx = store.read("/evt/energy_hit_idx", outfile)[0].view_as("np")
-    ids = store.read("hardware_tcm_1/array_idx", f_tcm)[0].view_as("np")
+    ehidx = lh5.read_as("/evt/energy_hit_idx", outfile, library="np")
+    ids = lh5.read("hardware_tcm_1/array_idx", f_tcm).flattened_data.nda
     ids = ids[eidx]
     assert ak.all(ids == ehidx[ehidx != 999999999999])
 
@@ -183,15 +181,15 @@ def test_vov(lgnd_test_data, files_config):
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 12
 
-    timestamp, _ = store.read("/evt/timestamp", outfile)
+    timestamp = lh5.read("/evt/timestamp", outfile)
     assert np.all(~np.isnan(timestamp.nda))
 
-    vov_ene, _ = store.read("/evt/energy", outfile)
-    vov_aoe, _ = store.read("/evt/aoe", outfile)
-    arr_ac, _ = store.read("/evt/multiplicity", outfile)
-    vov_aoeene, _ = store.read("/evt/energy_times_aoe", outfile)
-    vov_eneac, _ = store.read("/evt/energy_times_multiplicity", outfile)
-    arr_ac2, _ = store.read("/evt/multiplicity_squared", outfile)
+    vov_ene = lh5.read("/evt/energy", outfile)
+    vov_aoe = lh5.read("/evt/aoe", outfile)
+    arr_ac = lh5.read("/evt/multiplicity", outfile)
+    vov_aoeene = lh5.read("/evt/energy_times_aoe", outfile)
+    vov_eneac = lh5.read("/evt/energy_times_multiplicity", outfile)
+    arr_ac2 = lh5.read("/evt/multiplicity_squared", outfile)
 
     assert isinstance(vov_ene, VectorOfVectors)
     assert isinstance(vov_aoe, VectorOfVectors)
@@ -206,15 +204,17 @@ def test_vov(lgnd_test_data, files_config):
 
     assert (np.diff(vov_ene.cumulative_length.nda, prepend=[0]) == arr_ac.nda).all()
 
-    vov_eid = store.read("/evt/energy_id", outfile)[0].view_as("ak")
-    vov_eidx = store.read("/evt/energy_idx", outfile)[0].view_as("ak")
-    vov_aoe_idx = store.read("/evt/aoe_idx", outfile)[0].view_as("ak")
+    vov_eid = lh5.read_as("/evt/energy_id", outfile, library="ak")
+    vov_eidx = lh5.read_as("/evt/energy_idx", outfile, library="ak")
+    vov_aoe_idx = lh5.read_as("/evt/aoe_idx", outfile, library="ak")
 
-    ids = store.read("hardware_tcm_1/array_id", f_tcm)[0].view_as("ak")
-    ids = ak.unflatten(ids[ak.flatten(vov_eidx)], ak.count(vov_eidx, axis=-1))
+    ids = lh5.read_as("hardware_tcm_1/array_id", f_tcm, library="ak")
+    ids = ak.unflatten(
+        ak.flatten(ids)[ak.flatten(vov_eidx)], ak.count(vov_eidx, axis=-1)
+    )
     assert ak.all(ids == vov_eid)
 
-    arr_ene = store.read("/evt/energy_sum", outfile)[0].view_as("ak")
+    arr_ene = lh5.read_as("/evt/energy_sum", outfile, library="ak")
     assert ak.all(
         ak.isclose(arr_ene, ak.nansum(vov_ene.view_as("ak"), axis=-1), rtol=1e-3)
     )
@@ -305,9 +305,9 @@ def test_vector_sort(lgnd_test_data, files_config):
 
     assert os.path.exists(outfile)
     assert len(lh5.ls(outfile, "/evt/")) == 4
-    vov_t0, _ = store.read("/evt/t0_acend", outfile)
+    vov_t0 = lh5.read("/evt/t0_acend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) >= 0) | (np.isnan(np.diff(nda_t0)))).all()
-    vov_t0, _ = store.read("/evt/t0_decend", outfile)
+    vov_t0 = lh5.read("/evt/t0_decend", outfile)
     nda_t0 = vov_t0.to_aoesa().view_as("np")
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()

@@ -8,7 +8,7 @@ import importlib
 import itertools
 import logging
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, namedtuple
 from typing import Any
 
 import awkward as ak
@@ -17,6 +17,7 @@ from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
 
 from ..utils import load_dict
 from . import aggregators, utils
+from .build_tcm import _concat_tables
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ def build_evt(
     datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
     config: str | Mapping[str, ...],
     wo_mode: str = "write_safe",
+    buffer_len=10**4,
 ) -> None | Table:
     r"""Transform data from hit-structured tiers to event-structured data.
 
@@ -182,139 +184,165 @@ def build_evt(
         elif isinstance(v, list):
             channels[key] = [e for e in v]
 
-    # load tcm data from disk
-    tcm = utils.TCMData(
-        id=lh5.read_as(f"/{f.tcm.group}/array_id", f.tcm.file, library="np"),
-        idx=lh5.read_as(f"/{f.tcm.group}/array_idx", f.tcm.file, library="np"),
-        cumulative_length=lh5.read_as(
-            f"/{f.tcm.group}/cumulative_length", f.tcm.file, library="np"
-        ),
-    )
+    evt_tbl = build_evt_cols(f, datainfo, config, channels, wo_mode, buffer_len)
+    if f.evt.file is None:
+        return evt_tbl
 
-    # get number of events in file (ask the TCM)
-    n_rows = len(tcm.cumulative_length)
-    table = Table(size=n_rows)
 
-    # now loop over operations (columns in evt table)
-    for field, v in config["operations"].items():
-        log.debug(f"processing field: '{field}'")
+def build_evt_cols(
+    file_config: utils.FilesConfig | dict,
+    datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
+    config: Mapping[str, ...],
+    channels: list,
+    wo_mode: str = "write_safe",
+    buffer_len=10**4,
+) -> None | Table:
 
-        # if mode not defined in operation, it can only be an operation on the
-        # evt level
-        if "aggregation_mode" not in v.keys():
-            # compute and eventually get rid of evt. suffix
-            obj = table.eval(
-                v["expression"].replace("evt.", ""), v.get("parameters", {})
-            )
+    if not isinstance(file_config, namedtuple):
+        file_config = utils.make_files_config(file_config)
 
-            # add attributes if present
-            if "lgdo_attrs" in v.keys():
-                obj.attrs |= v["lgdo_attrs"]
+    evt_tables = []
 
-        # else we build the event entry
-        else:
-            if "channels" not in v.keys():
-                channels_e = []
-            elif isinstance(v["channels"], str):
-                channels_e = channels[v["channels"]]
-            elif isinstance(v["channels"], list):
-                channels_e = list(
-                    itertools.chain.from_iterable([channels[e] for e in v["channels"]])
+    for tcm_lh5, _, n_rows in lh5.LH5Iterator(
+        file_config.tcm.file,
+        file_config.tcm.group,
+        buffer_len=buffer_len,
+        field_mask=["array_id", "array_idx"],
+    ):
+        # load tcm data from disk
+        tcm = utils.TCMData(
+            array_id=tcm_lh5.array_id.view_as("ak"),
+            array_idx=tcm_lh5.array_idx.view_as("ak"),
+        )
+
+        # get number of events in file (ask the TCM)
+        table = Table(size=n_rows)
+
+        # now loop over operations (columns in evt table)
+        for field, v in config["operations"].items():
+            log.debug(f"processing field: '{field}'")
+
+            # if mode not defined in operation, it can only be an operation on the
+            # evt level
+            if "aggregation_mode" not in v.keys():
+                # compute and eventually get rid of evt. suffix
+                obj = table.eval(
+                    v["expression"].replace("evt.", ""), v.get("parameters", {})
                 )
-            channels_skip = []
-            if "exclude_channels" in v.keys():
-                if isinstance(v["exclude_channels"], str):
-                    channels_skip = channels[v["exclude_channels"]]
-                elif isinstance(v["exclude_channels"], list):
-                    channels_skip = list(
+
+                # add attributes if present
+                if "lgdo_attrs" in v.keys():
+                    obj.attrs |= v["lgdo_attrs"]
+
+            # else we build the event entry
+            else:
+                if "channels" not in v.keys():
+                    channels_e = []
+                elif isinstance(v["channels"], str):
+                    channels_e = channels[v["channels"]]
+                elif isinstance(v["channels"], list):
+                    channels_e = list(
                         itertools.chain.from_iterable(
-                            [channels[e] for e in v["exclude_channels"]]
+                            [channels[e] for e in v["channels"]]
                         )
                     )
+                channels_skip = []
+                if "exclude_channels" in v.keys():
+                    if isinstance(v["exclude_channels"], str):
+                        channels_skip = channels[v["exclude_channels"]]
+                    elif isinstance(v["exclude_channels"], list):
+                        channels_skip = list(
+                            itertools.chain.from_iterable(
+                                [channels[e] for e in v["exclude_channels"]]
+                            )
+                        )
 
-            defaultv = v.get("initial", np.nan)
-            if isinstance(defaultv, str) and (
-                defaultv in ["np.nan", "np.inf", "-np.inf"]
-            ):
-                defaultv = eval(defaultv)
+                defaultv = v.get("initial", np.nan)
+                if isinstance(defaultv, str) and (
+                    defaultv in ["np.nan", "np.inf", "-np.inf"]
+                ):
+                    defaultv = eval(defaultv)
 
-            obj = evaluate_expression(
-                datainfo,
-                tcm,
-                channels=channels_e,
-                channels_skip=channels_skip,
-                mode=v["aggregation_mode"],
-                expr=v["expression"],
-                n_rows=n_rows,
-                table=table,
-                parameters=v.get("parameters", None),
-                query=v.get("query", None),
-                default_value=defaultv,
-                sorter=v.get("sort", None),
-            )
+                obj = evaluate_expression(
+                    datainfo,
+                    tcm,
+                    channels=channels_e,
+                    channels_skip=channels_skip,
+                    mode=v["aggregation_mode"],
+                    expr=v["expression"],
+                    n_rows=n_rows,
+                    table=table,
+                    parameters=v.get("parameters", None),
+                    query=v.get("query", None),
+                    default_value=defaultv,
+                    sorter=v.get("sort", None),
+                )
 
-            # add attribute if present
-            if "lgdo_attrs" in v.keys():
-                obj.attrs |= v["lgdo_attrs"]
+                # add attribute if present
+                if "lgdo_attrs" in v.keys():
+                    obj.attrs |= v["lgdo_attrs"]
 
-        # cast to type, if required
-        # hijack the poor LGDO
-        if "dtype" in v:
-            type_ = v["dtype"]
+            # cast to type, if required
+            # hijack the poor LGDO
+            if "dtype" in v:
+                type_ = v["dtype"]
 
-            if isinstance(obj, Array):
-                obj.nda = obj.nda.astype(type_)
-            if isinstance(obj, VectorOfVectors):
-                fldata_ptr = obj.flattened_data
-                while isinstance(fldata_ptr, VectorOfVectors):
-                    fldata_ptr = fldata_ptr.flattened_data
+                if isinstance(obj, Array):
+                    obj.nda = obj.nda.astype(type_)
+                if isinstance(obj, VectorOfVectors):
+                    fldata_ptr = obj.flattened_data
+                    while isinstance(fldata_ptr, VectorOfVectors):
+                        fldata_ptr = fldata_ptr.flattened_data
 
-                fldata_ptr.nda = fldata_ptr.nda.astype(type_)
+                    fldata_ptr.nda = fldata_ptr.nda.astype(type_)
 
-        log.debug(f"new column {field!s} = {obj!r}")
-        table.add_field(field, obj)
+            log.debug(f"new column {field!s} = {obj!r}")
+            table.add_field(field, obj)
 
-    # might need to re-organize fields in subtables, create a new object for that
-    nested_tbl = Table(size=n_rows)
-    output_fields = config.get("outputs", table.keys())
+        # might need to re-organize fields in subtables, create a new object for that
+        nested_tbl = Table(size=n_rows)
+        output_fields = config.get("outputs", table.keys())
 
-    for field, obj in table.items():
-        # also only add fields requested by the user
-        if field not in output_fields:
-            continue
+        for field, obj in table.items():
+            # also only add fields requested by the user
+            if field not in output_fields:
+                continue
 
-        # if names contain slahes, put in sub-tables
-        lvl_ptr = nested_tbl
-        subfields = field.strip("/").split("___")
-        for level in subfields:
-            # if we are at the end, just add the field
-            if level == subfields[-1]:
-                lvl_ptr.add_field(level, obj)
-                break
+            # if names contain slahes, put in sub-tables
+            lvl_ptr = nested_tbl
+            subfields = field.strip("/").split("___")
+            for level in subfields:
+                # if we are at the end, just add the field
+                if level == subfields[-1]:
+                    lvl_ptr.add_field(level, obj)
+                    break
 
-            if not level:
-                msg = f"invalid field name '{field}'"
-                raise RuntimeError(msg)
+                if not level:
+                    msg = f"invalid field name '{field}'"
+                    raise RuntimeError(msg)
 
-            # otherwise, increase nesting
-            if level not in lvl_ptr:
-                lvl_ptr.add_field(level, Table(size=n_rows))
-            lvl_ptr = lvl_ptr[level]
+                # otherwise, increase nesting
+                if level not in lvl_ptr:
+                    lvl_ptr.add_field(level, Table(size=n_rows))
+                lvl_ptr = lvl_ptr[level]
 
-    # write output fields into outfile
-    if output_fields:
-        if f.evt.file is None:
-            return nested_tbl
-
-        lh5.write(
-            obj=nested_tbl,
-            name=f.evt.group,
-            lh5_file=f.evt.file,
-            wo_mode=wo_mode,
-        )
-    else:
-        log.warning("no output fields specified, no file will be written.")
-        return nested_tbl
+        # write output fields into outfile
+        if output_fields:
+            if file_config.evt.file is None:
+                evt_tables.append(nested_tbl)
+            else:
+                lh5.write(
+                    obj=nested_tbl,
+                    name=file_config.evt.group,
+                    lh5_file=file_config.evt.file,
+                    wo_mode=wo_mode,
+                )
+        else:
+            # warning will be given on each iteration, maybe not ideal?
+            log.warning("no output fields specified, no file will be written.")
+            evt_tables.append(nested_tbl)
+        if file_config.evt.file is None:
+            return _concat_tables(evt_tables)
 
 
 def evaluate_expression(
@@ -484,12 +512,15 @@ def evaluate_expression(
             else:
                 ch_comp = table[mode[12:].replace("evt.", "")]
                 if isinstance(ch_comp, Array):
-                    ch_comp = Array(tcm.id[ch_comp.view_as("np")])
+                    ch_comp = Array(
+                        ak.flatten(tcm.array_id)[ch_comp.view_as("np")].to_numpy()
+                    )
                 elif isinstance(ch_comp, VectorOfVectors):
                     ch_comp = ch_comp.view_as("ak")
                     ch_comp = VectorOfVectors(
                         ak.unflatten(
-                            tcm.id[ak.flatten(ch_comp)], ak.count(ch_comp, axis=-1)
+                            ak.flatten(tcm.array_id)[ak.flatten(ch_comp)].to_numpy(),
+                            ak.count(ch_comp, axis=-1),
                         )
                     )
                 else:

@@ -18,7 +18,7 @@ H5DataLoc = namedtuple(
 )
 DataInfo = namedtuple("DataInfo", ("raw", "tcm", "evt"), defaults=3 * (None,))
 
-TCMData = namedtuple("TCMData", ("id", "idx", "cumulative_length"))
+TCMData = namedtuple("TCMData", ("array_id", "array_idx"))
 
 
 def make_files_config(data: dict):
@@ -157,7 +157,8 @@ def get_data_at_channel(
     table_id = get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
     # get index list for this channel to be loaded
-    idx_ch = tcm.idx[tcm.id == table_id]
+    chan_tcm_indexs = (ak.flatten(tcm.array_id) == table_id).to_numpy()
+    idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
     outsize = len(idx_ch)
 
     if expr == "tcm.array_id":
@@ -165,7 +166,7 @@ def get_data_at_channel(
     elif expr == "tcm.array_idx":
         res = idx_ch
     elif expr == "tcm.index":
-        res = np.where(tcm.id == table_id)[0]
+        res = np.where(chan_tcm_indexs)[0]
     else:
         var = find_parameters(
             datainfo=datainfo,
