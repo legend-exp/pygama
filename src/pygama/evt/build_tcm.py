@@ -26,7 +26,6 @@ def readd_attrs(final_table, input_table):
 
 
 def _concat_tables(tbls):
-    # this will drop attrs, need to fix
     out_tbl = tbls[0].view_as("ak")
     for tbl in tbls[1:]:
         out_tbl = ak.concatenate([out_tbl, tbl.view_as("ak")], axis=0)
@@ -93,6 +92,8 @@ def build_tcm(
         coin_windows = [coin_windows]
     if not isinstance(window_refs, list):
         window_refs = [window_refs]
+    if out_fields is not None and not isinstance(out_fields, list):
+        out_fields = [out_fields]
 
     iterators = []
     array_ids = []

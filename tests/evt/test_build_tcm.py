@@ -2,6 +2,7 @@ import os
 
 import lgdo
 import numpy as np
+import pytest
 from lgdo import lh5
 from lgdo.types import VectorOfVectors, Table
 
@@ -93,6 +94,71 @@ def test_generate_tcm_cols(lgnd_test_data):
         ],
     )
     # fmt: on
+    # test with None hash_func
+    tcm_cols = evt.build_tcm(
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+        "timestamp",
+        hash_func=None,
+        buffer_len=1,
+    )
+    assert np.array_equal(
+        tcm_cols.array_id.flattened_data.nda,
+        [
+            1,
+            0,
+            2,
+            1,
+            2,
+            1,
+            2,
+            1,
+            1,
+            1,
+            0,
+            1,
+            1,
+            2,
+            2,
+            1,
+            2,
+            1,
+            2,
+            0,
+            0,
+            2,
+            2,
+            2,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        ],
+    )
+    # test invalid hash func
+    with pytest.raises(NotImplementedError):
+        evt.build_tcm(
+            [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+            "timestamp",
+            hash_func=[],
+        )
+
+    # test invalid window_refs
+    with pytest.raises(NotImplementedError):
+        evt.build_tcm(
+            [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+            "timestamp",
+            window_refs="test",
+        )
+
+    # test adding extra fields
+    tcm_cols = evt.build_tcm(
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+        "timestamp",
+        out_fields="timestamp",
+    )
+    assert "timestamp" in tcm_cols.keys()
 
 
 def test_build_tcm_write(lgnd_test_data, tmptestdir):
