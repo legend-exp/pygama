@@ -2,39 +2,20 @@ from __future__ import annotations
 
 import re
 
+import awkward as ak
 import lgdo
-import numpy as np
 from lgdo import lh5
-from lgdo.types import Table, VectorOfVectors
+from lgdo.types import Table
 
 from . import tcm as ptcm
 
 
-def _join_vov(vov1, vov2):
-    flattened = np.concatenate([vov1.flattened_data.nda, vov2.flattened_data.nda])
-    cumulative_length = np.concatenate(
-        [
-            vov1.cumulative_length.nda,
-            vov2.cumulative_length.nda + vov1.cumulative_length.nda[-1],
-        ]
-    )
-    return VectorOfVectors(
-        cumulative_length=cumulative_length, flattened_data=flattened, attrs=vov1.attrs
-    )
-
-
-def _join_table(tbl1, tbl2):
-    final_table = Table(size=len(tbl1) + len(tbl2))
-    for field in tbl1:
-        final_table.add_field(field, _join_vov(tbl1[field], tbl2[field]))
-    return final_table
-
-
 def _concat_tables(tbls):
-    out_tbl = tbls[0]
+    # this will drop attrs, need to fix
+    out_tbl = tbls[0].view_as("ak")
     for tbl in tbls[1:]:
-        out_tbl = _join_table(out_tbl, tbl)
-    return out_tbl
+        out_tbl = ak.concatenate([out_tbl, tbl.view_as("ak")], axis=0)
+    return Table(col_dict=out_tbl)
 
 
 def build_tcm(
@@ -152,7 +133,11 @@ def build_tcm(
         sto = lh5.LH5Store()
         while True:
             try:
-                sto.write(tcm_gen.__next__(), out_name, out_file, wo_mode=wo_mode)
+                out_tbl = tcm_gen.__next__()
+                out_tbl.attrs.update(
+                    {"tables": str(all_tables), "hash_func": str(hash_func)}
+                )
+                sto.write(out_tbl, out_name, out_file, wo_mode=wo_mode)
             except StopIteration:
                 break
     else:
@@ -162,4 +147,6 @@ def build_tcm(
                 tcm.append(tcm_gen.__next__())
             except StopIteration:
                 break
-        return _concat_tables(tcm)
+        out_tbl = _concat_tables(tcm)
+        out_tbl.attrs.update({"tables": str(all_tables), "hash_func": str(hash_func)})
+        return out_tbl
