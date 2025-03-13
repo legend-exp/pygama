@@ -174,8 +174,46 @@ def test_build_tcm_write(lgnd_test_data, tmptestdir):
         wo_mode="of",
     )
     assert os.path.exists(out_file)
-    store = lh5.LH5Store()
-    tcm_cols, _ = store.read("hardware_tcm", out_file)
+    tcm_cols = lh5.read("hardware_tcm", out_file)
+    assert isinstance(tcm_cols, lgdo.Struct)
+    assert list(tcm_cols.keys()) == ["array_id", "array_idx"]
+    # fmt: off
+    assert np.array_equal(
+        tcm_cols.array_id.cumulative_length.nda,
+        [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+        ],
+    )
+    assert np.array_equal(
+        tcm_cols.array_id.flattened_data.nda,
+        [
+            1084804, 1084803, 1121600, 1084804, 1121600, 1084804, 1121600,
+            1084804, 1084804, 1084804, 1084803, 1084804, 1084804, 1121600,
+            1121600, 1084804, 1121600, 1084804, 1121600, 1084803, 1084803,
+            1121600, 1121600, 1121600, 1084803, 1084803, 1084803, 1084803,
+            1084803, 1084803,
+        ],
+    )
+    assert np.array_equal(
+        tcm_cols.array_idx.flattened_data.nda,
+        [
+            0, 0, 0, 1, 1, 2, 2, 3, 4, 5, 1, 6, 7, 3, 4, 8, 5, 9, 6, 2, 3, 7,
+            8, 9, 4, 5, 6, 7, 8, 9,
+        ],
+    )
+    # fmt: on
+    # test also with small buffers
+    evt.build_tcm(
+        [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+        "timestamp",
+        out_file=out_file,
+        out_name="hardware_tcm",
+        wo_mode="of",
+        buffer_len=1,
+    )
+    assert os.path.exists(out_file)
+    tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert list(tcm_cols.keys()) == ["array_id", "array_idx"]
     # fmt: off
