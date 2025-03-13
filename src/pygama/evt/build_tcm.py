@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import awkward as ak
 import lgdo
@@ -147,6 +148,10 @@ def build_tcm(
         iterators, coin_windows=coin_windows, array_ids=array_ids, fields=out_fields
     )
     tcm = []
+    # clear existing output files
+    if out_file is not None and wo_mode == "of":
+        if Path(out_file).exists():
+            Path(out_file).unlink()
     while True:
         try:
             out_tbl = tcm_gen.__next__()
@@ -154,7 +159,9 @@ def build_tcm(
                 {"tables": str(all_tables), "hash_func": str(hash_func)}
             )
             if out_file is not None:
-                lh5.write(out_tbl, out_name, out_file, wo_mode=wo_mode)
+                lh5.write(
+                    out_tbl, out_name, out_file, wo_mode="o" if wo_mode == "u" else "a"
+                )
             else:
                 tcm.append(out_tbl)
         except StopIteration:

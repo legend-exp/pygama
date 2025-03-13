@@ -9,6 +9,7 @@ import itertools
 import logging
 import re
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 import awkward as ak
@@ -202,6 +203,9 @@ def build_evt_cols(
         file_config = utils.make_files_config(file_config)
 
     evt_tables = []
+    if file_config.evt.file is not None and wo_mode == "of":
+        if Path(file_config.evt.file).exists():
+            Path(file_config.evt.file).unlink()
 
     for tcm_lh5, _, n_rows in lh5.LH5Iterator(
         file_config.tcm.file,
@@ -335,7 +339,7 @@ def build_evt_cols(
                     obj=nested_tbl,
                     name=file_config.evt.group,
                     lh5_file=file_config.evt.file,
-                    wo_mode=wo_mode,
+                    wo_mode="o" if wo_mode == "u" else "a",
                 )
         else:
             # warning will be given on each iteration, maybe not ideal?
