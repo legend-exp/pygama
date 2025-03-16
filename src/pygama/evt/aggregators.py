@@ -8,7 +8,6 @@ import awkward as ak
 import numpy as np
 import pandas as pd
 from lgdo import lh5, types
-from lgdo.lh5 import LH5Store
 
 from . import utils
 
@@ -60,7 +59,6 @@ def evaluate_to_first_or_last(
     f = utils.make_files_config(datainfo)
 
     df = None
-    store = LH5Store(keep_open=True)
 
     for ch in channels:
         table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
@@ -95,11 +93,12 @@ def evaluate_to_first_or_last(
             )
 
             # find if sorter is in hit or dsp
-            sort_field = store.read(
+            sort_field = lh5.read_as(
                 f"{ch}/{sorter[0]}/{sorter[1]}",
                 f.hit.file if f"{f.hit.group}" == sorter[0] else f.dsp.file,
                 idx=idx_ch,
-            )[0].view_as("np")
+                library="np",
+            )
 
             if sort_field.ndim > 1:
                 raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
@@ -111,9 +110,13 @@ def evaluate_to_first_or_last(
             if is_first:
                 if ch == channels[0]:
                     df["sort_field"] = np.inf
-                ids = (ch_df.sort_field < df.sort_field[evt_ids_ch]) & (limarr)
+                ids = (
+                    ch_df.sort_field.to_numpy() < df.sort_field[evt_ids_ch].to_numpy()
+                ) & (limarr)
             else:
-                ids = (ch_df.sort_field > df.sort_field[evt_ids_ch]) & (limarr)
+                ids = (
+                    ch_df.sort_field.to_numpy() > df.sort_field[evt_ids_ch].to_numpy()
+                ) & (limarr)
 
             df.loc[evt_ids_ch[ids], list(df.columns)] = ch_df.loc[ids, list(df.columns)]
 
@@ -183,8 +186,6 @@ def evaluate_to_scalar(
             if out is None:
                 # define dimension of output array
                 out = utils.make_numpy_full(n_rows, default_value, res.dtype)
-            # else:
-            #     res = np.full(len(idx_ch), default_value)
 
             # get mask from query
             limarr = utils.get_mask_from_query(

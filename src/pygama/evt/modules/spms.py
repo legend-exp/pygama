@@ -78,6 +78,14 @@ def gather_pulse_data(
 
     # loop over selected table_names and load hit data
     concatme = []
+    # number of channels per event
+    evt_length = np.diff(
+        np.insert(types.VectorOfVectors(tcm.array_id).cumulative_length, 0, 0)
+    )
+
+    # construct global event ID's
+    glob_ids = np.repeat(np.arange(0, len(tcm.array_id), 1), evt_length)
+
     for channel in table_names:
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
 
@@ -89,16 +97,11 @@ def gather_pulse_data(
         lgdo_obj = lh5.read(
             f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=tbl_idxs_ch
         )
-        data = lgdo_obj.view_as(library="np")
+        data = lgdo_obj.view_as("np")
 
         # remove nans (this happens when SiPM data is stored as ArrayOfEqualSizedArrays)
         data = ak.drop_none(ak.nan_to_none(data))
 
-        # number of channels per event
-        evt_length = np.diff(np.insert(tcm.array_id.cumulative_length, 0, 0))
-
-        # construct global event ID's
-        glob_ids = np.repeat(np.arange(0, len(tcm.array_id), 1), evt_length)
         glob_ids_ch = glob_ids[
             chan_tcm_indexs
         ]  # global ID's where channel had a trigger
@@ -184,7 +187,7 @@ def gather_tcm_data(
     locs = np.isin(tcm_id_padded, table_ids)
 
     # select tcm field requested by the user
-    data = tcm[tcm_field]
+    data = tcm._asdict()[tcm_field]
 
     # apply mask
     # NOTE: need to cast to irregular axes, otherwise the masking result is
