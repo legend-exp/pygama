@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, WaveformTable
 
-from pygama.pargen import extract_tau
+from pygama.pargen import pz_correct
 
 
 def test_tp100_align():
@@ -18,12 +18,12 @@ def test_tp100_align():
     test_wfs = []
     for i in range(len(tp100_known)):
         xs = np.arange(0, wf_len - tp100_known[i])
-        ys = extract_tau.one_exp(xs, tau, 1)
+        ys = np.exp(-xs / tau)
         test_wfs.append(np.insert(ys, 0, np.zeros(tp100_known[i])))
 
     superpulse_window_width = 13
 
-    time_aligned_wfs = extract_tau.tp100_align(
+    time_aligned_wfs = pz_correct.tp100_align(
         test_wfs, superpulse_window_width, tp100_known
     )
     tp100s = []
@@ -36,16 +36,16 @@ def test_tp100_align():
 
 
 def test_dpz_model_fit():
-    tau2 = 30000
-    tau1 = 1100
-    frac = 0.98
+    tau1 = 30000
+    tau2 = 1100
+    frac = 0.02
     wf_len = 8192
     tp0 = 3200
 
     xs = np.arange(0, wf_len - tp0)
-    ys = extract_tau.dpz_model(xs, 1000, tau1, tau2, frac)
+    ys = pz_correct.dpz_model(xs, 1000, tau1, tau2, frac)
     test_wf = np.insert(ys, 0, np.zeros(tp0))
-    tau1_fit, tau2_fit, frac_fit, plot_dict_out = extract_tau.dpz_model_fit(
+    tau1_fit, tau2_fit, frac_fit, plot_dict_out = pz_correct.dpz_model_fit(
         test_wf, percent_tau1_fit=0.1, percent_tau2_fit=0.2, idx_shift=2, plot=0
     )
 
@@ -60,9 +60,9 @@ def test_get_dpz_decay_constants():
     First, generate a fake HPGe energy spectrum and associated waveforms. Then extract the time constants from the waveforms associated with the 2615 peak
     """
     np.random.seed(42)
-    tau2 = 30000
-    tau1 = 1100
-    frac = 0.98
+    tau1 = 30000
+    tau2 = 1100
+    frac = 0.02
     wf_len = 8192
     tp0 = 3200
     num_wfs = 1000
@@ -78,7 +78,7 @@ def test_get_dpz_decay_constants():
     wfs = []
     for amplitude in daq_energies:
         xs = np.arange(0, wf_len - tp0)
-        ys = extract_tau.dpz_model(xs, amplitude, tau1, tau2, frac)
+        ys = pz_correct.dpz_model(xs, amplitude, tau1, tau2, frac)
         test_wf = np.insert(ys, 0, np.zeros(tp0))
         wfs.append(test_wf)
 
@@ -126,17 +126,18 @@ def test_get_dpz_decay_constants():
                         "bl_mean",
                         "round(52*us/waveform.period)",
                         "len(waveform)",
-                        "db.dpz.tau1",
-                        "db.dpz.tau2",
-                        "db.dpz.frac",
+                        "1*ms/waveform.period",
+                        "db.pz.tau1",
+                        "db.pz.tau2",
+                        "db.pz.frac",
                         "tau1",
                         "tau2",
                         "frac",
                     ],
                     "defaults": {
-                        "db.dpz.tau1": 900,
-                        "db.dpz.tau2": 28000,
-                        "db.dpz.frac": 0.9855024553225362,
+                        "db.pz.tau1": 28000,
+                        "db.pz.tau2": 900,
+                        "db.pz.frac": 0.145,
                     },
                 },
             },
@@ -151,7 +152,7 @@ def test_get_dpz_decay_constants():
     superpulse_window_width = 13
     display = 0
 
-    tau = extract_tau.ExtractTau(dpz_opt_dsp_dict, wf_field)
+    tau = pz_correct.PZCorrect(dpz_opt_dsp_dict, wf_field)
 
     tau.get_dpz_decay_constants(
         tb_data,
@@ -163,9 +164,9 @@ def test_get_dpz_decay_constants():
         display,
     )
     assert np.allclose(
-        float(tau.output_dict["dpz"]["tau1"].split("*")[0]) / 16, tau1, rtol=1e-2
+        float(tau.output_dict["pz"]["tau1"].split("*")[0]) / 16, tau1, rtol=1e-2
     )
     assert np.allclose(
-        float(tau.output_dict["dpz"]["tau2"].split("*")[0]) / 16, tau2, rtol=1e-2
+        float(tau.output_dict["pz"]["tau2"].split("*")[0]) / 16, tau2, rtol=1e-2
     )
-    assert np.allclose(float(tau.output_dict["dpz"]["frac"]), frac, rtol=1e-2)
+    assert np.allclose(float(tau.output_dict["pz"]["frac"]), frac, rtol=1e-2)
