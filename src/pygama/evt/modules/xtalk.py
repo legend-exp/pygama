@@ -91,7 +91,9 @@ def gather_energy(
         tbl = types.Table()
         chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
-        evt_ids_ch = ak.any(tcm.array_id == channel, axis=1)
+        evt_ids_ch = np.repeat(
+            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == channel, axis=1)
+        )
 
         for name, file, group, column in tier_params:
             try:
@@ -155,7 +157,9 @@ def filter_hits(
 
         chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
-        evt_ids_ch = ak.any(tcm.array_id == channel, axis=1)
+        evt_ids_ch = np.repeat(
+            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == channel, axis=1)
+        )
 
         for name, file, group, column in tier_params:
             try:

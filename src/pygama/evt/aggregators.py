@@ -105,7 +105,10 @@ def evaluate_to_first_or_last(
 
             ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
 
-            evt_ids_ch = np.where(ak.any(tcm.array_id == table_id, axis=1))[0]
+            evt_ids_ch = np.repeat(
+                np.arange(0, len(tcm.array_id)),
+                ak.sum(tcm.array_id == table_id, axis=1),
+            )
 
             if is_first:
                 if ch == channels[0]:
@@ -196,7 +199,10 @@ def evaluate_to_scalar(
                 idx_ch=idx_ch,
             )
 
-            evt_ids_ch = np.where(ak.any(tcm.array_id == table_id, axis=1))[0]
+            evt_ids_ch = np.repeat(
+                np.arange(0, len(tcm.array_id)),
+                ak.sum(tcm.array_id == table_id, axis=1),
+            )
 
             # switch through modes
             if mode == "sum":
@@ -267,7 +273,9 @@ def evaluate_at_channel(
         chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
         idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
 
-        evt_ids_ch = np.where(ak.any(tcm.array_id == table_id, axis=1))[0]
+        evt_ids_ch = np.repeat(
+            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+        )
 
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
@@ -337,7 +345,9 @@ def evaluate_at_channel_vov(
     type_name = None
     for table_id in ch_comp_channels:
         table_name = utils.get_table_name_by_pattern(f.hit.table_fmt, table_id)
-        evt_ids_ch = np.where(ak.any(tcm.array_id == table_id, axis=1))[0]
+        evt_ids_ch = np.repeat(
+            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+        )
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
@@ -347,9 +357,10 @@ def evaluate_at_channel_vov(
                 field_list=field_list,
                 pars_dict=pars_dict,
             )
-            new_evt_ids_ch = np.where(
-                ak.any(ch_comp.view_as("ak") == table_id, axis=1)
-            )[0]
+            new_evt_ids_ch = np.repeat(
+                np.arange(0, len(ch_comp)),
+                ak.sum(ch_comp.view_as("ak") == table_id, axis=1),
+            )
             matches = np.isin(evt_ids_ch, new_evt_ids_ch)
             out[ch_comp.flattened_data.nda == table_id] = res[matches]
 
@@ -426,7 +437,9 @@ def evaluate_to_aoesa(
         chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
         idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
 
-        evt_ids_ch = np.where(ak.any(tcm.array_id == table_id, axis=1))[0]
+        evt_ids_ch = np.repeat(
+            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+        )
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(

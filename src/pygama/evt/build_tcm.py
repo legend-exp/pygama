@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from pathlib import Path
 
@@ -9,6 +10,8 @@ from lgdo import lh5
 from lgdo.types import Struct, Table, VectorOfVectors
 
 from . import tcm as ptcm
+
+log = logging.getLogger(__name__)
 
 
 def readd_attrs(final_table, input_table):
@@ -164,6 +167,7 @@ def build_tcm(
                 )
             else:
                 tcm.append(out_tbl)
+                log.debug(out_tbl)
         except StopIteration:
             break
     if out_file is None:

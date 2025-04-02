@@ -4,7 +4,7 @@ import lgdo
 import numpy as np
 import pytest
 from lgdo import lh5
-from lgdo.types import VectorOfVectors, Table
+from lgdo.types import Table, VectorOfVectors
 
 from pygama import evt
 
@@ -15,7 +15,9 @@ def test_generate_tcm_cols(lgnd_test_data):
     )
 
     tcm_cols = evt.build_tcm(
-        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)], "timestamp",buffer_len=100,
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+        "timestamp",
+        buffer_len=100,
     )
 
     assert isinstance(tcm_cols, Table)
@@ -56,10 +58,13 @@ def test_generate_tcm_cols(lgnd_test_data):
             8, 9, 4, 5, 6, 7, 8, 9,
         ],
     )
+
     # fmt: on
     # test with small buffer len
     tcm_cols = evt.build_tcm(
-        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)], "timestamp",buffer_len=1,
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+        "timestamp",
+        buffer_len=1,
     )
 
     assert isinstance(tcm_cols, Table)
@@ -93,6 +98,7 @@ def test_generate_tcm_cols(lgnd_test_data):
             8, 9, 4, 5, 6, 7, 8, 9,
         ],
     )
+
     # fmt: on
     # test with None hash_func
     tcm_cols = evt.build_tcm(
@@ -159,6 +165,53 @@ def test_generate_tcm_cols(lgnd_test_data):
         out_fields="timestamp",
     )
     assert "timestamp" in tcm_cols.keys()
+
+    # test channel appearing multiple times in single entry
+    tcm_cols = evt.build_tcm(
+        [(f_raw, f"{chan}/raw") for chan in lh5.ls(f_raw)],
+        "timestamp",
+        buffer_len=100,
+        coin_windows=1,
+    )
+    assert np.array_equal(
+        tcm_cols.array_id.cumulative_length.nda,
+        [30],
+    )
+    assert np.array_equal(
+        tcm_cols.array_id.flattened_data.nda,
+        [
+            1084804,
+            1084803,
+            1121600,
+            1084804,
+            1121600,
+            1084804,
+            1121600,
+            1084804,
+            1084804,
+            1084804,
+            1084803,
+            1084804,
+            1084804,
+            1121600,
+            1121600,
+            1084804,
+            1121600,
+            1084804,
+            1121600,
+            1084803,
+            1084803,
+            1121600,
+            1121600,
+            1121600,
+            1084803,
+            1084803,
+            1084803,
+            1084803,
+            1084803,
+            1084803,
+        ],
+    )
 
 
 def test_build_tcm_write(lgnd_test_data, tmptestdir):

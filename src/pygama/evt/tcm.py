@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import namedtuple
 
 import numpy as np
@@ -9,6 +10,8 @@ from lgdo.types import Table, VectorOfVectors
 # later on we might want a tcm class, or interface / inherit from an entry list
 # class. For now we just need the key clustering functionality
 
+
+log = logging.getLogger(__name__)
 
 coin_groups = namedtuple("coin_groups", ["name", "window", "window_ref"])
 
@@ -92,8 +95,10 @@ def generate_tcm_cols(
 
     if array_ids is None:
         array_ids = np.arange(0, len(iterators))
-
-    while not at_end.any():
+    # stop when all channels are registered as at end
+    while not at_end.all():
+        # channels to read is combo of channels with entries remaining and those which
+        # have entries before the first channel
         curr_mask = ~skip_mask & ~at_end
         dfs = []
         for _ii, it in enumerate(iterators[curr_mask]):
@@ -115,7 +120,11 @@ def generate_tcm_cols(
                 ]
             else:
                 buffer["array_idx"] = np.arange(start, start + buf_len, dtype=int)
-            dfs.append(buffer)  # don't copy the data!
+            if len(buffer) > 0:
+                dfs.append(buffer)  # don't copy the data!
+
+        if at_end.all() and len(dfs) == 0 and tcm is None:
+            break
 
         if tcm is None:
             tcm = pd.concat(dfs).sort_values(
@@ -126,6 +135,7 @@ def generate_tcm_cols(
                 [entry.name for entry in coin_windows] + ["array_id"]
             )
 
+        # define mask, true when new event, false if part of same event
         mask = np.zeros(len(tcm) - 1, dtype=bool)
         for entry in coin_windows:
             diffs = np.diff(tcm[entry.name])
@@ -133,37 +143,57 @@ def generate_tcm_cols(
                 mask = mask | (diffs > entry.window)
             else:
                 raise NotImplementedError(f"window_ref {entry.window_ref}")
-        # grab up to last instance of a channel to know that all channels have been included in evts
+
+        # grab up to evt including last instance of a channel to know that all channels
+        # have been included in previous evts
         last_instance = {
             arr_id: index for index, arr_id in enumerate(tcm.array_id.to_numpy())
         }
+        log.debug(f"last instance: {last_instance}")
 
-        for entry in array_ids:
+        for i, entry in enumerate(array_ids):
             if entry not in last_instance:
                 last_instance[entry] = np.inf
+            if at_end[i]:
+                last_instance[entry] = np.inf
 
-        # in next iteration read any channels < first otherwise read all
-        skip_mask = np.array(
-            [(last_instance[arr] > last_instance[array_ids[0]]) for arr in array_ids]
-        )
+        if len(np.array(array_ids)[~at_end]) > 1:
+            comp_chan = np.array(array_ids)[~at_end][0]
+            skip_mask = np.array(
+                [(last_instance[arr] >= last_instance[comp_chan]) for arr in array_ids]
+            )
+            if skip_mask.all():
+                skip_mask = np.zeros(len(array_ids), dtype=bool)
+        else:
+            skip_mask = np.zeros(len(array_ids), dtype=bool)
 
         # want to write entries only up to last entry of a channel to ensure all included in evt
         if at_end.all():
+            log.debug("at end, writing all entries")
             write_mask = mask
             last_entry = None
         else:
-            last_instance = np.nanmin([int(last_instance[arr]) for arr in array_ids])
-            last_entry = np.where(mask[last_instance:])[0]
+            last_instance = int(np.min([last_instance[arr] for arr in array_ids]))
+            last_entry = np.where(mask[:last_instance])[0]
+            log.debug(f"last instance: {last_instance}")
+            log.debug(f"last entry: {last_entry}")
+
             if len(last_entry) == 0:
-                last_entry = None
-                write_mask = mask
+                log.debug("last entry 0, going to next iteration")
+                log.debug(tcm)
+                continue
             else:
-                last_entry = last_instance + last_entry[0]
+                last_entry = last_entry[-1] + 1
                 write_mask = mask[:last_entry]
+                if len(write_mask) == 0:
+                    log.debug("no entries, going to next iteration")
+                    log.debug(tcm)
+                    continue
 
         # get cumulative_length
         cumulative_length = np.array(np.where(write_mask)[0]) + 1
-        cumulative_length = np.append(cumulative_length, len(write_mask) + 1)
+        if at_end.all():
+            cumulative_length = np.append(cumulative_length, len(write_mask) + 1)
 
         out_tbl = Table(size=len(cumulative_length))
         out_tbl.add_field(
