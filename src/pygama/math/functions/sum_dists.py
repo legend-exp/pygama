@@ -23,7 +23,7 @@ from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 
 def get_dists_and_par_idxs(
-    dists_and_pars_array: np.array(tuple, tuple)
+    dists_and_pars_array: np.array(tuple, tuple),
 ) -> Tuple[np.array, np.array]:
     r"""
     Split the array of tuples passed to the :func:`SumDists` constructor into separate arrays with one containing only the
