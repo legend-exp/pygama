@@ -206,7 +206,7 @@ def build_hit(
 
 
 def _reorder_table_operations(
-    config: Mapping[str, Mapping]
+    config: Mapping[str, Mapping],
 ) -> OrderedDict[str, Mapping]:
     """Reorder operations in `config` according to mutual dependency."""
 
