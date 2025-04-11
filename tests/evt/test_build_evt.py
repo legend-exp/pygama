@@ -11,7 +11,7 @@ config_dir = Path(__file__).parent / "configs"
 
 
 @pytest.fixture(scope="module")
-def files_config_nowrite(lgnd_test_data, tmptestdir):
+def files_config_nowrite(lgnd_test_data):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
     return {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
@@ -22,9 +22,9 @@ def files_config_nowrite(lgnd_test_data, tmptestdir):
 
 
 @pytest.fixture(scope="module")
-def files_config_write(lgnd_test_data, tmptestdir):
+def files_config_write(lgnd_test_data, tmpdir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    outfile = f"{tmptestdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    outfile = f"{tmpdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
     return {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
         "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
@@ -33,7 +33,7 @@ def files_config_write(lgnd_test_data, tmptestdir):
     }
 
 
-def test_basics(lgnd_test_data, files_config_nowrite):
+def test_basics(files_config_nowrite):
     evt = build_evt(
         files_config_nowrite,
         config=f"{config_dir}/basic-evt-config.yaml",
@@ -65,20 +65,20 @@ def test_basics(lgnd_test_data, files_config_nowrite):
     eidx = eidx[eidx != 999999999999]
 
     ids = lh5.read(
-        "hardware_tcm_1/array_id", files_config_nowrite["tcm"][0]
+        "hardware_tcm_1/table_key", files_config_nowrite["tcm"][0]
     ).flattened_data.nda
     ids = ids[eidx]
     assert ak.all(ids == eid[eid != 0])
 
     ehidx = evt.energy_hit_idx.view_as("np")
     ids = lh5.read(
-        "hardware_tcm_1/array_idx", files_config_nowrite["tcm"][0]
+        "hardware_tcm_1/row_in_table", files_config_nowrite["tcm"][0]
     ).flattened_data.nda
     ids = ids[eidx]
     assert ak.all(ids == ehidx[ehidx != 999999999999])
 
 
-def test_field_nesting(lgnd_test_data, files_config_nowrite):
+def test_field_nesting(files_config_nowrite):
     config = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "outputs": [
@@ -169,7 +169,7 @@ def test_field_nesting(lgnd_test_data, files_config_nowrite):
 #     assert ak.all(ak.num(vhit, axis=-1) == ak.num(full, axis=-1))
 
 
-def test_vov(lgnd_test_data, files_config_nowrite):
+def test_vov(files_config_nowrite):
     evt = build_evt(
         files_config_nowrite,
         config=f"{config_dir}/vov-test-evt-config.json",
@@ -196,7 +196,7 @@ def test_vov(lgnd_test_data, files_config_nowrite):
         np.diff(evt.energy.cumulative_length.nda, prepend=[0]) == evt.multiplicity.nda
     ).all()
 
-    ids = lh5.read_as("hardware_tcm_1/array_id", f_tcm, library="ak")
+    ids = lh5.read_as("hardware_tcm_1/table_key", f_tcm, library="ak")
     ids = ak.unflatten(
         ak.flatten(ids)[ak.flatten(evt.energy_idx.view_as("ak"))],
         ak.count(evt.energy_idx.view_as("ak"), axis=-1),
@@ -213,7 +213,7 @@ def test_vov(lgnd_test_data, files_config_nowrite):
     assert ak.all(evt.aoe.view_as("ak") == evt.aoe_idx.view_as("ak"))
 
 
-def test_graceful_crashing(lgnd_test_data, files_config_nowrite):
+def test_graceful_crashing(files_config_nowrite):
     with pytest.raises(TypeError):
         build_evt(files_config_nowrite, None)
 
@@ -245,7 +245,7 @@ def test_graceful_crashing(lgnd_test_data, files_config_nowrite):
         )
 
 
-def test_query(lgnd_test_data, files_config_nowrite):
+def test_query(files_config_nowrite):
     evt = build_evt(
         files_config_nowrite,
         config=f"{config_dir}/query-test-evt-config.json",
@@ -254,7 +254,7 @@ def test_query(lgnd_test_data, files_config_nowrite):
     assert len(evt.keys()) == 12
 
 
-def test_vector_sort(lgnd_test_data, files_config_nowrite):
+def test_vector_sort(files_config_nowrite):
     conf = {
         "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
         "outputs": ["acend_id", "t0_acend", "decend_id", "t0_decend"],
@@ -263,7 +263,7 @@ def test_vector_sort(lgnd_test_data, files_config_nowrite):
                 "channels": "geds_on",
                 "aggregation_mode": "gather",
                 "query": "hit.cuspEmax_ctc_cal>25",
-                "expression": "tcm.array_id",
+                "expression": "tcm.table_key",
                 "sort": "ascend_by:dsp.tp_0_est",
             },
             "t0_acend": {
@@ -274,7 +274,7 @@ def test_vector_sort(lgnd_test_data, files_config_nowrite):
                 "channels": "geds_on",
                 "aggregation_mode": "gather",
                 "query": "hit.cuspEmax_ctc_cal>25",
-                "expression": "tcm.array_id",
+                "expression": "tcm.table_key",
                 "sort": "descend_by:dsp.tp_0_est",
             },
             "t0_decend": {
@@ -298,7 +298,7 @@ def test_vector_sort(lgnd_test_data, files_config_nowrite):
     assert ((np.diff(nda_t0) <= 0) | (np.isnan(np.diff(nda_t0)))).all()
 
 
-def test_build_evt_write(lgnd_test_data, files_config_write):
+def test_build_evt_write(files_config_write):
     build_evt(
         files_config_write,
         config=f"{config_dir}/basic-evt-config.yaml",
