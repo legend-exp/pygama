@@ -1,8 +1,5 @@
 import os
-import uuid
-from getpass import getuser
 from pathlib import Path
-from tempfile import gettempdir
 
 import pytest
 from daq2lh5 import build_raw
@@ -10,7 +7,6 @@ from dspeed import build_dsp
 from legendtestdata import LegendTestData
 
 config_dir = Path(__file__).parent / "configs"
-_tmpdir = os.path.join(gettempdir(), f"pygama-tests-{getuser()}-{str(uuid.uuid4())}")
 
 
 @pytest.fixture(scope="session")
@@ -21,8 +17,8 @@ def lgnd_test_data():
 
 
 @pytest.fixture(scope="session")
-def dsp_test_file(lgnd_test_data, tmpdir):
-    out_name = f"{tmpdir}/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5"
+def dsp_test_file(lgnd_test_data, tmpdir_factory):
+    out_name = f"{tmpdir_factory}/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5"
     build_dsp(
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
         out_name,
@@ -36,8 +32,8 @@ def dsp_test_file(lgnd_test_data, tmpdir):
 
 
 @pytest.fixture(scope="session")
-def multich_raw_file(lgnd_test_data, tmpdir):
-    out_file = f"{tmpdir}/L200-comm-20211130-phy-spms.lh5"
+def multich_raw_file(lgnd_test_data, tmpdir_factory):
+    out_file = f"{tmpdir_factory}/L200-comm-20211130-phy-spms.lh5"
     out_spec = {
         "FCEventDecoder": {
             "ch{key}": {
@@ -59,14 +55,14 @@ def multich_raw_file(lgnd_test_data, tmpdir):
 
 
 @pytest.fixture(scope="session")
-def dsp_test_file_spm(multich_raw_file, tmpdir):
+def dsp_test_file_spm(multich_raw_file, tmpdir_factory):
     chan_config = {
         "ch0/raw": f"{config_dir}/sipm-dsp-config.json",
         "ch1/raw": f"{config_dir}/sipm-dsp-config.json",
         "ch2/raw": f"{config_dir}/sipm-dsp-config.json",
     }
 
-    out_file = f"{tmpdir}/L200-comm-20211130-phy-spms_dsp.lh5"
+    out_file = f"{tmpdir_factory}/L200-comm-20211130-phy-spms_dsp.lh5"
     build_dsp(
         multich_raw_file,
         out_file,

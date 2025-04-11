@@ -10,7 +10,7 @@ from pygama.flow import FileDB
 config_dir = Path(__file__).parent / "configs"
 
 
-def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir):
+def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir_factory):
     with open(config_dir / "filedb-config.json") as f:
         config = json.load(f)
 
@@ -19,12 +19,12 @@ def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir):
     fdb1 = FileDB(config, scan=False)
     fdb1.scan_files("cal/p03/r001")
     fdb1.scan_tables_columns()
-    fdb1.to_disk(f"{tmpdir}/fdb1.h5")
+    fdb1.to_disk(f"{tmpdir_factory}/fdb1.h5")
 
     fdb2 = FileDB(config, scan=False)
     fdb2.scan_files("phy/p03/r001")
     fdb2.scan_tables_columns()
-    fdb2.to_disk(f"{tmpdir}/fdb2.h5")
+    fdb2.to_disk(f"{tmpdir_factory}/fdb2.h5")
 
     # columns from cal and phy data should be different
     assert fdb1.columns
@@ -33,8 +33,8 @@ def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir):
 
     # test invariance to merge direction
     for fdb in [
-        FileDB([f"{tmpdir}/fdb1.h5", f"{tmpdir}/fdb2.h5"]),
-        FileDB([f"{tmpdir}/fdb2.h5", f"{tmpdir}/fdb1.h5"]),
+        FileDB([f"{tmpdir_factory}/fdb1.h5", f"{tmpdir_factory}/fdb2.h5"]),
+        FileDB([f"{tmpdir_factory}/fdb2.h5", f"{tmpdir_factory}/fdb1.h5"]),
     ]:
         # check that merging columns works
         merged_columns = []
@@ -343,14 +343,14 @@ def test_scan_tables_columns(test_filedb_full):
     ]
 
 
-def test_serialization(test_filedb_full, tmpdir):
+def test_serialization(test_filedb_full, tmpdir_factory):
     db = test_filedb_full
-    db.to_disk(f"{tmpdir}/filedb.lh5", wo_mode="of")
+    db.to_disk(f"{tmpdir_factory}/filedb.lh5", wo_mode="of")
 
     with pytest.raises(LH5EncodeError):
-        db.to_disk(f"{tmpdir}/filedb.lh5")
+        db.to_disk(f"{tmpdir_factory}/filedb.lh5")
 
-    db2 = FileDB(f"{tmpdir}/filedb.lh5")
+    db2 = FileDB(f"{tmpdir_factory}/filedb.lh5")
     assert_frame_equal(db.df, db2.df)
 
 

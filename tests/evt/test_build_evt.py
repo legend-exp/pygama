@@ -22,9 +22,9 @@ def files_config_nowrite(lgnd_test_data):
 
 
 @pytest.fixture(scope="module")
-def files_config_write(lgnd_test_data, tmpdir):
+def files_config_write(lgnd_test_data, tmpdir_factory):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    outfile = f"{tmpdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    outfile = f"{tmpdir_factory}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
     return {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
         "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
