@@ -100,7 +100,7 @@ def build_tcm(
         out_fields = [out_fields]
 
     iterators = []
-    array_ids = []
+    table_keys = []
     all_tables = []
 
     if buffer_len is None:
@@ -125,22 +125,22 @@ def build_tcm(
             tables = lh5.ls(filename, lh5_group=pattern)
             for table in tables:
                 all_tables.append(table)
-                array_id = len(array_ids)
+                table_key = len(table_keys)
                 if hash_func is not None:
                     if isinstance(hash_func, str):
-                        array_id = int(re.search(hash_func, table).group())
+                        table_key = int(re.search(hash_func, table).group())
                     else:
                         raise NotImplementedError(
                             f"hash_func of type {type(hash_func).__name__}"
                         )
                 else:
-                    array_id = len(all_tables) - 1
+                    table_key = len(all_tables) - 1
                 iterators.append(
                     lh5.LH5Iterator(
                         filename, table, field_mask=coin_cols, buffer_len=buffer_len
                     )
                 )
-                array_ids.append(array_id)
+                table_keys.append(table_key)
 
     coin_windows = [
         ptcm.coin_groups(n, w, r)
@@ -148,7 +148,7 @@ def build_tcm(
     ]
 
     tcm_gen = ptcm.generate_tcm_cols(
-        iterators, coin_windows=coin_windows, array_ids=array_ids, fields=out_fields
+        iterators, coin_windows=coin_windows, table_keys=table_keys, fields=out_fields
     )
     tcm = []
     # clear existing output files
@@ -167,7 +167,6 @@ def build_tcm(
                 )
             else:
                 tcm.append(out_tbl)
-                log.debug(out_tbl)
         except StopIteration:
             break
     if out_file is None:

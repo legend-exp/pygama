@@ -64,8 +64,8 @@ def evaluate_to_first_or_last(
         table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
-        idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
+        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
         # evaluate at channel
         if ch not in channels_skip:
@@ -106,8 +106,8 @@ def evaluate_to_first_or_last(
             ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
 
             evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.array_id)),
-                ak.sum(tcm.array_id == table_id, axis=1),
+                np.arange(0, len(tcm.table_key)),
+                ak.sum(tcm.table_key == table_id, axis=1),
             )
 
             if is_first:
@@ -173,8 +173,8 @@ def evaluate_to_scalar(
         table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
-        idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
+        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(
@@ -200,8 +200,8 @@ def evaluate_to_scalar(
             )
 
             evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.array_id)),
-                ak.sum(tcm.array_id == table_id, axis=1),
+                np.arange(0, len(tcm.table_key)),
+                ak.sum(tcm.table_key == table_id, axis=1),
             )
 
             # switch through modes
@@ -270,11 +270,11 @@ def evaluate_at_channel(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
-        idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
+        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
         evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
         )
 
         if (table_name in channels) and (table_name not in channels_skip):
@@ -346,7 +346,7 @@ def evaluate_at_channel_vov(
     for table_id in ch_comp_channels:
         table_name = utils.get_table_name_by_pattern(f.hit.table_fmt, table_id)
         evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
         )
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
@@ -434,11 +434,11 @@ def evaluate_to_aoesa(
         table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.array_id) == table_id
-        idx_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
+        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
         evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.array_id)), ak.sum(tcm.array_id == table_id, axis=1)
+            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
         )
 
         if ch not in channels_skip:

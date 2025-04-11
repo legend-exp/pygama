@@ -85,7 +85,7 @@ def build_evt(
                   "channels": "geds_on",
                   "aggregation_mode": "gather",
                   "query": "hit.cuspEmax_ctc_cal > 25",
-                  "expression": "tcm.array_id",
+                  "expression": "tcm.table_key",
                   "sort": "ascend_by:dsp.tp_0_est"
                 },
                 "energy":{
@@ -211,12 +211,12 @@ def build_evt_cols(
         file_config.tcm.file,
         file_config.tcm.group,
         buffer_len=buffer_len,
-        field_mask=["array_id", "array_idx"],
+        field_mask=["table_key", "row_in_table"],
     ):
         # load tcm data from disk
         tcm = utils.TCMData(
-            array_id=tcm_lh5.array_id.view_as("ak"),
-            array_idx=tcm_lh5.array_idx.view_as("ak"),
+            table_key=tcm_lh5.table_key.view_as("ak"),
+            row_in_table=tcm_lh5.row_in_table.view_as("ak"),
         )
 
         # get number of events in file (ask the TCM)
@@ -465,7 +465,7 @@ def evaluate_expression(
 
         # get module and function names
         func_call = expr.strip().split("(")[0]
-        subpackage, func = func_call.rsplit(".", 1)
+        subpackage, _ = func_call.rsplit(".", 1)
         package = subpackage.split(".")[0]
 
         # import function into current namespace
@@ -517,13 +517,13 @@ def evaluate_expression(
                 ch_comp = table[mode[12:].replace("evt.", "")]
                 if isinstance(ch_comp, Array):
                     ch_comp = Array(
-                        ak.flatten(tcm.array_id)[ch_comp.view_as("np")].to_numpy()
+                        ak.flatten(tcm.table_key)[ch_comp.view_as("np")].to_numpy()
                     )
                 elif isinstance(ch_comp, VectorOfVectors):
                     ch_comp = ch_comp.view_as("ak")
                     ch_comp = VectorOfVectors(
                         ak.unflatten(
-                            ak.flatten(tcm.array_id)[ak.flatten(ch_comp)].to_numpy(),
+                            ak.flatten(tcm.table_key)[ak.flatten(ch_comp)].to_numpy(),
                             ak.count(ch_comp, axis=-1),
                         )
                     )

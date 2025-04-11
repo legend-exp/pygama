@@ -985,7 +985,7 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
             mask = np.append(mask, file_mask)
         ids = np.where(mask)[0]
     else:
-        array_ids = lh5.read("hardware_tcm_1/array_id", tcm_file).view_as("ak")
+        array_ids = lh5.read("hardware_tcm_1/table_key", tcm_file).view_as("ak")
         chan_evts = ak.any(array_ids == chan, axis=-1)
         multiplicity = ak.count(array_ids[chan_evts], axis=-1)
         ids = np.where(multiplicity > multiplicity_threshold)[0]
