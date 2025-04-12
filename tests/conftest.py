@@ -12,13 +12,20 @@ config_dir = Path(__file__).parent / "configs"
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("5c0d3b4")
+    ldata.checkout("9951c46")
     return ldata
 
 
 @pytest.fixture(scope="session")
-def dsp_test_file(lgnd_test_data, tmpdir_factory):
-    out_name = f"{tmpdir_factory}/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5"
+def tmp_dir(tmpdir_factory):
+    out_dir = tmpdir_factory.mktemp("data")
+    assert os.path.exists(out_dir)
+    return out_dir
+
+
+@pytest.fixture(scope="session")
+def dsp_test_file(lgnd_test_data, tmp_dir):
+    out_name = f"{tmp_dir}/LDQTA_r117_20200110T105115Z_cal_geds_dsp.lh5"
     build_dsp(
         lgnd_test_data.get_path("lh5/LDQTA_r117_20200110T105115Z_cal_geds_raw.lh5"),
         out_name,
@@ -32,8 +39,8 @@ def dsp_test_file(lgnd_test_data, tmpdir_factory):
 
 
 @pytest.fixture(scope="session")
-def multich_raw_file(lgnd_test_data, tmpdir_factory):
-    out_file = f"{tmpdir_factory}/L200-comm-20211130-phy-spms.lh5"
+def multich_raw_file(lgnd_test_data, tmp_dir):
+    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms.lh5"
     out_spec = {
         "FCEventDecoder": {
             "ch{key}": {
@@ -55,14 +62,14 @@ def multich_raw_file(lgnd_test_data, tmpdir_factory):
 
 
 @pytest.fixture(scope="session")
-def dsp_test_file_spm(multich_raw_file, tmpdir_factory):
+def dsp_test_file_spm(multich_raw_file, tmp_dir):
     chan_config = {
         "ch0/raw": f"{config_dir}/sipm-dsp-config.json",
         "ch1/raw": f"{config_dir}/sipm-dsp-config.json",
         "ch2/raw": f"{config_dir}/sipm-dsp-config.json",
     }
 
-    out_file = f"{tmpdir_factory}/L200-comm-20211130-phy-spms_dsp.lh5"
+    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms_dsp.lh5"
     build_dsp(
         multich_raw_file,
         out_file,

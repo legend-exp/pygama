@@ -108,7 +108,7 @@ def generate_tcm_cols(
                 at_end[ii] = True
             table_key = table_keys[ii]
             table_key = np.full(buf_len, table_key, dtype=int)
-            buffer = buffer.view_as("pd")
+            buffer = buffer.view_as("pd")[:buf_len]
             buffer["table_key"] = table_key
             if row_in_tables is not None:
                 buffer["row_in_table"] = row_in_tables.astype(int)[ii][
@@ -124,11 +124,11 @@ def generate_tcm_cols(
 
         if tcm is None:
             tcm = pd.concat(dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["array_id"]
+                [entry.name for entry in coin_windows] + ["table_key"]
             )
         else:
             tcm = pd.concat([tcm] + dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["array_id"]
+                [entry.name for entry in coin_windows] + ["table_key"]
             )
 
         # define mask, true when new event, false if part of same event
@@ -143,7 +143,7 @@ def generate_tcm_cols(
         # grab up to evt including last instance of a channel to know that all channels
         # have been included in previous evts
         last_instance = {
-            arr_id: index for index, arr_id in enumerate(tcm.array_id.to_numpy())
+            arr_id: index for index, arr_id in enumerate(tcm.table_key.to_numpy())
         }
         log.debug(f"last instance: {last_instance}")
 

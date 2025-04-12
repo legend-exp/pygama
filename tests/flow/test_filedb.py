@@ -10,7 +10,7 @@ from pygama.flow import FileDB
 config_dir = Path(__file__).parent / "configs"
 
 
-def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir_factory):
+def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmp_dir):
     with open(config_dir / "filedb-config.json") as f:
         config = json.load(f)
 
@@ -19,12 +19,12 @@ def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir_factory):
     fdb1 = FileDB(config, scan=False)
     fdb1.scan_files("cal/p03/r001")
     fdb1.scan_tables_columns()
-    fdb1.to_disk(f"{tmpdir_factory}/fdb1.h5")
+    fdb1.to_disk(f"{tmp_dir}/fdb1.h5")
 
     fdb2 = FileDB(config, scan=False)
     fdb2.scan_files("phy/p03/r001")
     fdb2.scan_tables_columns()
-    fdb2.to_disk(f"{tmpdir_factory}/fdb2.h5")
+    fdb2.to_disk(f"{tmp_dir}/fdb2.h5")
 
     # columns from cal and phy data should be different
     assert fdb1.columns
@@ -33,8 +33,8 @@ def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmpdir_factory):
 
     # test invariance to merge direction
     for fdb in [
-        FileDB([f"{tmpdir_factory}/fdb1.h5", f"{tmpdir_factory}/fdb2.h5"]),
-        FileDB([f"{tmpdir_factory}/fdb2.h5", f"{tmpdir_factory}/fdb1.h5"]),
+        FileDB([f"{tmp_dir}/fdb1.h5", f"{tmp_dir}/fdb2.h5"]),
+        FileDB([f"{tmp_dir}/fdb2.h5", f"{tmp_dir}/fdb1.h5"]),
     ]:
         # check that merging columns works
         merged_columns = []
@@ -175,7 +175,7 @@ def test_filedb_basics(test_filedb):
 def test_scan_tables_columns(test_filedb_full):
     db = test_filedb_full
 
-    assert list(db.df.keys()) == [
+    assert set(db.df.keys()) == {
         "exp",
         "period",
         "run",
@@ -202,7 +202,7 @@ def test_scan_tables_columns(test_filedb_full):
         "tcm_col_idx",
         "evt_tables",
         "evt_col_idx",
-    ]
+    }
 
     assert db.columns == [
         [
@@ -339,18 +339,18 @@ def test_scan_tables_columns(test_filedb_full):
             "trigger_pos",
             "trigger_pos_dplms",
         ],
-        ["array_id", "array_idx"],
+        ["row_in_table", "table_key"],
     ]
 
 
-def test_serialization(test_filedb_full, tmpdir_factory):
+def test_serialization(test_filedb_full, tmp_dir):
     db = test_filedb_full
-    db.to_disk(f"{tmpdir_factory}/filedb.lh5", wo_mode="of")
+    db.to_disk(f"{tmp_dir}/filedb.lh5", wo_mode="of")
 
     with pytest.raises(LH5EncodeError):
-        db.to_disk(f"{tmpdir_factory}/filedb.lh5")
+        db.to_disk(f"{tmp_dir}/filedb.lh5")
 
-    db2 = FileDB(f"{tmpdir_factory}/filedb.lh5")
+    db2 = FileDB(f"{tmp_dir}/filedb.lh5")
     assert_frame_equal(db.df, db2.df)
 
 

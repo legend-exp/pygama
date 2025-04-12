@@ -50,8 +50,8 @@ class DataLoader:
                     "child": "evt",
                     "tcm_cols": {
                         "child_idx": "coin_idx",
-                        "parent_tb": "array_id",
-                        "parent_idx": "array_idx"
+                        "parent_tb": "table_key",
+                        "parent_idx": "row_in_table"
                     }
                 },
                 "evt": {

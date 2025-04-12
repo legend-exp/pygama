@@ -50,7 +50,7 @@
       "channels": "geds_on",
       "aggregation_mode": "gather",
       "query": "hit.cuspEmax_ctc_cal>25",
-      "expression": "tcm.array_id",
+      "expression": "tcm.table_key",
       "sort": "ascend_by:dsp.tp_0_est",
       "initial": 0
     },

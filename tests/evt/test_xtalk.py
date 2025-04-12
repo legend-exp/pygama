@@ -11,9 +11,9 @@ config_dir = Path(__file__).parent / "configs"
 
 
 @pytest.fixture(scope="module")
-def files_config(lgnd_test_data, tmpdir):
+def files_config(lgnd_test_data, tmp_dir):
     tcm_path = "lh5/prod-ref-l200/generated/tier/tcm/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_tcm.lh5"
-    outfile = f"{tmpdir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
+    outfile = f"{tmp_dir}/l200-p03-r001-phy-20230322T160139Z-tier_evt.lh5"
 
     return {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),

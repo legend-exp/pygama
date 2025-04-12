@@ -80,18 +80,18 @@ def gather_pulse_data(
     concatme = []
     # number of channels per event
     evt_length = np.diff(
-        np.insert(types.VectorOfVectors(tcm.array_id).cumulative_length, 0, 0)
+        np.insert(types.VectorOfVectors(tcm.table_key).cumulative_length, 0, 0)
     )
 
     # construct global event ID's
-    glob_ids = np.repeat(np.arange(0, len(tcm.array_id), 1), evt_length)
+    glob_ids = np.repeat(np.arange(0, len(tcm.table_key), 1), evt_length)
 
     for channel in table_names:
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
 
         # determine list of indices found in the TCM that we want to load for channel
-        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[0].to_numpy()
-        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
         # read the data in
         lgdo_obj = lh5.read(
@@ -107,7 +107,7 @@ def gather_pulse_data(
         ]  # global ID's where channel had a trigger
 
         # count number of hits per channel for global events with trigger in channel, else 0
-        glob_ids_cts = np.zeros(len(tcm.array_id), dtype=int)
+        glob_ids_cts = np.zeros(len(tcm.table_key), dtype=int)
         glob_ids_cts[glob_ids_ch] = ak.count(data, axis=1)
 
         # insert empty row [] for global events with no trigger in channel
@@ -183,7 +183,7 @@ def gather_tcm_data(
         utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) for id in table_names
     ]
     # find them in tcm.id (we'll filter the rest out)
-    tcm_id_padded = types.VectorOfVectors(tcm.array_id).to_aoesa().view_as("np")
+    tcm_id_padded = types.VectorOfVectors(tcm.table_key).to_aoesa().view_as("np")
     locs = np.isin(tcm_id_padded, table_ids)
 
     # select tcm field requested by the user

@@ -31,7 +31,7 @@ def build_tcm_index_array(
     """
 
     # initialise the output object
-    tcm_indexs_out = np.full((len(tcm.array_id), len(rawids)), np.nan)
+    tcm_indexs_out = np.full((len(tcm.table_key), len(rawids)), np.nan)
 
     # parse observables string. default to hit tier
     for idx_chan, channel in enumerate(rawids):
@@ -40,8 +40,8 @@ def build_tcm_index_array(
         table_id = utils.get_tcm_id_by_pattern(
             datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
         )
-        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[0].to_numpy()
-        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
         tcm_indexs_out[tbl_idxs_ch, idx_chan] = chan_tcm_indexs
 
     # transpose to return object where row is events and column rawid idx
@@ -85,12 +85,12 @@ def gather_energy(
                 tier_params.append((name, file, group, column))
 
     # initialise the output object
-    energy_out = np.full((len(tcm.array_id), len(rawids)), np.nan)
+    energy_out = np.full((len(tcm.table_key), len(rawids)), np.nan)
 
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
-        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
-        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == channel)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
         evt_ids_ch = np.repeat(
             np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == channel, axis=1)
         )
@@ -155,8 +155,8 @@ def filter_hits(
     for idx_chan, channel in enumerate(rawids):
         tbl = types.Table()
 
-        chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == channel)[0].to_numpy()
-        tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
+        chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == channel)[0].to_numpy()
+        tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
         evt_ids_ch = np.repeat(
             np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == channel, axis=1)
         )
@@ -326,11 +326,11 @@ def calibrate_energy(
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
 
-            chan_tcm_indexs = np.where(ak.flatten(tcm.array_id) == table_id)[
+            chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[
                 0
             ].to_numpy()
-            tbl_idxs_ch = ak.flatten(tcm.array_idx)[chan_tcm_indexs].to_numpy()
-            evt_ids_ch = ak.any(tcm.array_id == table_id, axis=1)
+            tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
+            evt_ids_ch = ak.any(tcm.table_key == table_id, axis=1)
 
             # read the dsp data
             outtbl_obj = lh5.read(

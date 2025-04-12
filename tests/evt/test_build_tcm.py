@@ -212,11 +212,11 @@ def test_generate_tcm_cols(lgnd_test_data):
     )
 
 
-def test_build_tcm_write(lgnd_test_data, tmpdir_factory):
+def test_build_tcm_write(lgnd_test_data, tmp_dir):
     f_raw = lgnd_test_data.get_path(
         "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
     )
-    out_file = f"{tmpdir_factory}/pygama-test-tcm.lh5"
+    out_file = f"{tmp_dir}/pygama-test-tcm.lh5"
     evt.build_tcm(
         [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
         "timestamp",
