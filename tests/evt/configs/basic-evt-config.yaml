@@ -41,7 +41,7 @@ operations:
     channels: geds_on
     aggregation_mode: first_at:dsp.tp_0_est
     query: hit.cuspEmax_ctc_cal>25
-    expression: tcm.array_id
+    expression: tcm.table_key
     initial: 0
   energy_idx:
     channels: geds_on
@@ -53,7 +53,7 @@ operations:
     channels: geds_on
     aggregation_mode: first_at:dsp.tp_0_est
     query: hit.cuspEmax_ctc_cal>25
-    expression: tcm.array_idx
+    expression: tcm.row_in_table
     initial: 999999999999
   energy_any_above1MeV:
     channels: geds_on

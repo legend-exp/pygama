@@ -515,16 +515,21 @@ class BayesianOptimizer:
                 np.linalg.norm(np.array(self.prev_x) - np.array(self.current_x))
             )
             self.prev_x = self.current_x
-
-        self.best_samples_ = pd.concat(
-            [
-                self.best_samples_,
-                pd.DataFrame(
-                    {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
-                ),
-            ],
-            ignore_index=True,
+        new_entry = pd.DataFrame(
+            {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
         )
+        if (
+            not new_entry.empty
+            and new_entry.notnull().any().any()
+            and len(new_entry) >= 1
+        ):
+            self.best_samples_ = pd.concat(
+                [
+                    self.best_samples_,
+                    new_entry,
+                ],
+                ignore_index=True,
+            )
 
     def get_best_vals(self):
         out_dict = {}

@@ -85,7 +85,7 @@ class FileDB:
                 "raw": ["baseline", "waveform", "daqenergy"],
                 "dsp": ["trapEftp", "AoE", "trapEmax"],
                 "hit": ["trapEftp_cal", "trapEmax_cal"],
-                "tcm": ["cumulative_length", "array_id", "array_idx"],
+                "tcm": ["table_key", "row_in_table"],
                 "evt": ["lar_veto", "muon_veto", "ge_mult"]
             }
         }
@@ -100,7 +100,7 @@ class FileDB:
     >>> db.scan_tables_columns()  # read in also table columns names
     >>> print(db)
     << Columns >>
-    [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['array_id', 'array_idx', 'cumulative_length']]
+    [['baseline', 'card', 'ch_orca', 'channel', 'crate', 'daqenergy', 'deadtime', 'dr_maxticks', 'dr_start_pps', 'dr_start_ticks', 'dr_stop_pps', 'dr_stop_ticks', 'eventnumber', 'fcid', 'numtraces', 'packet_id', 'runtime', 'timestamp', 'to_abs_mu_usec', 'to_dt_mu_usec', 'to_master_sec', 'to_mu_sec', 'to_mu_usec', 'to_start_sec', 'to_start_usec', 'tracelist', 'ts_maxticks', 'ts_pps', 'ts_ticks', 'waveform'], ['bl_intercept', 'bl_mean', 'bl_slope', 'bl_std', 'tail_slope', 'tail_std', 'wf_blsub'], ['table_key', 'row_in_table', 'cumulative_length']]
     << DataFrame >>
        exp period   run         timestamp type  ... hit_col_idx tcm_tables tcm_col_idx evt_tables evt_col_idx
     0  l60    p01  r014  20220716T105236Z  cal  ...        None         []         [2]       None        None
