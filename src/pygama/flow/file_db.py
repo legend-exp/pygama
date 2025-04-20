@@ -10,10 +10,10 @@ import string
 import warnings
 
 import h5py
+import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
 from lgdo.lh5 import ls
-from lgdo.lh5.store import LH5Store
 from lgdo.lh5.utils import expand_path, expand_vars
 from lgdo.types import Array, Scalar, VectorOfVectors
 from parse import parse
@@ -480,8 +480,7 @@ class FileDB:
             columns_vov = VectorOfVectors(
                 flattened_data=flattened, cumulative_length=length
             )
-            sto = LH5Store()
-            sto.write(columns_vov, "unique_columns", to_file)
+            lh5.write(columns_vov, "unique_columns", to_file)
 
         return self.columns
 
@@ -509,7 +508,6 @@ class FileDB:
         if not paths:
             raise FileNotFoundError(path)
 
-        sto = LH5Store()
         # objects/accumulators that will be used to configure the FileDB at the end
         _cfg = None
         _df = None
@@ -531,7 +529,7 @@ class FileDB:
 
         # loop over the files
         for p in paths:
-            cfg, _ = sto.read("config", p)
+            cfg = lh5.read("config", p)
             cfg = json.loads(cfg.value.decode())
 
             # make sure configurations are all the same
@@ -543,7 +541,7 @@ class FileDB:
                 )
 
             # read in unique columns
-            vov, _ = sto.read("columns", p)
+            vov = lh5.read("columns", p)
             # Convert back from VoV of UTF-8 bytestrings to a list of lists of strings
             columns = [[v.decode("utf-8") for v in ov] for ov in list(vov)]
 
@@ -606,8 +604,7 @@ class FileDB:
         """
         log.debug(f"writing database to {filename}")
 
-        sto = LH5Store()
-        sto.write(Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode)
+        lh5.write(Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode)
 
         if wo_mode in ["write_safe", "w", "overwrite_file", "of"]:
             wo_mode = "a"
@@ -624,7 +621,7 @@ class FileDB:
                 flattened_data=Array(nda=np.array(flat).astype("S")),
                 cumulative_length=Array(nda=np.array(cum_l)),
             )
-            sto.write(col_vov, "columns", filename, wo_mode=wo_mode)
+            lh5.write(col_vov, "columns", filename, wo_mode=wo_mode)
 
         # FIXME: to_hdf() throws this:
         #

@@ -100,7 +100,9 @@ def generate_tcm_cols(
         for _ii, it in enumerate(iterators[curr_mask]):
             ii = np.where(curr_mask)[0][_ii]
             try:
-                buffer, start, buf_len = it.__next__()
+                buffer = it.__next__()
+                buf_len = len(buffer)
+                start = it.current_i_entry
             except StopIteration:
                 at_end[ii] = True
                 continue
