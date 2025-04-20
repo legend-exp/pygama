@@ -16,6 +16,7 @@ def apply_recovery_cut(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     timestamps: types.Array,
     flag: types.Array,
@@ -42,6 +43,7 @@ def apply_xtalk_correction(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     return_mode: str,
     uncal_energy_expr: str,
@@ -121,6 +123,7 @@ def apply_xtalk_correction_and_calibrate(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     return_mode: str,
     uncal_energy_expr: str,
@@ -197,6 +200,7 @@ def apply_xtalk_correction_and_calibrate(
         cal_par_files,
         uncal_var,
         recal_var,
+        channel_mapping,
     )
 
     multiplicity_mask = xtalk.filter_hits(
