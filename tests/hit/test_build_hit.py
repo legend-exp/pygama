@@ -43,8 +43,7 @@ def test_basics(dsp_test_file, tmp_dir):
     assert os.path.exists(outfile)
     assert lh5.ls(outfile, "/geds/") == ["geds/hit"]
 
-    store = lh5.LH5Store()
-    tbl, _ = store.read("geds/hit", outfile)
+    tbl = lh5.read("geds/hit", outfile)
     assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
 
 
@@ -116,8 +115,7 @@ def test_outputs_specification(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    store = lh5.LH5Store()
-    obj, _ = store.read("/geds/hit", outfile)
+    obj = lh5.read("/geds/hit", outfile)
     assert sorted(obj.keys()) == ["A_max", "AoE", "calE"]
 
 
@@ -131,8 +129,7 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    sto = lh5.LH5Store()
-    obj, _ = sto.read("/geds/hit", outfile)
+    obj = lh5.read("/geds/hit", outfile)
     assert list(obj.keys()) == [
         "is_valid_rt",
         "is_valid_t0",
@@ -141,7 +138,7 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
         "aggr2",
     ]
 
-    df = sto.read("geds/hit", outfile)[0].view_as("pd")
+    df = lh5.read_as("geds/hit", outfile, "pd")
 
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
     assert not (df["aggr1"] > 7).any()
@@ -221,10 +218,9 @@ def test_build_hit_spms_calc(dsp_test_file_spm, tmp_dir):
     assert lh5.ls(out_file, "ch0/") == ["ch0/hit"]
     assert lh5.ls(out_file, "ch0/hit/") == ["ch0/hit/energy_in_pe"]
 
-    store = lh5.LH5Store()
-    df0 = store.read("ch0/hit/energy_in_pe", out_file)[0].view_as("np")
-    df1 = store.read("ch1/hit/energy_in_pe", out_file)[0].view_as("np")
-    df2 = store.read("ch2/hit/energy_in_pe", out_file)[0].view_as("np")
+    df0 = lh5.read_as("ch0/hit/energy_in_pe", out_file, "np")
+    df1 = lh5.read_as("ch1/hit/energy_in_pe", out_file, "np")
+    df2 = lh5.read_as("ch2/hit/energy_in_pe", out_file, "np")
 
     assert len(df0) == 5
     assert len(df1) == 5

@@ -11,11 +11,12 @@ from itertools import product
 from keyword import iskeyword
 from typing import Iterator
 
+import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
 from awkward_pandas import AwkwardDtype
 from dspeed.vis import WaveformBrowser
-from lgdo.lh5 import LH5Iterator, LH5Store
+from lgdo.lh5 import LH5Iterator
 from lgdo.lh5.utils import expand_vars
 from lgdo.types import Array, Struct, Table
 from lgdo.types.vovutils import build_cl, explode_arrays
@@ -537,8 +538,6 @@ class DataLoader:
         if save_output_columns:
             entry_cols += for_output
 
-        sto = LH5Store()
-
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar = tqdm(
                 desc="Building entry list",
@@ -585,7 +584,7 @@ class DataLoader:
 
             tcm_table_name = self.filedb.get_table_name(tcm_tier, tcm_tb)
             try:
-                tcm_lgdo, _ = sto.read(tcm_table_name, tcm_path)
+                tcm_lgdo = lh5.read(tcm_table_name, tcm_path)
             except KeyError:
                 log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
                 continue
@@ -651,7 +650,7 @@ class DataLoader:
                             if tb in col_tiers[file]["tables"][tier]:
                                 table_name = self.filedb.get_table_name(tier, tb)
                                 try:
-                                    tier_table, _ = sto.read(
+                                    tier_table = lh5.read(
                                         table_name,
                                         tier_path,
                                         field_mask=cut_cols[level],
@@ -710,9 +709,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write(f_struct, "entries", output_file, wo_mode="a")
+                    lh5.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
+                    lh5.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -782,8 +781,6 @@ class DataLoader:
         log.debug(f"need to load {cut_cols} columns for applying cuts")
         col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
 
-        sto = LH5Store()
-
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar = tqdm(
                 desc="Building entry list",
@@ -832,7 +829,7 @@ class DataLoader:
                     # now read how many rows are there in the file
                     table_name = self.filedb.get_table_name(tier, tb)
                     try:
-                        n_rows = sto.read_n_rows(table_name, tier_path)
+                        n_rows = lh5.read_n_rows(table_name, tier_path)
                     except KeyError:
                         log.warning(f"Cannot find {table_name} in file {tier_path}")
                         continue
@@ -862,7 +859,7 @@ class DataLoader:
                             # load the data from the tier file, just the columns needed for the cut
                             table_name = self.filedb.get_table_name(tier, tb)
                             try:
-                                tier_tb, _ = sto.read(
+                                tier_tb = lh5.read(
                                     table_name, tier_path, field_mask=cut_cols
                                 )
                             except KeyError:
@@ -902,9 +899,9 @@ class DataLoader:
                 f_dict = f_entries.to_dict("list")
                 f_struct = Struct(f_dict)
                 if self.merge_files:
-                    sto.write(f_struct, "entries", output_file, wo_mode="a")
+                    lh5.write(f_struct, "entries", output_file, wo_mode="a")
                 else:
-                    sto.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
+                    lh5.write(f_struct, f"entries/{file}", output_file, wo_mode="a")
 
         if log.getEffectiveLevel() >= logging.INFO:
             progress_bar.close()
@@ -1063,8 +1060,6 @@ class DataLoader:
             tier_table.update(zip(tier_table.keys(), exp_cols))
             return tier_table
 
-        sto = LH5Store()
-
         if self.merge_files:
             tables = entry_list[f"{parent}_table"].unique()
             field_mask = []
@@ -1115,7 +1110,7 @@ class DataLoader:
                         for file in files
                     ]
 
-                    tier_table, _ = sto.read(
+                    tier_table = lh5.read(
                         name=tb_name,
                         lh5_file=tier_paths,
                         idx=idx_mask,
@@ -1141,7 +1136,7 @@ class DataLoader:
             f_table = utils.dict_to_table(col_dict=col_dict, attr_dict=attr_dict)
 
             if output_file:
-                sto.write(f_table, "merged_data", output_file, wo_mode="o")
+                lh5.write(f_table, "merged_data", output_file, wo_mode="o")
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return f_table
@@ -1218,7 +1213,7 @@ class DataLoader:
                             raise FileNotFoundError(tier_path)
 
                         table_name = self.filedb.get_table_name(tier, tb)
-                        tier_table, _ = sto.read(
+                        tier_table = lh5.read(
                             table_name,
                             tier_path,
                             idx=idx_mask,
@@ -1244,7 +1239,7 @@ class DataLoader:
                 if in_memory:
                     load_out.add_field(name=file, obj=f_table)
                 if output_file:
-                    sto.write(f_table, f"{file}", output_file, wo_mode="o")
+                    lh5.write(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
 
             if log.getEffectiveLevel() >= logging.INFO:
@@ -1277,8 +1272,6 @@ class DataLoader:
         parent = self.tcms[tcm_level]["parent"]
         child = self.tcms[tcm_level]["child"]
         load_levels = [parent, child]
-
-        sto = LH5Store()
 
         if self.merge_files:  # Try to load all information at once
             raise NotImplementedError
@@ -1316,7 +1309,7 @@ class DataLoader:
                                 )
                                 if os.path.exists(tier_path):
                                     table_name = self.filedb.get_table_name(tier, tb)
-                                    tier_table, _ = sto.read(
+                                    tier_table = lh5.read(
                                         table_name,
                                         tier_path,
                                         idx=idx_mask,
@@ -1330,7 +1323,7 @@ class DataLoader:
                 if in_memory:
                     load_out[file] = f_table
                 if output_file:
-                    sto.write(f_table, f"file{file}", output_file, wo_mode="o")
+                    lh5.write(f_table, f"file{file}", output_file, wo_mode="o")
                 # end file loop
 
             if in_memory:

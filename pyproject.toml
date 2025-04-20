@@ -36,7 +36,7 @@ dependencies = [
     "h5py>=3.2",
     "iminuit",
     "legend-daq2lh5>=1.2.1",
-    "legend-pydataobj>=1.7,<1.12",
+    "legend-pydataobj>=1.12.0a1,",
     "pylegendmeta>=0.9",
     "matplotlib",
     "numba!=0.53.*,!=0.54.*,!=0.57",

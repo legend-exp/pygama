@@ -123,12 +123,14 @@ def load_data(
             )
         df = pd.DataFrame(columns=list(df_fields))
 
-        for table, entry, n_rows in lh5_it:
+        for table in lh5_it:
             # Evaluate all provided expressions and add to table
             for outname, info in cal_dict.items():
                 table[outname] = table.eval(
                     info["expression"], info.get("parameters", None)
                 )
+            entry = lh5_it.current_global_entries[0]
+            n_rows = len(table)
 
             # Copy params in table into dataframe
             for par in df:

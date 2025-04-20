@@ -10,8 +10,9 @@ from collections import OrderedDict
 from typing import Iterable, Mapping
 
 import lgdo
+import lgdo.lh5 as lh5
 import numpy as np
-from lgdo.lh5 import LH5Iterator, LH5Store, ls
+from lgdo.lh5 import LH5Iterator, ls
 
 from .. import utils
 
@@ -75,13 +76,12 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`lgdo.lh5.store.LH5Store.write`.
+        forwarded to :meth:`lgdo.lh5.write`.
 
     See Also
     --------
     lgdo.types.table.Table.eval
     """
-    store = LH5Store()
 
     if lh5_tables_config is None and hit_config is None:
         raise ValueError("either lh5_tables_config or hit_config must be specified")
@@ -134,13 +134,12 @@ def build_hit(
     first_done = False
     for tbl, cfg in lh5_tables_config.items():
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
-        tot_n_rows = store.read_n_rows(tbl, infile)
         write_offset = 0
 
         log.info(f"Processing table '{tbl}' in file {infile}")
 
-        for tbl_obj, start_row, n_rows in lh5_it:
-            n_rows = min(tot_n_rows - start_row, n_rows)
+        for tbl_obj in lh5_it:
+            start_row = lh5_it.current_i_entry
 
             # create a new table object that links all the columns in the
             # current table (i.e. no copy)
@@ -193,11 +192,11 @@ def build_hit(
                         if col not in cfg["outputs"]:
                             outtbl_obj.remove_column(col, delete=True)
 
-            store.write(
+            lh5.write(
                 obj=outtbl_obj,
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
-                n_rows=n_rows,
+                n_rows=len(tbl_obj),
                 wo_mode=wo_mode if first_done is False else "append",
                 write_start=write_offset + start_row,
             )

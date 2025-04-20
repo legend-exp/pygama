@@ -9,8 +9,7 @@ def test_cuts(lgnd_test_data):
     data = lgnd_test_data.get_path(
         "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
     )
-    sto = lh5.LH5Store()
-    tbl = sto.read("ch1104000/dsp", data)[0]
+    tbl = lh5.read("ch1104000/dsp", data)
 
     cut_pars = {
         "bl_std_cut": {"cut_parameter": "bl_std", "cut_level": 4, "mode": "inclusive"},
