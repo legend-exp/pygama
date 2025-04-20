@@ -16,6 +16,7 @@ def gather_pulse_data(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     observable: str,
     pulse_mask: types.VectorOfVectors = None,
@@ -88,6 +89,8 @@ def gather_pulse_data(
 
     for channel in table_names:
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
+        if table_id is None:
+            continue
 
         # determine list of indices found in the TCM that we want to load for channel
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
@@ -131,6 +134,7 @@ def gather_pulse_data(
             datainfo,
             tcm,
             table_names,
+            channel_mapping,
             a_thr_pe=a_thr_pe,
             t_loc_ns=t_loc_ns,
             dt_range_ns=dt_range_ns,
@@ -155,6 +159,7 @@ def gather_tcm_data(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     tcm_field="id",
     pulse_mask=None,
@@ -180,7 +185,9 @@ def gather_tcm_data(
 
     # list user wanted table names
     table_ids = [
-        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) for id in table_names
+        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id)
+        for id in table_names
+        if utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) is not None
     ]
     # find them in tcm.id (we'll filter the rest out)
     tcm_id_padded = types.VectorOfVectors(tcm.table_key).to_aoesa().view_as("np")
@@ -203,6 +210,7 @@ def gather_tcm_data(
                 datainfo,
                 tcm,
                 table_names,
+                channel_mapping,
                 a_thr_pe=a_thr_pe,
                 t_loc_ns=t_loc_ns,
                 dt_range_ns=dt_range_ns,
@@ -231,6 +239,7 @@ def make_pulse_data_mask(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     a_thr_pe=None,
     t_loc_ns=None,
@@ -267,6 +276,7 @@ def make_pulse_data_mask(
         datainfo,
         tcm,
         table_names,
+        channel_mapping,
         observable="hit.trigger_pos",
         drop_empty=False,
     )
@@ -275,6 +285,7 @@ def make_pulse_data_mask(
         datainfo,
         tcm,
         table_names,
+        channel_mapping,
         observable="hit.energy_in_pe",
         drop_empty=False,
     ).view_as("ak")
@@ -318,6 +329,7 @@ def geds_coincidence_classifier(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
+    channel_mapping: dict,
     *,
     spms_t0: types.VectorOfVectors,
     spms_amp: types.VectorOfVectors,

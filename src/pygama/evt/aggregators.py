@@ -25,6 +25,7 @@ def evaluate_to_first_or_last(
     pars_dict=None,
     default_value=np.nan,
     is_first: bool = True,
+    channel_mapping=None,
 ) -> types.Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
@@ -56,12 +57,15 @@ def evaluate_to_first_or_last(
     is_first
        defines if sorted by smallest or largest value of `sorter`
     """
-    f = utils.make_files_config(datainfo)
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
 
     df = None
 
     for ch in channels:
-        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+        table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
+        if table_id is None:
+            continue
 
         # get index list for this channel to be loaded
         chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
@@ -95,7 +99,11 @@ def evaluate_to_first_or_last(
             # find if sorter is in hit or dsp
             sort_field = lh5.read_as(
                 f"{ch}/{sorter[0]}/{sorter[1]}",
-                f.hit.file if f"{f.hit.group}" == sorter[0] else f.dsp.file,
+                (
+                    datainfo.hit.file
+                    if f"{datainfo.hit.group}" == sorter[0]
+                    else datainfo.dsp.file
+                ),
                 idx=idx_ch,
                 library="np",
             )
@@ -138,6 +146,7 @@ def evaluate_to_scalar(
     n_rows,
     pars_dict=None,
     default_value=np.nan,
+    channel_mapping=None,
 ) -> types.Array:
     """Aggregates by summation across channels.
 
@@ -166,11 +175,14 @@ def evaluate_to_scalar(
     default_value
        default value.
     """
-    f = utils.make_files_config(datainfo)
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
     out = None
 
     for ch in channels:
-        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+        table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
+        if table_id is None:
+            continue
 
         # get index list for this channel to be loaded
         chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
@@ -234,6 +246,7 @@ def evaluate_at_channel(
     ch_comp,
     pars_dict=None,
     default_value=np.nan,
+    channel_mapping=None,
 ) -> types.Array:
     """Aggregates by evaluating the expression at a given channel.
 
@@ -258,15 +271,16 @@ def evaluate_at_channel(
     default_value
        default value.
     """
-    f = utils.make_files_config(datainfo)
-    table_id_fmt = f.hit.table_fmt
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
+    table_id_fmt = datainfo.hit.table_fmt
 
     out = None
 
     for table_id in np.unique(ch_comp.nda.astype(int)):
         table_name = utils.get_table_name_by_pattern(table_id_fmt, table_id)
         # skip default value
-        if table_name not in lh5.ls(f.hit.file):
+        if table_name not in lh5.ls(datainfo.hit.file):
             continue
 
         # get index list for this channel to be loaded
@@ -309,6 +323,7 @@ def evaluate_at_channel_vov(
     channels_skip,
     pars_dict=None,
     default_value=np.nan,
+    channel_mapping=None,
 ) -> types.VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
@@ -334,7 +349,8 @@ def evaluate_at_channel_vov(
     default_value
        default value.
     """
-    f = utils.make_files_config(datainfo)
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
 
     ch_comp_channels = np.unique(ch_comp.flattened_data.nda).astype(int)
 
@@ -344,7 +360,7 @@ def evaluate_at_channel_vov(
 
     type_name = None
     for table_id in ch_comp_channels:
-        table_name = utils.get_table_name_by_pattern(f.hit.table_fmt, table_id)
+        table_name = utils.get_table_name_by_pattern(datainfo.hit.table_fmt, table_id)
         evt_ids_ch = np.repeat(
             np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
         )
@@ -391,6 +407,7 @@ def evaluate_to_aoesa(
     pars_dict=None,
     default_value=np.nan,
     missing_value=np.nan,
+    channel_mapping=None,
 ) -> types.ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
@@ -424,14 +441,17 @@ def evaluate_to_aoesa(
     sorter
        sorts the entries in the vector according to sorter expression.
     """
-    f = utils.make_files_config(datainfo)
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
 
     # define dimension of output array
     dtype = None
     out = None
 
     for i, ch in enumerate(channels):
-        table_id = utils.get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+        table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
+        if table_id is None:
+            continue
 
         # get index list for this channel to be loaded
         chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
@@ -487,6 +507,7 @@ def evaluate_to_vector(
     pars_dict=None,
     default_value=np.nan,
     sorter=None,
+    channel_mapping=None,
 ) -> types.VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.

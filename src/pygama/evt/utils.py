@@ -58,7 +58,10 @@ def copy_lgdo_attrs(obj):
 def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:
     pre = table_id_fmt.split("{")[0]
     post = table_id_fmt.split("}")[1]
-    return int(ch.strip(pre).strip(post))
+    try:
+        return int(ch.strip(pre).strip(post))
+    except ValueError:
+        return None
 
 
 def get_table_name_by_pattern(table_id_fmt: str, ch_id: int) -> str:
@@ -91,11 +94,12 @@ def find_parameters(
     field_list
        list of tuples ``(tier, field)`` to be found in non `tcm`, `evt` tiers.
     """
-    f = make_files_config(datainfo)
+    if not isinstance(datainfo, DataInfo):
+        datainfo = make_files_config(datainfo)
 
     final_dict = {}
 
-    for name, tier in f._asdict().items():
+    for name, tier in datainfo._asdict().items():
         if name not in ["tcm", "evt"] and tier.file is not None:  # skip other tables
             keys = [
                 k.split("/")[-1]
@@ -153,8 +157,9 @@ def get_data_at_channel(
     default_value
        default value.
     """
-    f = make_files_config(datainfo)
-    table_id = get_tcm_id_by_pattern(f.hit.table_fmt, ch)
+    if not isinstance(datainfo, DataInfo):
+        datainfo = make_files_config(datainfo)
+    table_id = get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
 
     # get index list for this channel to be loaded
     chan_tcm_indexs = (ak.flatten(tcm.table_key) == table_id).to_numpy()
@@ -182,7 +187,7 @@ def get_data_at_channel(
         # move tier+dots in expression to underscores (e.g. evt.foo -> evt_foo)
 
         new_expr = expr
-        for name in f._asdict():
+        for name in datainfo._asdict():
             if name == "evt":
                 new_expr = new_expr.replace(f"{name}.", "")
             elif name not in ["tcm", "raw"]:
@@ -235,12 +240,13 @@ def get_mask_from_query(
     idx_ch
        channel indices to be read.
     """
-    f = make_files_config(datainfo)
+    if not isinstance(datainfo, DataInfo):
+        datainfo = make_files_config(datainfo)
 
     # get sub evt based query condition if needed
     if isinstance(query, str):
         query_lst = re.findall(
-            rf"({'|'.join(f._asdict().keys())}).([a-zA-Z_$][\w$]*)", query
+            rf"({'|'.join(datainfo._asdict().keys())}).([a-zA-Z_$][\w$]*)", query
         )
         query_var = find_parameters(
             datainfo=datainfo,
@@ -250,7 +256,7 @@ def get_mask_from_query(
         )
 
         new_query = query
-        for name in f._asdict():
+        for name in datainfo._asdict():
             if name not in ["tcm", "evt"]:
                 new_query = new_query.replace(f"{name}.", f"{name}_")
 

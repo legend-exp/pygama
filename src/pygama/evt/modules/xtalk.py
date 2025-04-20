@@ -40,6 +40,8 @@ def build_tcm_index_array(
         table_id = utils.get_tcm_id_by_pattern(
             datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
         )
+        if table_id is None:
+            continue
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
         tcm_indexs_out[tbl_idxs_ch, idx_chan] = chan_tcm_indexs
@@ -283,6 +285,7 @@ def calibrate_energy(
     par_files: str | list[str],
     uncal_energy_var: str = None,
     recal_energy_var: str = None,
+    channel_mapping: dict = None,
 ):
     """Function to recalibrate the energy after xtalk correction.
 
@@ -316,7 +319,12 @@ def calibrate_energy(
 
     for i, chan in enumerate(xtalk_matrix_rawids):
         try:
-            cfg = pars[f"ch{chan}"]
+            if f"ch{chan}" in pars:
+                cfg = pars[f"ch{chan}"]
+            elif channel_mapping is not None and f"ch{chan}" in channel_mapping:
+                cfg = pars[channel_mapping[f"ch{chan}"]]
+            else:
+                raise KeyError
             cfg, chan_inputs = _remove_uneeded_operations(
                 _reorder_table_operations(cfg), recal_energy_var.split(".")[-1]
             )
@@ -325,6 +333,8 @@ def calibrate_energy(
 
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
+            if table_id is None:
+                continue
 
             chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[
                 0
