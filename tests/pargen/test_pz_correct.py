@@ -127,6 +127,7 @@ def test_get_dpz_decay_constants():
                         "round(52*us/waveform.period)",
                         "len(waveform)",
                         "1*ms/waveform.period",
+                        "0.5",
                         "db.pz.tau1",
                         "db.pz.tau2",
                         "db.pz.frac",
