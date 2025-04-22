@@ -32,7 +32,7 @@ requires-python = ">=3.9"
 dependencies = [
     "hist",
     "colorlog",
-    "dspeed>=1.6.4",
+    "dspeed>=1.6.4,<1.6.5",
     "h5py>=3.2",
     "iminuit",
     "legend-daq2lh5>=1.2.1",
