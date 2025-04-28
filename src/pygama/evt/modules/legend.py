@@ -2,9 +2,15 @@
 Module provides LEGEND internal functions
 """
 
+from __future__ import annotations
+
+from collections.abc import Sequence
 from importlib import import_module
 
-from lgdo.lh5 import utils
+import numpy as np
+from lgdo import types
+
+from .. import utils
 
 
 def metadata(params: dict) -> list:
@@ -34,3 +40,37 @@ def metadata(params: dict) -> list:
                 == params["selectors"][k]
             ]
     return tmp
+
+
+def convert_rawid(
+    datainfo: utils.DataInfo,
+    tcm: utils.TCMData,
+    table_names: Sequence[str],
+    channel_mapping: dict,
+    *,
+    rawid_obj: types.VectorOfVectors | types.Array,
+):
+    """Convert rawid to channel number."""
+
+    if isinstance(rawid_obj, types.VectorOfVectors):
+        rawids = rawid_obj.flattened_data.nda
+        detector = np.array(
+            [
+                channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                for rawid in rawids
+            ]
+        )
+        return types.VectorOfVectors(
+            flattened_data=detector, cumulative_length=rawid_obj.cumulative_length
+        )
+    elif isinstance(rawid_obj, types.Array):
+        rawids = rawid_obj.nda
+        detector = np.array(
+            [
+                channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                for rawid in rawids
+            ]
+        )
+        return types.Array(detector)
+    else:
+        raise TypeError("rawid_obj must be a VectorOfVectors or Array")
