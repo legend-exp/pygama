@@ -236,7 +236,7 @@ class HPGeCalibration:
             {
                 "input_peaks_kev": peaks_kev,
                 "found_peaks_kev": peaks_kev[iytup],
-                "found_peaks_locs": detected_max_locs[iytup],
+                "found_peaks_locs": detected_max_locs[ixtup],
             }
         )
         log.info(f"{len(peaks_kev[iytup])} peaks found:")
