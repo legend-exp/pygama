@@ -178,13 +178,13 @@ def better_int_binning(
         dx = 1
 
     # Finally, build a good binning from dx
-    n_bins = np.ceil((x_hi - x_lo) / dx)
+    final_n_bins = np.ceil((x_hi - x_lo) / dx)
     x_lo = np.floor(x_lo)
-    x_hi = x_lo + n_bins * dx
+    x_hi = x_lo + final_n_bins * dx
     if n_bins is None:
         return int(x_lo), int(x_hi), int(dx)
     else:
-        return int(x_lo), int(x_hi), int(n_bins)
+        return int(x_lo), int(x_hi), int(final_n_bins)
 
 
 @nb.njit(parallel=False, fastmath=True)
