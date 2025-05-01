@@ -550,15 +550,8 @@ def compton_sf(
         else:
             raise ValueError("mode not recognised")
 
-    ct_n = len(cut_param[~mask])
-    ct_err = np.sqrt(len(cut_param[~mask]))
-    surv_n = len(cut_param[mask])
-    surv_err = np.sqrt(len(cut_param[mask]))
-
-    pc_n = ct_n + surv_n
-
-    sf = surv_n / pc_n
-    err = 100 * sf * (1 - sf) * np.sqrt((ct_err / ct_n) ** 2 + (surv_err / surv_n) ** 2)
+    sf = len(cut_param[mask]) / len(cut_param)
+    err = 100 * np.sqrt(sf * (1 - sf)) / len(cut_param)
     sf *= 100
 
     return {
