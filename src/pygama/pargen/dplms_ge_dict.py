@@ -10,17 +10,16 @@ import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from lgdo import Table, lh5
+from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-from pygama.math.distributions import gauss_on_step
+import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
 
 log = logging.getLogger(__name__)
-sto = lh5.LH5Store()
 
 
 def dplms_ge_dict(
@@ -31,7 +30,6 @@ def dplms_ge_dict(
     dplms_dict: dict,
     decay_const: float = 0,
     ene_par: str = "dplmsEmax",
-    p_val_lim: float = 10**-20,
     display: int = 0,
 ) -> dict:
     """
@@ -39,10 +37,10 @@ def dplms_ge_dict(
 
     Parameters
     ----------
-    fft_files
-        table with fft data
+    raw_fft
+        table with fft raw data
     raw_cal
-        table with cal data
+        table with cal raw data
     dsp_config
         dsp config file
     par_dsp
@@ -75,9 +73,9 @@ def dplms_ge_dict(
 
     bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
-    bls_cut_pars = [par for par in dplms_dict["bls_cut_pars"].keys()]
+    bls_cut_pars = [par for par in dplms_dict["bls_cut_pars"]]
     for par in bls_cut_pars:
-        bls_par[par] = dsp_fft[par].nda
+        bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
     log.info(
         f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
@@ -108,7 +106,7 @@ def dplms_ge_dict(
         "peak": peaks_kev[-1],
         "kev_width": kev_widths[-1],
         "parameter": ene_par,
-        "func": gauss_on_step,
+        "func": eval(dplms_dict["fom_func"]),
     }
 
     if display > 0:
@@ -132,6 +130,7 @@ def dplms_ge_dict(
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
             log_msg += f" {key} = {value}"
+        log.info(log_msg)
 
         grid_dict[i] = coeff_values
 
@@ -168,6 +167,7 @@ def dplms_ge_dict(
                 peak_dict,
                 "dt_eff",
                 idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
+                frac_max=0.5,
             )
         except Exception:
             log.debug("FWHM not calculated")
@@ -179,18 +179,17 @@ def dplms_ge_dict(
             res["alpha"],
             res["chisquare"],
         )
+        p_val = chi2.sf(chisquare[0], chisquare[1])
         log.info(
-            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, evaluated in {time.time()-t_tmp:.1f} s"
+            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time()-t_tmp:.1f} s"
         )
-
         grid_dict[i]["fwhm"] = fwhm
         grid_dict[i]["fwhm_err"] = fwhm_err
         grid_dict[i]["alpha"] = alpha
-        p_val = chi2.sf(chisquare[0], chisquare[1])
         if (
             fwhm < dplms_dict["fwhm_limit"]
             and fwhm_err < dplms_dict["err_limit"]
-            and p_val > p_val_lim
+            and p_val > dplms_dict["p_val_lim"]
             and ~np.isnan(fwhm)
         ):
             if fwhm < min_fom:
@@ -207,7 +206,6 @@ def dplms_ge_dict(
         ft_coeff = best_case_values.get("ft", dplms_dict["dp_def"]["nm"])
         rt_coeff = best_case_values.get("rt", dplms_dict["dp_def"]["rt"])
         pt_coeff = best_case_values.get("pt", dplms_dict["dp_def"]["pt"])
-
         if all(
             v is not None
             for v in [
@@ -224,9 +222,9 @@ def dplms_ge_dict(
                 f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}"
             )
         else:
-            log.error("Some values are missing in the best case results")
+            log.debug("Some values are missing in the best case results")
     else:
-        log.error("Filter synthesis failed")
+        log.debug("Filter synthesis failed")
         nm_coeff = dplms_dict["dp_def"]["nm"]
         ft_coeff = dplms_dict["dp_def"]["ft"]
         rt_coeff = dplms_dict["dp_def"]["rt"]
