@@ -14,7 +14,7 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-import pygama.math.distributions as pmd
+import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
@@ -69,7 +69,7 @@ def dplms_ge_dict(
     log.debug("Applied Cuts")
 
     bl_field = dplms_dict["bl_field"]
-    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs,:])} baselines after cuts")
+    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
 
     bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
@@ -457,13 +457,13 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
         thr = dplms_dict["dp_def"]["rt"]
 
     idxs_ct, ct_ll, ct_hh = is_valid_centroid(centroid, centroid_lim, wsize, bsize)
-    log.info(f"... {len(peak_pos[idxs_ct,:])} signals after alignment")
+    log.info(f"... {len(peak_pos[idxs_ct, :])} signals after alignment")
 
     idxs_pp, pp_ll, pp_hh = is_not_pile_up(peak_pos, peak_pos_neg, thr, peak_lim, wsize)
-    log.info(f"... {len(peak_pos[idxs_pp,:])} signals after pile-up cut")
+    log.info(f"... {len(peak_pos[idxs_pp, :])} signals after pile-up cut")
 
     idxs_rt, rt_ll, rt_hh = is_valid_risetime(risetime, rt_low, perc)
-    log.info(f"... {len(peak_pos[idxs_rt,:])} signals after risetime cut")
+    log.info(f"... {len(peak_pos[idxs_rt, :])} signals after risetime cut")
 
     idxs = idxs_ct & idxs_pp & idxs_rt
     sel_dict = {
