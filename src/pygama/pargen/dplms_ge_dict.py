@@ -14,7 +14,6 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
@@ -28,6 +27,7 @@ def dplms_ge_dict(
     dsp_config: dict,
     par_dsp: dict,
     dplms_dict: dict,
+    fom_func,
     decay_const: float = 0,
     ene_par: str = "dplmsEmax",
     display: int = 0,
@@ -47,6 +47,8 @@ def dplms_ge_dict(
         Dictionary with db parameters for dsp processing
     dplms_dict
         Dictionary with various parameters
+    fom_func
+        Function for peak fits
 
     Returns
     -------
@@ -106,7 +108,7 @@ def dplms_ge_dict(
         "peak": peaks_kev[-1],
         "kev_width": kev_widths[-1],
         "parameter": ene_par,
-        "func": eval(dplms_dict["fom_func"]),
+        "func": fom_func,
     }
 
     if display > 0:
