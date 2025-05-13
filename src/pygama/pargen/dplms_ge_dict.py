@@ -14,6 +14,7 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
+import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
