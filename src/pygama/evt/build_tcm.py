@@ -99,6 +99,25 @@ def build_tcm(
     if out_fields is not None and not isinstance(out_fields, list):
         out_fields = [out_fields]
 
+    if len(coin_cols) != len(coin_windows):
+        if len(coin_windows) == 1:
+            coin_windows = coin_windows * len(coin_cols)
+        else:
+            msg = (
+                "coin_cols and coin_windows must have the same length, "
+                f"got {len(coin_cols)} and {len(coin_windows)}"
+            )
+            raise ValueError(msg)
+    if len(coin_cols) != len(window_refs):
+        if len(window_refs) == 1:
+            window_refs = window_refs * len(coin_cols)
+        else:
+            msg = (
+                "coin_cols and coin_windows must have the same length, "
+                f"got {len(coin_cols)} and {len(window_refs)}"
+            )
+            raise ValueError(msg)
+
     iterators = []
     table_keys = []
     all_tables = []

@@ -224,6 +224,20 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         out_name="hardware_tcm",
         wo_mode="of",
     )
+
+    with pytest.raises(ValueError):
+        evt.build_tcm(
+            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+            coin_cols="timestamp",
+            window_refs=["last", "last"],
+        )
+    with pytest.raises(ValueError):
+        evt.build_tcm(
+            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+            coin_cols=["timestamp"],
+            coin_windows=[1, 2],
+        )
+
     assert os.path.exists(out_file)
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
