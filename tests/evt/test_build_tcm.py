@@ -105,41 +105,16 @@ def test_generate_tcm_cols(lgnd_test_data):
         hash_func=None,
         buffer_len=1,
     )
+    # fmt: off
     assert np.array_equal(
         tcm_cols.table_key.flattened_data.nda,
         [
-            1,
-            0,
-            2,
-            1,
-            2,
-            1,
-            2,
-            1,
-            1,
-            1,
-            0,
-            1,
-            1,
-            2,
-            2,
-            1,
-            2,
-            1,
-            2,
-            0,
-            0,
-            2,
-            2,
-            2,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
+            1, 0, 2, 1, 2, 1, 2, 1, 1, 1, 0,
+            1, 1, 2, 2, 1, 2, 1, 2, 0, 0, 2,
+            2, 2, 0, 0, 0, 0, 0, 0,
         ],
     )
+    # fmt: on
     # test invalid hash func
     with pytest.raises(NotImplementedError):
         evt.build_tcm(
@@ -175,40 +150,60 @@ def test_generate_tcm_cols(lgnd_test_data):
         tcm_cols.table_key.cumulative_length.nda,
         [30],
     )
+    # fmt: off
     assert np.array_equal(
         tcm_cols.table_key.flattened_data.nda,
         [
-            1084804,
-            1084803,
-            1121600,
-            1084804,
-            1121600,
-            1084804,
-            1121600,
-            1084804,
-            1084804,
-            1084804,
-            1084803,
-            1084804,
-            1084804,
-            1121600,
-            1121600,
-            1084804,
-            1121600,
-            1084804,
-            1121600,
-            1084803,
-            1084803,
-            1121600,
-            1121600,
-            1121600,
-            1084803,
-            1084803,
-            1084803,
-            1084803,
-            1084803,
-            1084803,
+            1084804, 1084803, 1121600, 1084804, 1121600, 1084804,
+            1121600, 1084804, 1084804, 1084804, 1084803, 1084804,
+            1084804, 1121600, 1121600, 1084804, 1121600, 1084804,
+            1121600, 1084803, 1084803, 1121600, 1121600, 1121600,
+            1084803, 1084803, 1084803, 1084803, 1084803, 1084803,
         ],
+    )
+    # fmt: on
+
+
+def test_build_tcm_multiple_cols(lgnd_test_data):
+    f_raw = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
+    )
+
+    with pytest.raises(ValueError):
+        evt.build_tcm(
+            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+            coin_cols="timestamp",
+            window_refs=["last", "last"],
+        )
+    with pytest.raises(ValueError):
+        evt.build_tcm(
+            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+            coin_cols=["timestamp"],
+            coin_windows=[1, 2],
+        )
+    tcm = evt.build_tcm(
+        [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+        coin_cols=["timestamp", "table_key"],
+    )
+    assert isinstance(tcm, Table)
+    assert isinstance(tcm.table_key, VectorOfVectors)
+    assert isinstance(tcm.row_in_table, VectorOfVectors)
+    # fmt: off
+    assert np.array_equal(
+        tcm.table_key.flattened_data.nda,
+        [
+            1084804, 1084803, 1121600, 1084804, 1121600, 1084804, 1121600,
+            1084804, 1084804, 1084804, 1084803, 1084804, 1084804, 1121600,
+            1121600, 1084804, 1121600, 1084804, 1121600, 1084803, 1084803,
+            1121600, 1121600, 1121600, 1084803, 1084803, 1084803, 1084803,
+            1084803, 1084803,
+        ],
+    )
+    # fmt: on
+
+    assert np.array_equal(
+        tcm.table_key.cumulative_length.nda,
+        np.arange(1, 31),
     )
 
 
@@ -224,19 +219,6 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         out_name="hardware_tcm",
         wo_mode="of",
     )
-
-    with pytest.raises(ValueError):
-        evt.build_tcm(
-            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
-            coin_cols="timestamp",
-            window_refs=["last", "last"],
-        )
-    with pytest.raises(ValueError):
-        evt.build_tcm(
-            [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
-            coin_cols=["timestamp"],
-            coin_windows=[1, 2],
-        )
 
     assert os.path.exists(out_file)
     tcm_cols = lh5.read("hardware_tcm", out_file)
