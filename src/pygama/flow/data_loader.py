@@ -679,7 +679,7 @@ class DataLoader:
                         )
                         f_entries.drop(drop_idx, inplace=True)
                     elif mode == "any":
-                        evts = list(idx_match[f"{child}_idx"].unique())
+                        evts = idx_match[f"{child}_idx"].unique().tolist()
                         keep_idx = f_entries.query(f"{child}_idx in {evts}").index
                         drop = set.symmetric_difference(
                             set(f_entries.index), list(keep_idx)
