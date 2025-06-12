@@ -33,7 +33,7 @@ dependencies = [
     "hist",
     "colorlog",
     "dbetto",
-    "dspeed>=1.6.5a1",
+    "dspeed>=1.7",
     "h5py>=3.2",
     "iminuit",
     "legend-daq2lh5>=1.2.1",
