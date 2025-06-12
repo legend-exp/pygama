@@ -43,7 +43,8 @@ def make_files_config(data: dict):
 
 
 def make_numpy_full(size, fill_value, try_dtype):
-    if np.can_cast(fill_value, try_dtype):
+    # turn fill_value into an array (or scalar) so we have a proper dtype
+    if np.can_cast(np.array(fill_value).dtype, try_dtype):
         return np.full(size, fill_value, dtype=try_dtype)
     else:
         return np.full(size, fill_value)
