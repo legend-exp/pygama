@@ -32,6 +32,7 @@ requires-python = ">=3.9"
 dependencies = [
     "hist",
     "colorlog",
+    "dbetto",
     "dspeed>=1.6.5a1",
     "h5py>=3.2",
     "iminuit",

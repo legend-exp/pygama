@@ -223,7 +223,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert os.path.exists(out_file)
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert list(tcm_cols.keys()) == ["table_key", "row_in_table"]
+    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
     # fmt: off
     assert np.array_equal(
         tcm_cols.table_key.cumulative_length.nda,

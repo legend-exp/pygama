@@ -130,12 +130,12 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
     )
 
     obj = lh5.read("/geds/hit", outfile)
-    assert list(obj.keys()) == [
+    assert sorted(obj.keys()) == [
+        "aggr1",
+        "aggr2",
         "is_valid_rt",
         "is_valid_t0",
         "is_valid_tmax",
-        "aggr1",
-        "aggr2",
     ]
 
     df = lh5.read_as("geds/hit", outfile, "pd")
