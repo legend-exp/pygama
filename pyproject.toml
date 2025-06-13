@@ -36,18 +36,20 @@ dependencies = [
     "dspeed>=1.7",
     "h5py>=3.2",
     "iminuit",
-    "legend-daq2lh5>=1.2.1",
     "legend-pydataobj>=1.12",
     "pylegendmeta>=0.9",
     "matplotlib",
     "numba!=0.53.*,!=0.54.*,!=0.57",
     "numpy>=1.21",
     "pandas>=1.4.4",
+    "tables",
+    "numpy==1.26.4; python_version == '3.9'", # HACK: remove when ending support for python 3.9
+    "pandas==1.5.3; python_version == '3.9'", # HACK: remove when ending support for python 3.9
+    "tables==3.9.2; python_version == '3.9'", # HACK: remove when ending support for python 3.9
     "pint",
     "pyyaml",
     "scikit-learn",
     "scipy>=1.0.1",
-    "tables",
     "tqdm>=4.66",
 ]
 dynamic = [

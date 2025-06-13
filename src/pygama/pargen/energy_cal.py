@@ -2083,7 +2083,7 @@ def get_hpge_energy_fixed(func):
     else:
         log.error(f"get_hpge_energy_fixed not implemented for {func.__name__}")
         return None
-    mask = ~np.in1d(func.required_args(), fixed)
+    mask = ~np.isin(func.required_args(), fixed)
     return fixed, mask
 
 

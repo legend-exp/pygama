@@ -219,7 +219,7 @@ def aoe_peak_fixed(func, **kwargs):
         fixed = ["x_lo", "x_hi", "mu", "sigma"]
     elif func == gaussian:
         fixed = ["x_lo", "x_hi"]
-    mask = ~np.in1d(func.required_args(), fixed)
+    mask = ~np.isin(func.required_args(), fixed)
     return fixed, mask
 
 

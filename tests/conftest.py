@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 
 import pytest
-from daq2lh5 import build_raw
 from dspeed import build_dsp
 from legendtestdata import LegendTestData
 
@@ -12,7 +11,7 @@ config_dir = Path(__file__).parent / "configs"
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("9951c46")
+    ldata.checkout("756aef8")
     return ldata
 
 
@@ -39,30 +38,7 @@ def dsp_test_file(lgnd_test_data, tmp_dir):
 
 
 @pytest.fixture(scope="session")
-def multich_raw_file(lgnd_test_data, tmp_dir):
-    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms.lh5"
-    out_spec = {
-        "FCEventDecoder": {
-            "ch{key}": {
-                "key_list": [[0, 6]],
-                "out_stream": out_file + ":{name}",
-                "out_name": "raw",
-            }
-        }
-    }
-
-    build_raw(
-        in_stream=lgnd_test_data.get_path("fcio/L200-comm-20211130-phy-spms.fcio"),
-        out_spec=out_spec,
-        overwrite=True,
-    )
-    assert os.path.exists(out_file)
-
-    return out_file
-
-
-@pytest.fixture(scope="session")
-def dsp_test_file_spm(multich_raw_file, tmp_dir):
+def dsp_test_file_spm(lgnd_test_data, tmp_dir):
     chan_config = {
         "ch0/raw": f"{config_dir}/sipm-dsp-config.json",
         "ch1/raw": f"{config_dir}/sipm-dsp-config.json",
@@ -71,7 +47,7 @@ def dsp_test_file_spm(multich_raw_file, tmp_dir):
 
     out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms_dsp.lh5"
     build_dsp(
-        multich_raw_file,
+        lgnd_test_data.get_path("lh5/L200-comm-20211130-phy-spms.lh5"),
         out_file,
         {},
         n_max=5,
