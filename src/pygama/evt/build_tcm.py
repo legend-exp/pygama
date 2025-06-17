@@ -40,16 +40,16 @@ def _concat_tables(tbls):
 
 def build_tcm(
     input_tables: list[tuple[str, str | list[str]]],
-    coin_cols: str,
-    hash_func: str = r"\d+",
-    coin_windows: float = 0,
-    window_refs: str = "last",
-    out_file: str = None,
+    coin_cols: str | list[str],
+    hash_func: str | None = r"\d+",
+    coin_windows: float | list[float] = 0,
+    window_refs: str | list[str] = "last",
+    out_file: str | None = None,
     out_name: str = "tcm",
     wo_mode: str = "write_safe",
-    buffer_len: int = None,
-    out_fields=None,
-) -> lgdo.Table:
+    buffer_len: int | None = None,
+    out_fields: str | list[str] | None = None,
+) -> lgdo.Table | None:
     r"""Build a Time Coincidence Map (TCM).
 
     Given a list of input tables, create an output table containing an entry
@@ -60,22 +60,23 @@ def build_tcm(
     Parameters
     ----------
     input_tables
-        each entry is ``(filename, table_name_pattern)``. All tables matching
-        ``table_name_pattern`` in ``filename`` will be added to the list of
-        input tables. ``table_name_pattern`` can be replaced with a list of
-        patterns to be searched for in the file
-    coin_col
-        the name of the column in each tables used to build coincidences. All
-        tables must contain a column with this name.
+        Each entry is ``(filename, table_name_pattern)``. ``table_name_pattern``
+        may be a string or list of strings. All tables matching each pattern in
+        ``filename`` will be used as input tables.
+    coin_cols
+        Name of the column (or columns) in each table used to build
+        coincidences. All input tables must contain these columns.
     hash_func
         mapping of table names to integers for use in the TCM.  `hash_func` is
         a regexp pattern that acts on each table name. The default `hash_func`
         ``r"\d+"`` pulls the first integer out of the table name. Setting to
         ``None`` will use a table's index in `input_tables`.
-    coin_window
-        the clustering window width.
-    window_ref
-        Configuration for the clustering window.
+    coin_windows
+        Width of the clustering window(s). If a single value is supplied it will
+        be used for all ``coin_cols``.
+    window_refs
+        Window reference for the clustering window. Currently only ``"last"`` is
+        implemented.
     out_file
         name (including path) for the output file. If ``None``, no file will be
         written; the TCM will just be returned in memory.
@@ -83,6 +84,17 @@ def build_tcm(
         name for the TCM table in the output file.
     wo_mode
         mode to send to :meth:`~.lgdo.lh5.LH5Store.write`.
+
+    out_fields
+        Optional additional fields to propagate from the input tables into the
+        output TCM.
+
+    Returns
+    -------
+    lgdo.Table or None
+        If ``out_file`` is ``None`` the resulting TCM is returned as a
+        :class:`lgdo.Table`. Otherwise ``None`` is returned after writing the
+        table to ``out_file``.
 
     See Also
     --------
