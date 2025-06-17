@@ -166,9 +166,15 @@ def build_tcm(
                         )
                 else:
                     table_key = len(all_tables) - 1
+
+                h5py_open_mode = "a" if out_file == filename else "r"
                 iterators.append(
                     lh5.LH5Iterator(
-                        filename, table, field_mask=coin_cols, buffer_len=buffer_len
+                        filename,
+                        table,
+                        field_mask=coin_cols,
+                        buffer_len=buffer_len,
+                        h5py_open_mode=h5py_open_mode,
                     )
                 )
                 table_keys.append(table_key)
