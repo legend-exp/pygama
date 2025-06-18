@@ -120,6 +120,7 @@ def build_tcm(
                 f"got {len(coin_cols)} and {len(coin_windows)}"
             )
             raise ValueError(msg)
+
     if len(coin_cols) != len(window_refs):
         if len(window_refs) == 1:
             window_refs = window_refs * len(coin_cols)
@@ -130,10 +131,16 @@ def build_tcm(
             )
             raise ValueError(msg)
 
+    _filenames = [tpl[0] for tpl in input_tables]
+    if len(set(_filenames)) != len(_filenames):
+        msg = "file names specified multiple times in input_tables"
+        raise ValueError(msg)
+
     iterators = []
     table_keys = []
     all_tables = []
 
+    # determine buffer length automatically
     if buffer_len is None:
         ntables = 0
         for filename, patterns in input_tables:
@@ -149,35 +156,39 @@ def build_tcm(
         )
         buffer_len = int(10**7 / (ntables * n_fields))
 
+    # loop over files
     for filename, patterns in input_tables:
         if isinstance(patterns, str):
             patterns = [patterns]
-        for pattern in patterns:
-            tables = lh5.ls(filename, lh5_group=pattern)
-            for table in tables:
-                all_tables.append(table)
-                table_key = len(table_keys)
-                if hash_func is not None:
-                    if isinstance(hash_func, str):
-                        table_key = int(re.search(hash_func, table).group())
-                    else:
-                        raise NotImplementedError(
-                            f"hash_func of type {type(hash_func).__name__}"
-                        )
-                else:
-                    table_key = len(all_tables) - 1
 
-                h5py_open_mode = "a" if out_file == filename else "r"
-                iterators.append(
-                    lh5.LH5Iterator(
-                        filename,
-                        table,
-                        field_mask=coin_cols,
-                        buffer_len=buffer_len,
-                        h5py_open_mode=h5py_open_mode,
+        # make a list of tables in the file
+        for pattern in patterns:
+            for table in lh5.ls(filename, lh5_group=pattern):
+                all_tables.append(table)
+
+        for table_idx, table in enumerate(all_tables):
+            if hash_func is not None:
+                if isinstance(hash_func, str):
+                    table_key = int(re.search(hash_func, table).group())
+                else:
+                    raise NotImplementedError(
+                        f"hash_func of type {type(hash_func).__name__}"
                     )
+            else:
+                table_key = table_idx
+
+            h5py_open_mode = "a" if out_file == filename else "r"
+
+            iterators.append(
+                lh5.LH5Iterator(
+                    filename,
+                    table,
+                    field_mask=coin_cols,
+                    buffer_len=buffer_len,
+                    h5py_open_mode=h5py_open_mode,
                 )
-                table_keys.append(table_key)
+            )
+            table_keys.append(table_key)
 
     coin_windows = [
         ptcm.coin_groups(n, w, r)
@@ -192,6 +203,8 @@ def build_tcm(
     if out_file is not None and wo_mode == "of":
         if Path(out_file).exists():
             Path(out_file).unlink()
+
+    wrote_first = False
     while True:
         try:
             out_tbl = tcm_gen.__next__()
@@ -200,12 +213,17 @@ def build_tcm(
             )
             if out_file is not None:
                 lh5.write(
-                    out_tbl, out_name, out_file, wo_mode="o" if wo_mode == "u" else "a"
+                    out_tbl,
+                    out_name,
+                    out_file,
+                    wo_mode=wo_mode if not wrote_first else "a",
                 )
+                wrote_first = True
             else:
                 tcm.append(out_tbl)
         except StopIteration:
             break
+
     if out_file is None:
         out_tbl = _concat_tables(tcm)
         return out_tbl
