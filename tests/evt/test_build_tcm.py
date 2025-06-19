@@ -1,5 +1,4 @@
 import os
-import shutil
 
 import lgdo
 import numpy as np
@@ -332,17 +331,20 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
 
     # test append to input file
     clone = f"{tmp_dir}/test-append-tcm-input.lh5"
-    shutil.copy(f_raw, clone)
+    tables = ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"]
+
+    for table in tables:
+        lh5.write(lh5.read(table, f_raw), table, clone)
 
     evt.build_tcm(
-        [(clone, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+        [(clone, tables)],
         "timestamp",
         out_file=clone,
-        out_name="/tcm2",
+        out_name="/tcm",
         wo_mode="write_safe",
         buffer_len=1,
     )
     assert os.path.exists(clone)
-    tcm_cols = lh5.read("tcm2", clone)
+    tcm_cols = lh5.read("tcm", clone)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
