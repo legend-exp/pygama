@@ -245,6 +245,8 @@ def make_pulse_data_mask(
     t_loc_ns=None,
     dt_range_ns=None,
     t_loc_default_ns=None,
+    t0_observable="hit.trigger_pos",
+    energy_observable="hit.energy_in_pe",
 ) -> types.VectorOfVectors:
     """Calculate a 3D :class:`~lgdo.types.vectorofvectors.VectorOfVectors` pulse data mask.
 
@@ -270,6 +272,10 @@ def make_pulse_data_mask(
     t_loc_default_ns
         default value for `t_loc_ns`, in case the supplied value is
         :any:`numpy.nan`.
+    t0_observable 
+        parameter to use for channels t0 in the form `tier.param`
+    energy_observable
+        parameter to use for channels energy in the form `tier.param`
     """
     # get the t0 of each single pulse
     pulse_t0 = gather_pulse_data(
@@ -277,7 +283,7 @@ def make_pulse_data_mask(
         tcm,
         table_names,
         channel_mapping,
-        observable="hit.trigger_pos",
+        observable=t0_observable,
         drop_empty=False,
     )
 
@@ -286,7 +292,7 @@ def make_pulse_data_mask(
         tcm,
         table_names,
         channel_mapping,
-        observable="hit.energy_in_pe",
+        observable=energy_observable,
         drop_empty=False,
     ).view_as("ak")
 
