@@ -272,7 +272,7 @@ def make_pulse_data_mask(
     t_loc_default_ns
         default value for `t_loc_ns`, in case the supplied value is
         :any:`numpy.nan`.
-    t0_observable 
+    t0_observable
         parameter to use for channels t0 in the form `tier.param`
     energy_observable
         parameter to use for channels energy in the form `tier.param`
