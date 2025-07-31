@@ -521,10 +521,12 @@ class PZCorrect:
         display=0,
         figsize=(8, 6),
         fontsize=8,
+        n_waveforms=100,
+        downsample=1,
     ):
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
-        wf_idxs = np.random.choice(len(wfs), 100)
+        wf_idxs = np.random.choice(len(wfs), n_waveforms)
         if norm_param is not None:
             means = tb_out[norm_param].nda[wf_idxs]
             wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
@@ -533,7 +535,9 @@ class PZCorrect:
         plt.rcParams["font.size"] = fontsize
         fig = plt.figure(figsize=figsize)
         for wf in wfs:
-            plt.plot(np.arange(0, len(wf), 1), wf)
+            plt.plot(
+                np.arange(0, len(wf), downsample), wf[np.arange(0, len(wf), downsample)]
+            )
         plt.axhline(1, color="black")
         plt.axhline(0, color="black")
         plt.xlim(xlim)
