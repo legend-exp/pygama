@@ -25,6 +25,8 @@ def gather_pulse_data(
     dt_range_ns: Sequence[float] = None,
     t_loc_default_ns: float = None,
     drop_empty: bool = True,
+    energy_observable: str = "hit.energy_in_pe",
+    t0_observable: str = "hit.trigger_pos",
 ) -> types.VectorOfVectors:
     """Gathers SiPM pulse data into a 3D :class:`~lgdo.types.vectorofvectors.VectorOfVectors`.
 
@@ -139,6 +141,8 @@ def gather_pulse_data(
             t_loc_ns=t_loc_ns,
             dt_range_ns=dt_range_ns,
             t_loc_default_ns=t_loc_default_ns,
+            energy_observable=energy_observable,
+            t0_observable=t0_observable,
         )
 
     if pulse_mask is not None:
