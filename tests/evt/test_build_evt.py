@@ -307,14 +307,13 @@ def test_build_evt_write(files_config_write):
     outfile = files_config_write["evt"][0]
     assert Path(outfile).exists()
 
+
 def test_buffered_build_evt(files_config_nowrite):
     evt1 = evt = build_evt(
         files_config_nowrite,
         config=f"{config_dir}/basic-evt-config.yaml",
     )
     evt2 = evt = build_evt(
-        files_config_nowrite,
-        config=f"{config_dir}/basic-evt-config.yaml",
-        buffer_len=1
+        files_config_nowrite, config=f"{config_dir}/basic-evt-config.yaml", buffer_len=1
     )
-    assert (evt1.energy.flattened_data.nda==evt2.energy.flattened_data.nda).all()
+    assert (evt1.energy.flattened_data.nda == evt2.energy.flattened_data.nda).all()
