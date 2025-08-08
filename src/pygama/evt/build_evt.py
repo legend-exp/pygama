@@ -407,8 +407,8 @@ def build_evt_cols(
             # warning will be given on each iteration, maybe not ideal?
             log.warning("no output fields specified, no file will be written.")
             evt_tables.append(nested_tbl)
-        if datainfo.evt.file is None:
-            return _concat_tables(evt_tables)
+    if datainfo.evt.file is None:
+        return _concat_tables(evt_tables)
 
 
 def evaluate_expression(

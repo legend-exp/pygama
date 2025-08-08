@@ -275,7 +275,7 @@ def evaluate_at_channel(
         datainfo = utils.make_files_config(datainfo)
     table_id_fmt = datainfo.hit.table_fmt
 
-    out = None
+    out = utils.make_numpy_full(len(ch_comp.nda), default_value, type(default_value))
 
     for table_id in np.unique(ch_comp.nda.astype(int)):
         table_name = utils.get_table_name_by_pattern(table_id_fmt, table_id)
@@ -303,12 +303,7 @@ def evaluate_at_channel(
         else:
             res = np.full(len(idx_ch), default_value)
 
-        if out is None:
-            out = utils.make_numpy_full(len(ch_comp.nda), default_value, res.dtype)
-
-        out[evt_ids_ch] = np.where(
-            table_id == ch_comp.nda[idx_ch], res, out[evt_ids_ch]
-        )
+        out[evt_ids_ch] = res
 
     return types.Array(nda=out)
 
