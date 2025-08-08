@@ -304,7 +304,7 @@ def evaluate_at_channel(
             res = np.full(len(idx_ch), default_value)
 
         out[evt_ids_ch] = np.where(
-            table_id == ch_comp.nda[idx_ch], res, out[evt_ids_ch]
+            table_id == ch_comp.nda, res, out[evt_ids_ch]
         )
 
     return types.Array(nda=out)
