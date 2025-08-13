@@ -72,7 +72,7 @@ def dplms_ge_dict(
     log.debug("Applied Cuts")
 
     bl_field = dplms_dict["bl_field"]
-    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
+    print(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
 
     bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
@@ -80,7 +80,7 @@ def dplms_ge_dict(
     for par in bls_cut_pars:
         bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
-    log.info(
+    print(
         f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
     )
 
@@ -89,7 +89,7 @@ def dplms_ge_dict(
     )
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
-    log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
+    print(f"Time to calculate noise matrix {(t2-t1):.2f} s")
 
     log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
@@ -118,8 +118,6 @@ def dplms_ge_dict(
 
     # penalized coefficients
     dp_coeffs = dplms_dict["dp_coeffs"]
-    za_coeff = dplms_dict["dp_def"]["za"]
-    dp_coeffs.pop("za")
     coeff_keys = [key for key in dp_coeffs.keys()]
     lists = [dp_coeffs[key] for key in dp_coeffs.keys()]
 
@@ -133,25 +131,27 @@ def dplms_ge_dict(
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
             log_msg += f" {key} = {value}"
-        log.info(log_msg)
+        print(log_msg)
 
         grid_dict[i] = coeff_values
 
         sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
         wfs = dsp_cal[wf_field].nda[sel_dict["idxs"], :]
-        log.info(f"... {len(wfs)} signals after signal selection")
+        print(f"... {len(wfs)} signals after signal selection")
 
         ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
 
         t_tmp = time.time()
         nm_coeff = coeff_values["nm"]
+        za_coeff = coeff_values["za"]
+        pl_coeff = coeff_values["pl"]
         ft_coeff = coeff_values["ft"]
         x, y, refy = filter_synthesis(
             ref,
             nm_coeff * nmat,
             rmat,
             za_coeff,
-            pmat,
+            pmat * pl_coeff,
             ft_coeff * fmat,
             dplms_dict["length"],
             wsize,
@@ -173,7 +173,7 @@ def dplms_ge_dict(
                 frac_max=0.5,
             )
         except Exception:
-            log.debug("FWHM not calculated")
+            print("FWHM not calculated")
             continue
 
         fwhm, fwhm_err, alpha, chisquare = (
@@ -183,7 +183,7 @@ def dplms_ge_dict(
             res["chisquare"],
         )
         p_val = chi2.sf(chisquare[0], chisquare[1])
-        log.info(
+        print(
             f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time()-t_tmp:.1f} s"
         )
         grid_dict[i]["fwhm"] = fwhm
@@ -192,7 +192,7 @@ def dplms_ge_dict(
         if (
             fwhm < dplms_dict["fwhm_limit"]
             and fwhm_err < dplms_dict["err_limit"]
-            and p_val > dplms_dict["p_val_lim"]
+            #and p_val > dplms_dict["p_val_lim"]
             and ~np.isnan(fwhm)
         ):
             if fwhm < min_fom:
@@ -206,7 +206,9 @@ def dplms_ge_dict(
         fwhm_err = best_case_values.get("fwhm_err", 0)
         alpha = best_case_values.get("alpha", 0)
         nm_coeff = best_case_values.get("nm", dplms_dict["dp_def"]["nm"])
-        ft_coeff = best_case_values.get("ft", dplms_dict["dp_def"]["nm"])
+        za_coeff = best_case_values.get("za", dplms_dict["dp_def"]["za"])
+        pl_coeff = best_case_values.get("pl", dplms_dict["dp_def"]["pl"])
+        ft_coeff = best_case_values.get("ft", dplms_dict["dp_def"]["ft"])
         rt_coeff = best_case_values.get("rt", dplms_dict["dp_def"]["rt"])
         pt_coeff = best_case_values.get("pt", dplms_dict["dp_def"]["pt"])
         if all(
@@ -216,12 +218,14 @@ def dplms_ge_dict(
                 fwhm_err,
                 alpha,
                 nm_coeff,
+                za_coeff,
+                pl_coeff,
                 ft_coeff,
                 rt_coeff,
                 pt_coeff,
             ]
         ):
-            log.info(
+            print(
                 f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}"
             )
         else:
@@ -229,6 +233,8 @@ def dplms_ge_dict(
     else:
         log.debug("Filter synthesis failed")
         nm_coeff = dplms_dict["dp_def"]["nm"]
+        za_coeff = dplms_dict["dp_def"]["za"]
+        pl_coeff = dplms_dict["dp_def"]["pl"]
         ft_coeff = dplms_dict["dp_def"]["ft"]
         rt_coeff = dplms_dict["dp_def"]["rt"]
         pt_coeff = dplms_dict["dp_def"]["pt"]
@@ -246,7 +252,7 @@ def dplms_ge_dict(
         nm_coeff * nmat,
         rmat,
         za_coeff,
-        pmat,
+        pmat * pl_coeff,
         ft_coeff * fmat,
         dplms_dict["length"],
         wsize,
@@ -259,6 +265,7 @@ def dplms_ge_dict(
             "dp_coeffs": {
                 "nm": nm_coeff,
                 "za": za_coeff,
+                "pl": pl_coeff,
                 "ft": ft_coeff,
                 "rt": rt_coeff,
                 "pt": pt_coeff,
