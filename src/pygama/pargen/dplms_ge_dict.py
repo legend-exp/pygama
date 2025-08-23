@@ -72,7 +72,7 @@ def dplms_ge_dict(
     log.debug("Applied Cuts")
 
     bl_field = dplms_dict["bl_field"]
-    print(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
+    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
 
     bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
@@ -80,16 +80,16 @@ def dplms_ge_dict(
     for par in bls_cut_pars:
         bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
-    print(
+    log.info(
         f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
     )
-
     log.info(
         f'Calculating noise matrix of length {dplms_dict["length"]} n. events: {bls.shape[0]}, size: {bls.shape[1]}'
     )
+
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
-    print(f"Time to calculate noise matrix {(t2-t1):.2f} s")
+    log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
 
     log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
@@ -131,13 +131,13 @@ def dplms_ge_dict(
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
             log_msg += f" {key} = {value}"
-        print(log_msg)
+        log.info(log_msg)
 
         grid_dict[i] = coeff_values
 
         sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
         wfs = dsp_cal[wf_field].nda[sel_dict["idxs"], :]
-        print(f"... {len(wfs)} signals after signal selection")
+        log.info(f"... {len(wfs)} signals after signal selection")
 
         ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
 
@@ -173,7 +173,7 @@ def dplms_ge_dict(
                 frac_max=0.5,
             )
         except Exception:
-            print("FWHM not calculated")
+            log.debug("FWHM not calculated")
             continue
 
         fwhm, fwhm_err, alpha, chisquare = (
@@ -183,7 +183,7 @@ def dplms_ge_dict(
             res["chisquare"],
         )
         p_val = chi2.sf(chisquare[0], chisquare[1])
-        print(
+        log.info(
             f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time()-t_tmp:.1f} s"
         )
         grid_dict[i]["fwhm"] = fwhm
@@ -192,7 +192,7 @@ def dplms_ge_dict(
         if (
             fwhm < dplms_dict["fwhm_limit"]
             and fwhm_err < dplms_dict["err_limit"]
-            #and p_val > dplms_dict["p_val_lim"]
+            and p_val > dplms_dict["p_val_lim"]
             and ~np.isnan(fwhm)
         ):
             if fwhm < min_fom:
@@ -225,9 +225,7 @@ def dplms_ge_dict(
                 pt_coeff,
             ]
         ):
-            print(
-                f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}"
-            )
+            log.info(f"\nBest case: {best_case_values}")
         else:
             log.debug("Some values are missing in the best case results")
     else:
@@ -283,7 +281,7 @@ def dplms_ge_dict(
     log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
 
     if display > 0:
-        plot_dict = {"ref": ref, "coefficients": x}
+        plot_dict = {"ref": ref, "coefficients": x, "nmat": nmat}
 
         bl_idxs = np.random.choice(len(bls), dplms_dict["n_plot"])
         bls = bls[bl_idxs]
@@ -516,7 +514,9 @@ def signal_matrices(
 
     # Pile-up matrix
     if decay_const > 0:
-        decay = np.exp(-np.arange(length) / decay_const)
+        decay = (
+            -np.arange(length) * decay_const
+        )  # np.exp(-np.arange(length) / decay_const)
     else:
         decay = np.zeros(length)
     pmat = np.outer(decay, decay)
