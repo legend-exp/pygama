@@ -281,7 +281,7 @@ def dplms_ge_dict(
     log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
 
     if display > 0:
-        plot_dict = {"ref": ref, "coefficients": x, "nmat": nmat}
+        plot_dict = {"ref": ref, "coefficients": x}
 
         bl_idxs = np.random.choice(len(bls), dplms_dict["n_plot"])
         bls = bls[bl_idxs]
@@ -514,9 +514,7 @@ def signal_matrices(
 
     # Pile-up matrix
     if decay_const > 0:
-        decay = (
-            -np.arange(length) * decay_const
-        )  # np.exp(-np.arange(length) / decay_const)
+        decay = -np.arange(length) * decay_const
     else:
         decay = np.zeros(length)
     pmat = np.outer(decay, decay)
