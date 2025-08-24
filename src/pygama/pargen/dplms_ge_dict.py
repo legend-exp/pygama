@@ -497,6 +497,42 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
     return nmat
 
 
+def noise_matrix_corr(bls1: np.array, bls2: np.array, length: int) -> np.array:
+    nev, size = bls1.shape
+    nev2, size2 = bls2.shape
+    ref1 = np.mean(bls1, axis=0)
+    ref2 = np.mean(bls2, axis=0)
+    bls1 = bls1 - np.mean(ref1)
+    bls2 = bls2 - np.mean(ref2)
+    kernel = np.identity(size - length + 1)
+
+    nmat1 = np.matmul(bls1.T, bls1, dtype=float) / nev
+    nmat2 = np.matmul(bls1.T, bls2, dtype=float) / nev
+    nmat3 = np.matmul(bls2.T, bls2, dtype=float) / nev
+    nmat4 = np.matmul(bls2.T, bls1, dtype=float) / nev
+
+    nmat1 = convolve2d(nmat1, kernel, boundary="symm", mode="valid") / (
+        size - length + 1
+    )
+    nmat2 = convolve2d(nmat2, kernel, boundary="symm", mode="valid") / (
+        size - length + 1
+    )
+    nmat3 = convolve2d(nmat3, kernel, boundary="symm", mode="valid") / (
+        size - length + 1
+    )
+    nmat4 = convolve2d(nmat4, kernel, boundary="symm", mode="valid") / (
+        size - length + 1
+    )
+
+    nmat = np.full((2 * length, 2 * length), np.nan)
+    nmat[:length, :length] = nmat1
+    nmat[length:, :length] = nmat2
+    nmat[length:, length:] = nmat3
+    nmat[:length, length:] = nmat4
+    nmat = 0.5 * (nmat + nmat.T)
+    return nmat
+
+
 def signal_matrices(
     wfs: np.array, length: int, decay_const: float, ff: int = 2
 ) -> np.array:
@@ -542,16 +578,75 @@ def filter_synthesis(
     size: int,
     flip: bool = True,
 ) -> np.array:
-    mat = nmat + rmat + za * np.ones([length, length]) + pmat + fmat
+    # Reference slice
     flo = (size // 2) - (length // 2)
     fhi = (size // 2) + (length // 2)
-    x = np.linalg.solve(mat, ref[flo:fhi]).astype(np.float32)
+    ref_window = ref[flo:fhi]
+
+    # Construct full correlated matrix
+    mat = nmat + rmat + za * np.ones([length, length]) + pmat + fmat
+
+    # Solve system for filter coefficients
+    x = np.linalg.solve(mat, ref_window).astype(np.float32)
+
+    # Normalize via convolution with reference
     y = convolve(ref, np.flip(x), mode="valid")
     maxy = np.max(y)
     x /= maxy
     y /= maxy
     refy = ref[(size // 2) - (len(y) // 2) : (size // 2) + (len(y) // 2)]
+
     if flip:
         return np.flip(x), y, refy
     else:
         return x, y, refy
+
+
+def filter_synthesis_corr(
+    ref: np.array,
+    nmat_corr: np.array,
+    rmat: np.array,
+    za: int,
+    pmat: np.array,
+    fmat: np.array,
+    length: int,
+    size: int,
+    flip: bool = True,
+) -> np.array:
+    # Reference slice
+    flo = (size // 2) - (length // 2)
+    fhi = (size // 2) + (length // 2)
+    ref_window = ref[flo:fhi]
+
+    # Extend reference
+    ref_corr = np.zeros(2 * length, dtype=np.float32)
+    ref_corr[:length] = ref_window
+
+    # Build extended correlation matrices
+    rmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
+    pmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
+    fmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
+
+    rmat_corr[:length, :length] = rmat
+    pmat_corr[:length, :length] = pmat
+    fmat_corr[:length, :length] = fmat
+
+    # Construct full correlated matrix
+    mat_corr = (
+        nmat_corr
+        + rmat_corr
+        + pmat_corr
+        + fmat_corr
+        + za * np.ones((2 * length, 2 * length), dtype=np.float32)
+    )
+
+    # Solve system for filter coefficients
+    x = np.linalg.solve(mat_corr, ref_corr)
+
+    # Normalize via convolution with reference
+    y = convolve(ref_corr, np.flip(x), mode="valid")
+    x /= np.max(y)
+
+    if flip:
+        return np.flip(x[:length]), np.flip(x[length:])
+    return x
