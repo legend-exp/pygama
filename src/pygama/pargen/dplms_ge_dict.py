@@ -497,38 +497,43 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
     return nmat
 
 
-def noise_matrix_corr(bls1: np.array, bls2: np.array, length: int) -> np.array:
-    nev, size = bls1.shape
-    nev2, size2 = bls2.shape
-    ref1 = np.mean(bls1, axis=0)
-    ref2 = np.mean(bls2, axis=0)
-    bls1 = bls1 - np.mean(ref1)
-    bls2 = bls2 - np.mean(ref2)
+def noise_matrix_corr(
+    bls: np.ndarray, bls_corr: list[np.ndarray], length: int
+) -> np.ndarray:
+    all_bls = [bls] + bls_corr
+    n = len(all_bls)
+
+    processed = []
+    for arr in all_bls:
+        ref = np.mean(arr, axis=0)
+        processed.append(arr - np.mean(ref))
+
+    size = processed[0].shape[1]
     kernel = np.identity(size - length + 1)
 
-    nmat1 = np.matmul(bls1.T, bls1, dtype=float) / nev
-    nmat2 = np.matmul(bls1.T, bls2, dtype=float) / nev
-    nmat3 = np.matmul(bls2.T, bls2, dtype=float) / nev
-    nmat4 = np.matmul(bls2.T, bls1, dtype=float) / nev
+    block_mat = [[None for _ in range(n)] for _ in range(n)]
 
-    nmat1 = convolve2d(nmat1, kernel, boundary="symm", mode="valid") / (
-        size - length + 1
-    )
-    nmat2 = convolve2d(nmat2, kernel, boundary="symm", mode="valid") / (
-        size - length + 1
-    )
-    nmat3 = convolve2d(nmat3, kernel, boundary="symm", mode="valid") / (
-        size - length + 1
-    )
-    nmat4 = convolve2d(nmat4, kernel, boundary="symm", mode="valid") / (
-        size - length + 1
-    )
+    for i in range(n):
+        for j in range(i, n):
+            nev = processed[i].shape[0]
+            nij = np.matmul(processed[i].T, processed[j], dtype=float) / nev
+            nij = convolve2d(nij, kernel, boundary="symm", mode="valid") / (
+                size - length + 1
+            )
+            block_mat[i][j] = nij
+            if i != j:
+                block_mat[j][i] = nij.T
 
-    nmat = np.full((2 * length, 2 * length), np.nan)
-    nmat[:length, :length] = nmat1
-    nmat[length:, :length] = nmat2
-    nmat[length:, length:] = nmat3
-    nmat[:length, length:] = nmat4
+    big_size = n * length
+    nmat = np.full((big_size, big_size), np.nan)
+
+    for i in range(n):
+        for j in range(n):
+            if block_mat[i][j] is not None:
+                nmat[i * length : (i + 1) * length, j * length : (j + 1) * length] = (
+                    block_mat[i][j]
+                )
+
     nmat = 0.5 * (nmat + nmat.T)
     return nmat
 
@@ -613,19 +618,22 @@ def filter_synthesis_corr(
     size: int,
     flip: bool = True,
 ) -> np.array:
+    # Extract number of correlated geds
+    n_geds = nmat_corr.shape[0] // length
+
     # Reference slice
     flo = (size // 2) - (length // 2)
     fhi = (size // 2) + (length // 2)
     ref_window = ref[flo:fhi]
 
     # Extend reference
-    ref_corr = np.zeros(2 * length, dtype=np.float32)
+    ref_corr = np.zeros(n_geds * length, dtype=np.float32)
     ref_corr[:length] = ref_window
 
     # Build extended correlation matrices
-    rmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
-    pmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
-    fmat_corr = np.zeros((2 * length, 2 * length), dtype=np.float32)
+    rmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
+    pmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
+    fmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
 
     rmat_corr[:length, :length] = rmat
     pmat_corr[:length, :length] = pmat
@@ -637,16 +645,17 @@ def filter_synthesis_corr(
         + rmat_corr
         + pmat_corr
         + fmat_corr
-        + za * np.ones((2 * length, 2 * length), dtype=np.float32)
+        + za * np.ones((n_geds * length, n_geds * length), dtype=np.float32)
     )
 
     # Solve system for filter coefficients
-    x = np.linalg.solve(mat_corr, ref_corr)
+    x = np.linalg.solve(mat_corr, ref_corr).astype(np.float32)
 
     # Normalize via convolution with reference
     y = convolve(ref_corr, np.flip(x), mode="valid")
     x /= np.max(y)
 
     if flip:
-        return np.flip(x[:length]), np.flip(x[length:])
-    return x
+        return [np.flip(x[n * length : (n + 1) * length]) for n in range(n_geds)]
+    else:
+        return [x[n * length : (n + 1) * length] for n in range(n_geds)]
