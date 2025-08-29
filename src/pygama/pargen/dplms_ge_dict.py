@@ -31,6 +31,7 @@ def dplms_ge_dict(
     fom_func,
     decay_const: float = 0,
     ene_par: str = "dplmsEmax",
+    ctc_par: str = "dt_eff",
     display: int = 0,
 ) -> dict:
     """
@@ -102,7 +103,7 @@ def dplms_ge_dict(
     t3 = time.time()
     log.info(f"Time to run dsp production {(t3-t2):.2f} s")
 
-    dsp_config["outputs"] = [ene_par, "dt_eff"]
+    dsp_config["outputs"] = [ene_par, ctc_par]
 
     # dictionary for peak fitting
     peak_dict = {
@@ -168,8 +169,8 @@ def dplms_ge_dict(
             res = fom_fwhm_with_alpha_fit(
                 dsp_opt,
                 peak_dict,
-                "dt_eff",
-                idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
+                ctc_par,
+                idxs=np.where(~np.isnan(dsp_opt[ctc_par].nda))[0],
                 frac_max=0.5,
             )
         except Exception:
@@ -272,7 +273,7 @@ def dplms_ge_dict(
     }
     out_alpha_dict = {
         f"{ene_par}_ctc": {
-            "expression": f"{ene_par}*(1+dt_eff*a)",
+            "expression": f"{ene_par}*(1+{ctc_par}*a)",
             "parameters": {"a": round(alpha, 9)},
         }
     }
