@@ -31,6 +31,7 @@ def dplms_ge_dict(
     fom_func,
     decay_const: float = 0,
     ene_par: str = "dplmsEmax",
+    ctc_par: str = "dt_eff",
     display: int = 0,
 ) -> dict:
     """
@@ -83,10 +84,10 @@ def dplms_ge_dict(
     log.info(
         f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
     )
-
     log.info(
         f'Calculating noise matrix of length {dplms_dict["length"]} n. events: {bls.shape[0]}, size: {bls.shape[1]}'
     )
+
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
     log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
@@ -102,7 +103,7 @@ def dplms_ge_dict(
     t3 = time.time()
     log.info(f"Time to run dsp production {(t3-t2):.2f} s")
 
-    dsp_config["outputs"] = [ene_par, "dt_eff"]
+    dsp_config["outputs"] = [ene_par, ctc_par]
 
     # dictionary for peak fitting
     peak_dict = {
@@ -118,8 +119,6 @@ def dplms_ge_dict(
 
     # penalized coefficients
     dp_coeffs = dplms_dict["dp_coeffs"]
-    za_coeff = dplms_dict["dp_def"]["za"]
-    dp_coeffs.pop("za")
     coeff_keys = [key for key in dp_coeffs.keys()]
     lists = [dp_coeffs[key] for key in dp_coeffs.keys()]
 
@@ -145,13 +144,15 @@ def dplms_ge_dict(
 
         t_tmp = time.time()
         nm_coeff = coeff_values["nm"]
+        za_coeff = coeff_values["za"]
+        pl_coeff = coeff_values["pl"]
         ft_coeff = coeff_values["ft"]
         x, y, refy = filter_synthesis(
             ref,
             nm_coeff * nmat,
             rmat,
             za_coeff,
-            pmat,
+            pmat * pl_coeff,
             ft_coeff * fmat,
             dplms_dict["length"],
             wsize,
@@ -168,8 +169,8 @@ def dplms_ge_dict(
             res = fom_fwhm_with_alpha_fit(
                 dsp_opt,
                 peak_dict,
-                "dt_eff",
-                idxs=np.where(~np.isnan(dsp_opt["dt_eff"].nda))[0],
+                ctc_par,
+                idxs=np.where(~np.isnan(dsp_opt[ctc_par].nda))[0],
                 frac_max=0.5,
             )
         except Exception:
@@ -206,7 +207,9 @@ def dplms_ge_dict(
         fwhm_err = best_case_values.get("fwhm_err", 0)
         alpha = best_case_values.get("alpha", 0)
         nm_coeff = best_case_values.get("nm", dplms_dict["dp_def"]["nm"])
-        ft_coeff = best_case_values.get("ft", dplms_dict["dp_def"]["nm"])
+        za_coeff = best_case_values.get("za", dplms_dict["dp_def"]["za"])
+        pl_coeff = best_case_values.get("pl", dplms_dict["dp_def"]["pl"])
+        ft_coeff = best_case_values.get("ft", dplms_dict["dp_def"]["ft"])
         rt_coeff = best_case_values.get("rt", dplms_dict["dp_def"]["rt"])
         pt_coeff = best_case_values.get("pt", dplms_dict["dp_def"]["pt"])
         if all(
@@ -216,19 +219,21 @@ def dplms_ge_dict(
                 fwhm_err,
                 alpha,
                 nm_coeff,
+                za_coeff,
+                pl_coeff,
                 ft_coeff,
                 rt_coeff,
                 pt_coeff,
             ]
         ):
-            log.info(
-                f"\nBest case: FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, ctc {alpha}"
-            )
+            log.info(f"\nBest case: {best_case_values}")
         else:
             log.debug("Some values are missing in the best case results")
     else:
         log.debug("Filter synthesis failed")
         nm_coeff = dplms_dict["dp_def"]["nm"]
+        za_coeff = dplms_dict["dp_def"]["za"]
+        pl_coeff = dplms_dict["dp_def"]["pl"]
         ft_coeff = dplms_dict["dp_def"]["ft"]
         rt_coeff = dplms_dict["dp_def"]["rt"]
         pt_coeff = dplms_dict["dp_def"]["pt"]
@@ -246,7 +251,7 @@ def dplms_ge_dict(
         nm_coeff * nmat,
         rmat,
         za_coeff,
-        pmat,
+        pmat * pl_coeff,
         ft_coeff * fmat,
         dplms_dict["length"],
         wsize,
@@ -259,6 +264,7 @@ def dplms_ge_dict(
             "dp_coeffs": {
                 "nm": nm_coeff,
                 "za": za_coeff,
+                "pl": pl_coeff,
                 "ft": ft_coeff,
                 "rt": rt_coeff,
                 "pt": pt_coeff,
@@ -267,7 +273,7 @@ def dplms_ge_dict(
     }
     out_alpha_dict = {
         f"{ene_par}_ctc": {
-            "expression": f"{ene_par}*(1+dt_eff*a)",
+            "expression": f"{ene_par}*(1+{ctc_par}*a)",
             "parameters": {"a": round(alpha, 9)},
         }
     }
@@ -492,6 +498,47 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
     return nmat
 
 
+def noise_matrix_corr(
+    bls: np.ndarray, bls_corr: list[np.ndarray], length: int
+) -> np.ndarray:
+    all_bls = [bls] + bls_corr
+    n = len(all_bls)
+
+    processed = []
+    for arr in all_bls:
+        ref = np.mean(arr, axis=0)
+        processed.append(arr - np.mean(ref))
+
+    size = processed[0].shape[1]
+    kernel = np.identity(size - length + 1)
+
+    block_mat = [[None for _ in range(n)] for _ in range(n)]
+
+    for i in range(n):
+        for j in range(i, n):
+            nev = processed[i].shape[0]
+            nij = np.matmul(processed[i].T, processed[j], dtype=float) / nev
+            nij = convolve2d(nij, kernel, boundary="symm", mode="valid") / (
+                size - length + 1
+            )
+            block_mat[i][j] = nij
+            if i != j:
+                block_mat[j][i] = nij.T
+
+    big_size = n * length
+    nmat = np.full((big_size, big_size), np.nan)
+
+    for i in range(n):
+        for j in range(n):
+            if block_mat[i][j] is not None:
+                nmat[i * length : (i + 1) * length, j * length : (j + 1) * length] = (
+                    block_mat[i][j]
+                )
+
+    nmat = 0.5 * (nmat + nmat.T)
+    return nmat
+
+
 def signal_matrices(
     wfs: np.array, length: int, decay_const: float, ff: int = 2
 ) -> np.array:
@@ -509,7 +556,7 @@ def signal_matrices(
 
     # Pile-up matrix
     if decay_const > 0:
-        decay = np.exp(-np.arange(length) / decay_const)
+        decay = -np.arange(length) * decay_const
     else:
         decay = np.zeros(length)
     pmat = np.outer(decay, decay)
@@ -537,16 +584,79 @@ def filter_synthesis(
     size: int,
     flip: bool = True,
 ) -> np.array:
-    mat = nmat + rmat + za * np.ones([length, length]) + pmat + fmat
+    # Reference slice
     flo = (size // 2) - (length // 2)
     fhi = (size // 2) + (length // 2)
-    x = np.linalg.solve(mat, ref[flo:fhi]).astype(np.float32)
+    ref_window = ref[flo:fhi]
+
+    # Construct full correlated matrix
+    mat = nmat + rmat + za * np.ones([length, length]) + pmat + fmat
+
+    # Solve system for filter coefficients
+    x = np.linalg.solve(mat, ref_window).astype(np.float32)
+
+    # Normalize via convolution with reference
     y = convolve(ref, np.flip(x), mode="valid")
     maxy = np.max(y)
     x /= maxy
     y /= maxy
     refy = ref[(size // 2) - (len(y) // 2) : (size // 2) + (len(y) // 2)]
+
     if flip:
         return np.flip(x), y, refy
     else:
         return x, y, refy
+
+
+def filter_synthesis_corr(
+    ref: np.array,
+    nmat_corr: np.array,
+    rmat: np.array,
+    za: int,
+    pmat: np.array,
+    fmat: np.array,
+    length: int,
+    size: int,
+    flip: bool = True,
+) -> np.array:
+    # Extract number of correlated geds
+    n_geds = nmat_corr.shape[0] // length
+
+    # Reference slice
+    flo = (size // 2) - (length // 2)
+    fhi = (size // 2) + (length // 2)
+    ref_window = ref[flo:fhi]
+
+    # Extend reference
+    ref_corr = np.zeros(n_geds * length, dtype=np.float32)
+    ref_corr[:length] = ref_window
+
+    # Build extended correlation matrices
+    rmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
+    pmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
+    fmat_corr = np.zeros((n_geds * length, n_geds * length), dtype=np.float32)
+
+    rmat_corr[:length, :length] = rmat
+    pmat_corr[:length, :length] = pmat
+    fmat_corr[:length, :length] = fmat
+
+    # Construct full correlated matrix
+    mat_corr = (
+        nmat_corr
+        + rmat_corr
+        + pmat_corr
+        + fmat_corr
+        + za * np.ones((n_geds * length, n_geds * length), dtype=np.float32)
+    )
+
+    # Solve system for filter coefficients
+    x = np.linalg.solve(mat_corr, ref_corr).astype(np.float32)
+
+    # Normalize via convolution with reference
+    y = convolve(ref_corr, np.flip(x), mode="valid")
+    x /= np.max(y)
+
+    if flip:
+        return [np.flip(x[n * length : (n + 1) * length]) for n in range(n_geds)]
+    else:
+        return [x[n * length : (n + 1) * length] for n in range(n_geds)]
