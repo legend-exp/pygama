@@ -56,7 +56,11 @@ def convert_rawid(
         rawids = rawid_obj.flattened_data.nda
         detector = np.array(
             [
-                channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                (
+                    channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                    if rawid != 0
+                    else "0000000"
+                )
                 for rawid in rawids
             ]
         )
@@ -67,7 +71,11 @@ def convert_rawid(
         rawids = rawid_obj.nda
         detector = np.array(
             [
-                channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                (
+                    channel_mapping[datainfo.hit.table_fmt.replace("{}", str(rawid))]
+                    if rawid != 0
+                    else "0000000"
+                )
                 for rawid in rawids
             ]
         )
