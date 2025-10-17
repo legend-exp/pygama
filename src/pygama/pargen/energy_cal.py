@@ -2642,7 +2642,7 @@ def hpge_fit_energy_cal_func(
         covariance matrix for the best fit parameters.
     """
 
-    if deg == 0 and len(mus) ==1:
+    if deg == 0 and len(mus) == 1:
         e_vars = mu_vars / energy_scale_pars[1] ** 2
         scale, scale_cov = fit_simple_scaling(mus, energies_kev, var=e_vars)
         pars = np.array([0, scale])
@@ -2677,7 +2677,9 @@ def hpge_fit_energy_cal_func(
         else:
             if 0 not in fixed:
                 fixed.append([0])
-        c = cost.LeastSquares(mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper)
+        c = cost.LeastSquares(
+            mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper
+        )
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
@@ -2685,7 +2687,10 @@ def hpge_fit_energy_cal_func(
         m.simplex()
         m.migrad()
         m.hesse()
-    return m.values, m.errors, m.covariance
+        pars = m.values
+        cov = m.covariance
+        errs = m.errors
+    return pars, errs, cov
 
 
 def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
