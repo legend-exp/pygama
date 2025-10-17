@@ -2641,42 +2641,50 @@ def hpge_fit_energy_cal_func(
     cov : 2D array
         covariance matrix for the best fit parameters.
     """
-    d_mu_d_es = np.zeros(len(mus))
-    for n in range(len(energy_scale_pars) - 1):
-        d_mu_d_es += energy_scale_pars[n + 1] * mus ** (n + 1)
-    e_weights = np.sqrt(d_mu_d_es * mu_vars)
-    mask = np.isfinite(e_weights)
-    poly_pars = (
-        Polynomial.fit(
-            mus[mask],
-            energies_kev[mask],
-            deg=1 if deg == 0 else deg,
-            w=1 / e_weights[mask],
-        )
-        .convert()
-        .coef
-    )
-    if fixed is not None:
-        for idx, val in fixed.items():
-            if val is True or val is None:
-                pass
-            else:
-                poly_pars[idx] = val
-    if deg == 0:
-        poly_pars[0] = 0
-    if fixed is None:
-        fixed = [0]
+
+    if deg == 0 and len(mus) ==1:
+        e_vars = mu_vars / energy_scale_pars[1] ** 2
+        scale, scale_cov = fit_simple_scaling(mus, energies_kev, var=e_vars)
+        pars = np.array([0, scale])
+        cov = np.array([[0, 0], [0, scale_cov]])
+        errs = np.diag(np.sqrt(cov))
     else:
-        if 0 not in fixed:
-            fixed.append([0])
-    c = cost.LeastSquares(mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper)
-    m = Minuit(c, *poly_pars)
-    if fixed is not None:
-        for idx in list(fixed):
-            m.fixed[idx] = True
-    m.simplex()
-    m.migrad()
-    m.hesse()
+        d_mu_d_es = np.zeros(len(mus))
+        for n in range(len(energy_scale_pars) - 1):
+            d_mu_d_es += energy_scale_pars[n + 1] * mus ** (n + 1)
+        e_weights = np.sqrt(d_mu_d_es * mu_vars)
+        mask = np.isfinite(e_weights)
+        poly_pars = (
+            Polynomial.fit(
+                mus[mask],
+                energies_kev[mask],
+                deg=1 if deg == 0 else deg,
+                w=1 / e_weights[mask],
+            )
+            .convert()
+            .coef
+        )
+        if fixed is not None:
+            for idx, val in fixed.items():
+                if val is True or val is None:
+                    pass
+                else:
+                    poly_pars[idx] = val
+        if deg == 0:
+            poly_pars[0] = 0
+        if fixed is None:
+            fixed = [0]
+        else:
+            if 0 not in fixed:
+                fixed.append([0])
+        c = cost.LeastSquares(mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper)
+        m = Minuit(c, *poly_pars)
+        if fixed is not None:
+            for idx in list(fixed):
+                m.fixed[idx] = True
+        m.simplex()
+        m.migrad()
+        m.hesse()
     return m.values, m.errors, m.covariance
 
 
