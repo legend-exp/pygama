@@ -1251,7 +1251,7 @@ class DataLoader:
                 if self.output_format == "lgdo.Table":
                     return load_out
                 elif self.output_format == "pd.DataFrame":
-                    return [ tb.view_as("pd") for tb in load_out.values() ]
+                    return [tb.view_as("pd") for tb in load_out.values()]
                 else:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"

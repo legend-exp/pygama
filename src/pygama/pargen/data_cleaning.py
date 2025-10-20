@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Collection, Mapping
 
 import awkward as ak
 import lgdo.lh5 as lh5
@@ -13,7 +14,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from collections.abc import Mapping, Collection
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
