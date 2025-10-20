@@ -31,7 +31,7 @@ def test_ops_reorder():
 
 
 def test_basics(dsp_test_file, tmp_dir):
-    outfile = f"{tmp_dir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+    outfile = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
     build_hit(
         dsp_test_file,
@@ -41,9 +41,9 @@ def test_basics(dsp_test_file, tmp_dir):
     )
 
     assert os.path.exists(outfile)
-    assert lh5.ls(outfile, "/geds/") == ["geds/hit"]
+    assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
-    tbl = lh5.read("geds/hit", outfile)
+    tbl = lh5.read("ch1084803/hit", outfile)
     assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
 
 
@@ -67,9 +67,9 @@ def test_illegal_arguments(dsp_test_file):
 
 
 def test_lh5_table_configs(dsp_test_file, tmp_dir):
-    outfile = f"{tmp_dir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+    outfile = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
-    lh5_tables_config = {"/geds/dsp": f"{config_dir}/basic-hit-config.json"}
+    lh5_tables_config = {"/ch1084803/dsp": f"{config_dir}/basic-hit-config.json"}
 
     build_hit(
         dsp_test_file,
@@ -79,10 +79,10 @@ def test_lh5_table_configs(dsp_test_file, tmp_dir):
     )
 
     assert os.path.exists(outfile)
-    assert lh5.ls(outfile, "/geds/") == ["geds/hit"]
+    assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
     lh5_tables_config = {
-        "/geds/dsp": {
+        "/ch1084803/dsp": {
             "outputs": ["calE", "AoE"],
             "operations": {
                 "calE": {
@@ -102,11 +102,11 @@ def test_lh5_table_configs(dsp_test_file, tmp_dir):
     )
 
     assert os.path.exists(outfile)
-    assert lh5.ls(outfile, "/geds/") == ["geds/hit"]
+    assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
 
 def test_outputs_specification(dsp_test_file, tmp_dir):
-    outfile = f"{tmp_dir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+    outfile = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
     build_hit(
         dsp_test_file,
@@ -115,12 +115,12 @@ def test_outputs_specification(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    obj = lh5.read("/geds/hit", outfile)
+    obj = lh5.read("/ch1084803/hit", outfile)
     assert sorted(obj.keys()) == ["A_max", "AoE", "calE"]
 
 
 def test_aggregation_outputs(dsp_test_file, tmp_dir):
-    outfile = f"{tmp_dir}/LDQTA_r117_20200110T105115Z_cal_geds_hit.lh5"
+    outfile = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
     build_hit(
         dsp_test_file,
@@ -129,7 +129,7 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    obj = lh5.read("/geds/hit", outfile)
+    obj = lh5.read("/ch1084803/hit", outfile)
     assert sorted(obj.keys()) == [
         "aggr1",
         "aggr2",
@@ -138,7 +138,7 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
         "is_valid_tmax",
     ]
 
-    df = lh5.read_as("geds/hit", outfile, "pd")
+    df = lh5.read_as("ch1084803/hit", outfile, "pd")
 
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
     assert not (df["aggr1"] > 7).any()
@@ -161,78 +161,54 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
     assert are_identical
 
 
-def test_build_hit_spms_basic(dsp_test_file_spm, tmp_dir):
-    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms_hit.lh5"
-    build_hit(
-        dsp_test_file_spm,
-        outfile=out_file,
-        hit_config=f"{config_dir}/spms-hit-config.json",
-        wo_mode="overwrite_file",
-    )
-    assert lh5.ls(out_file) == ["ch0", "ch1", "ch2"]
-    assert lh5.ls(out_file, "ch0/") == ["ch0/hit"]
-    assert lh5.ls(out_file, "ch0/hit/") == [
-        "ch0/hit/energy_in_pe",
-        "ch0/hit/quality_cut",
-        "ch0/hit/trigger_pos",
-    ]
+def test_build_hit_multiconfig(dsp_test_file, tmp_dir):
+    out_file = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
-
-def test_build_hit_spms_multiconfig(dsp_test_file_spm, tmp_dir):
-    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms_hit.lh5"
-
-    # append the tmp_dir to the start of paths in the spms-hit-multi-config.json
-    with open(f"{config_dir}/spms-hit-multi-config.json") as f:
+    # append the tmp_dir to the start of paths in the hit-multi-config.json
+    with open(f"{config_dir}/hit-multi-config.json") as f:
         configdict = json.load(f)
     for key in configdict.keys():
         configdict[key] = f"{config_dir}/" + configdict[key].split("/")[-1]
     newdict = json.dumps(configdict)
-    with open(f"{tmp_dir}/spms-hit-multi-config.json", "w") as file:
+    with open(f"{tmp_dir}/hit-multi-config.json", "w") as file:
         file.write(newdict)
 
     build_hit(
-        dsp_test_file_spm,
+        dsp_test_file,
         outfile=out_file,
-        lh5_tables_config=f"{tmp_dir}/spms-hit-multi-config.json",
-        wo_mode="overwrite",
+        lh5_tables_config=f"{tmp_dir}/hit-multi-config.json",
+        wo_mode="of",
     )
-    assert lh5.ls(out_file) == ["ch0", "ch1", "ch2"]
-    assert lh5.ls(out_file, "ch0/") == ["ch0/hit"]
-    assert lh5.ls(out_file, "ch0/hit/") == [
-        "ch0/hit/energy_in_pe",
-        "ch0/hit/quality_cut",
-        "ch0/hit/trigger_pos",
-    ]
+    chans = ["ch1084803", "ch1084804", "ch1121600"]
+    assert lh5.ls(out_file) == chans
+    for ch in chans:
+        assert lh5.ls(out_file, f"{ch}/") == [f"{ch}/hit"]
+        assert set(lh5.ls(out_file, f"{ch}/hit/")) == {
+            f"{ch}/hit/calE",
+            f"{ch}/hit/AoE",
+            f"{ch}/hit/A_max",
+        }
 
 
-def test_build_hit_spms_calc(dsp_test_file_spm, tmp_dir):
-    out_file = f"{tmp_dir}/L200-comm-20211130-phy-spms_hit.lh5"
+def test_build_hit_calc(dsp_test_file, tmp_dir):
+    out_file = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
     build_hit(
-        dsp_test_file_spm,
+        dsp_test_file,
         outfile=out_file,
         wo_mode="overwrite_file",
-        lh5_tables_config=f"{config_dir}/spms-hit-a-config.json",
+        lh5_tables_config=f"{config_dir}/hit-multi-config.json",
     )
-    assert lh5.ls(out_file) == ["ch0", "ch1", "ch2"]
-    assert lh5.ls(out_file, "ch0/") == ["ch0/hit"]
-    assert lh5.ls(out_file, "ch0/hit/") == ["ch0/hit/energy_in_pe"]
+    chans = ["ch1084803", "ch1084804", "ch1121600"]
+    assert lh5.ls(out_file) == chans
+    assert lh5.ls(out_file, "ch1084803/") == ["ch1084803/hit"]
 
-    df0 = lh5.read_as("ch0/hit/energy_in_pe", out_file, "np")
-    df1 = lh5.read_as("ch1/hit/energy_in_pe", out_file, "np")
-    df2 = lh5.read_as("ch2/hit/energy_in_pe", out_file, "np")
+    for ch in chans:
+        df_hit = lh5.read_as(f"{ch}/hit/calE", out_file, "np")
+        df_dsp = lh5.read_as(f"{ch}/dsp/trapEmax", dsp_test_file, "np")
 
-    assert len(df0) == 5
-    assert len(df1) == 5
-    assert len(df2) == 5
-
-    assert len(df0[0]) == 20
-    assert len(df1[0]) == 20
-    assert len(df2[0]) == 20
-
-    assert np.nanmean(df0) == 0
-    assert np.nanmean(df1) == 1
-    assert np.nanmean(df2) == 2
+        assert len(df_hit) == len(df_dsp)
+        assert np.all(np.isclose(df_hit, np.sqrt(1.23 + 42.69 * (2 * df_dsp) ** 2)))
 
 
 def test_vov_input(lgnd_test_data, tmp_dir):
