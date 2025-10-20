@@ -13,6 +13,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from collections.abc import Mapping, Collection
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
@@ -64,16 +65,16 @@ def get_keys(in_data, cut_dict):
     Get the keys of the data that are used in the cut dictionary
     """
     parameters = []
-    for _, entry in cut_dict.items():
+    for entry in cut_dict.values():
         if "cut_parameter" in entry:
             parameters.append(entry["cut_parameter"])
         else:
             parameters.append(entry["expression"])
 
     out_params = []
-    if isinstance(in_data, dict):
+    if isinstance(in_data, Mapping):
         possible_keys = in_data.keys()
-    elif isinstance(in_data, list):
+    elif isinstance(in_data, Collection):
         possible_keys = in_data
     for param in parameters:
         for key in possible_keys:
