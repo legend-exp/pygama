@@ -577,7 +577,7 @@ def evaluate_expression(
 
             # if it is an evt query we can evaluate it directly here
             if table and "evt." in query:
-                query_mask = eval(query.replace("evt.", ""), table)
+                query_mask = eval(query.replace("evt.", ""), dict(table))
 
         # switch through modes
         if table and (

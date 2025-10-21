@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pint
-from dspeed import build_processing_chain
+from dspeed import build_dsp
 from dspeed.units import unit_registry as ureg
 from matplotlib.colors import LogNorm
 from scipy.optimize import minimize
@@ -55,10 +55,7 @@ def run_one_dsp(
         If fom_function is None, returns the output lh5 table for the DSP iteration
     """
 
-    pc, lh5_col_names, tb_out = build_processing_chain(
-        tb_data, dsp_config, db_dict=db_dict
-    )
-    pc.execute()
+    tb_out = build_dsp(tb_data, dsp_config=dsp_config, database=db_dict)
     if fom_function is not None:
         if fom_kwargs is not None:
             return fom_function(tb_out, verbosity, fom_kwargs)
