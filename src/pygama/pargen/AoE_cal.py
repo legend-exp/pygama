@@ -1754,8 +1754,8 @@ class CalAoE:
         """
         sfs = pd.DataFrame()
         for i, peak in enumerate(peaks):
-            fwhm = self.eres_func(peak)
             try:
+                fwhm = self.eres_func(peak)
                 if peak == 2039:
                     emin = 2 * fwhm
                     emax = 2 * fwhm

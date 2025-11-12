@@ -89,6 +89,8 @@ def get_mode_stdev(par_array):
     )
     par_array = par_array[idxs]
     bin_width = np.nanpercentile(par_array, 55) - np.nanpercentile(par_array, 50)
+    if bin_width == 0:
+        bin_width = np.std(par_array) / 4
 
     counts, start_bins, var = pgh.get_hist(
         par_array,
@@ -115,9 +117,12 @@ def get_mode_stdev(par_array):
         upper_bound = np.nanmax(par_array)
 
     try:
+        dx = np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)
+        if dx == 0:
+            dx = bin_width
         counts, bins, var = pgh.get_hist(
             par_array,
-            dx=(np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)),
+            dx=dx,
             range=(lower_bound, upper_bound),
         )
 
@@ -153,9 +158,14 @@ def get_mode_stdev(par_array):
             lower_bound = np.nanpercentile(par_array, 5)
             upper_bound = np.nanpercentile(par_array, 95)
 
+            dx = np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)
+
+            if dx == 0:
+                dx = bin_width
+
             counts, bins, var = pgh.get_hist(
                 par_array,
-                dx=np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50),
+                dx=dx,
                 range=(lower_bound, upper_bound),
             )
 
@@ -473,7 +483,14 @@ def generate_cuts(
             except KeyError:
                 all_par_array = data.eval(par).to_numpy()
 
-            mean, std = get_mode_stdev(all_par_array)
+            bad_entries = (~np.isnan(all_par_array)) & (~np.isinf(all_par_array))
+
+            if len(np.where(bad_entries)[0]) == 0:
+                raise RuntimeError(f"no valid entries for {par}")
+
+            mean, std = get_mode_stdev(
+                all_par_array[(~np.isnan(all_par_array)) & (~np.isinf(all_par_array))]
+            )
 
             if isinstance(num_sigmas, (int, float)):
                 num_sigmas_left = num_sigmas
