@@ -1,24 +1,25 @@
-from lgdo import lh5, Table, Array, VectorOfVectors
-from legendmeta import LegendMetadata
-from pathlib import Path
-from dbetto import Props, TextDB
-import awkward as ak
-import pandas as pd
-from collections.abc import Collection
-from pygama.flow.utils import to_datetime
 import os
 import re
-from lgdo import Table
+from collections.abc import Collection
+from pathlib import Path
+
+import awkward as ak
+from dbetto import Props, TextDB
+from legendmeta import LegendMetadata
+from lgdo import Array, Table, VectorOfVectors, lh5
+
+from pygama.flow.utils import to_datetime
+
 
 def query_metadata(
     runs: str,
     channels: str,
-    fields: Collection[str]=[],
-    prod_config: Path|str = "$REFPROD/dataflow-config.yaml",
+    fields: Collection[str] = [],
+    prod_config: Path | str = "$REFPROD/dataflow-config.yaml",
     par_tiers: Collection[str] = None,
     by_run: bool = False,
     return_query_vals: bool = False,
-    library: str = 'ak'
+    library: str = "ak",
 ):
     """Query the metadata and pars data for a reference production. Return
     a table containing one entry for each run/channel with the requested
@@ -87,13 +88,13 @@ def query_metadata(
 
     return_query_vals
         if ``True``, return values found in query as columns; else only return those in ``fields``
-    
+
     library
         format of returned table. Can be ''ak'', ''lgdo'' or ''pd''
     """
     # return ak.array of periods, runs, channels, and fields from pars db
     ref_config = Props.read_from(lh5.utils.expand_path(prod_config), subst_pathvar=True)
-    ref_paths = ref_config['paths']
+    ref_paths = ref_config["paths"]
     meta = LegendMetadata(ref_paths["metadata"])
     runinfo = meta.datasets.runinfo
 
@@ -108,13 +109,22 @@ def query_metadata(
                     "datatype": dtype,
                     "starttime": info.start_key,
                 }
-                if eval(runs, {}, run_record | {"starttime":to_datetime(info.start_key).replace(tzinfo=None)}):
+                if eval(
+                    runs,
+                    {},
+                    run_record
+                    | {"starttime": to_datetime(info.start_key).replace(tzinfo=None)},
+                ):
                     run_data.append(run_record)
 
     # get the paths and groups corresponding to our runs+channels queries
     ch_data = []
     if par_tiers is None:
-        par_dbs = [TextDB(path, lazy=True) for key, path in ref_paths.items() if key[:4]=="par_" and os.path.exists(path)]
+        par_dbs = [
+            TextDB(path, lazy=True)
+            for key, path in ref_paths.items()
+            if key[:4] == "par_" and os.path.exists(path)
+        ]
     else:
         par_dbs = [TextDB(ref_paths[f"par_{tier}"], lazy=True) for tier in par_tiers]
 
@@ -135,20 +145,22 @@ def query_metadata(
         if path is not None and col_name_map.get(path, None) is None:
             col_name_map[path] = alias
             # alias must be unique
-            if alias is not None and any(path!=p and alias==a for p, a in col_name_map.items()):
+            if alias is not None and any(
+                path != p and alias == a for p, a in col_name_map.items()
+            ):
                 raise ValueError(f"alias {alias} already assigned")
-        
+
         # path can only be aliased to a single name
         elif path in col_name_map and alias != col_name_map[path]:
             raise ValueError()
-        
+
         # If this is in the field list, add to col_list
         if field in fields:
             if alias is not None:
                 col_list.add(alias)
             else:
                 col_list.add(path)
-        
+
         elif field in expr_vars:
             if alias is not None:
                 channels = channels.replace(field, alias)
@@ -167,16 +179,16 @@ def query_metadata(
 
     # Now loop through runs and find detectors for each run matching channel query
     records = []
-    eval_success = False # track if the eval ever succeeds
+    eval_success = False  # track if the eval ever succeeds
 
     for run in run_data:
         detlist = meta.channelmap(run["starttime"], run["datatype"])
         r_info = runinfo[run["period"]][run["run"]][run["datatype"]]
         if by_run:
             if return_query_vals:
-                ch_records = { k:[] for k in col_name_map.values() }
+                ch_records = {k: [] for k in col_name_map.values()}
             else:
-                ch_records = { k:[] for k in col_list }
+                ch_records = {k: [] for k in col_list}
 
             records.append(run | ch_records)
 
@@ -184,7 +196,7 @@ def query_metadata(
             ch_record = dict()
             for path, col_name in col_name_map.items():
                 p = path.split(".")
-                
+
                 param = None
                 if p[0] == "@det":
                     param = det
@@ -200,7 +212,9 @@ def query_metadata(
                         try:
                             param = par_db.cal[run["period"]][run["run"]]
                             param.scan()
-                            param = param[next(iter(param.keys()))][f"ch{det.daq.rawid}"]
+                            param = param[next(iter(param.keys()))][
+                                f"ch{det.daq.rawid}"
+                            ]
                             for key in p[1:]:
                                 param = param[key]
                         except:
@@ -217,7 +231,9 @@ def query_metadata(
                             param = None
                             break
                 else:
-                    raise ValueError(f"could not find metadata location {f[0]}. Options are '@pars', '@det'")
+                    raise ValueError(
+                        f"could not find metadata location {f[0]}. Options are '@pars', '@det'"
+                    )
 
                 ch_record[col_name] = param
 
@@ -230,7 +246,7 @@ def query_metadata(
 
             if keep_record:
                 if not return_query_vals:
-                    ch_record = { k:v for k, v in ch_record.items() if k in col_list }
+                    ch_record = {k: v for k, v in ch_record.items() if k in col_list}
                 if by_run:
                     for k, v in ch_record.items():
                         ch_records[k].append(v)
@@ -242,9 +258,14 @@ def query_metadata(
         raise ValueError("Could not interpret channel query for any channels")
 
     result = ak.Array(records)
-    if library == 'ak':
+    if library == "ak":
         return ak.Array(result)
-    elif library == 'pd':
+    elif library == "pd":
         return ak.to_dataframe(ak.Array(result))
     else:
-        return Table({f: Array(a) if a.ndim==1 else VectorOfVectors(a) for f, a in result.items()})
+        return Table(
+            {
+                f: Array(a) if a.ndim == 1 else VectorOfVectors(a)
+                for f, a in result.items()
+            }
+        )
