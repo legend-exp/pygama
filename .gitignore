@@ -1,3 +1,6 @@
+# cmdstanpy stuff
+src/pygama/pargen/stan-models/**
+
 # New additions go at the top!
 *.c
 .DS_Store
