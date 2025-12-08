@@ -109,6 +109,20 @@ def gather_pulse_data(
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
+        if len(tbl_idxs_ch) > len(tcm.table_key):
+            # more indices than events... probably a pileup in TCM
+            msg = (
+                f"table indices size mismatch: len(tbl_idxs_ch)={len(tbl_idxs_ch)} > "
+                f"len(tcm.table_key)={len(tcm.table_key)}, "
+                "maybe TCM clustered two events together"
+            )
+            raise ValueError(msg)
+
+        if len(tbl_idxs_ch) == 0:
+            msg = f"No entries found in TCM for channel {channel}"
+            log.debug(msg)
+            continue
+
         # read the data in
         lgdo_obj = lh5.read(
             f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=tbl_idxs_ch
