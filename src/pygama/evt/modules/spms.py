@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 import awkward as ak
@@ -10,6 +11,8 @@ from lgdo import lh5, types
 
 from .. import utils
 from . import larveto
+
+log = logging.getLogger(__name__)
 
 
 def gather_pulse_data(
@@ -24,7 +27,7 @@ def gather_pulse_data(
     t_loc_ns: float = None,
     dt_range_ns: Sequence[float] = None,
     t_loc_default_ns: float = None,
-    drop_empty: bool = True,
+    out_layout: str = "sparse",
     energy_observable: str = "hit.energy_in_pe",
     t0_observable: str = "hit.trigger_pos",
 ) -> types.VectorOfVectors:
@@ -67,11 +70,19 @@ def gather_pulse_data(
     t_loc_default_ns
         default value for `t_loc_ns`, in case the supplied value is
         :any:`numpy.nan`.
-    drop_empty
-        if ``True``, drop empty arrays at the last axis (the pulse axis), i.e.
-        drop channels with no pulse data. The filtering is applied after the
-        application of the mask.
+    out_layout
+        specify the desired output layout. If ``sparse``, the output array will
+        be jagged such that non-triggered events in a channel are missing
+        (equivalent to calibration mode for geds).
+        If ``non_sparse``, the output array will have empty arrays for
+        non-triggered events in a channel.
+        if ``drop_empty``: similar to ``sparse``, but channels with no pulses
+        across all events are removed.
     """
+    if out_layout not in ["sparse", "non_sparse", "drop_empty"]:
+        msg = f"out_layout {out_layout} not recognized"
+        raise ValueError(msg)
+
     # parse observables string. default to hit tier
     p = observable.split(".")
     tier = p[0] if len(p) > 1 else "hit"
@@ -81,7 +92,7 @@ def gather_pulse_data(
 
     # loop over selected table_names and load hit data
     concatme = []
-    # number of channels per event
+    # number of triggered channels per event (why not ak.num(array, axis=1)?)
     evt_length = np.diff(
         np.insert(types.VectorOfVectors(tcm.table_key).cumulative_length, 0, 0)
     )
@@ -111,16 +122,25 @@ def gather_pulse_data(
             chan_tcm_indexs
         ]  # global ID's where channel had a trigger
 
-        # count number of hits per channel for global events with trigger in channel, else 0
-        glob_ids_cts = np.zeros(len(tcm.table_key), dtype=int)
-        glob_ids_cts[glob_ids_ch] = ak.count(data, axis=1)
+        pulse_count = ak.count(data, axis=1)
 
-        # insert empty row [] for global events with no trigger in channel
-        # unflatten to the number of hits in channel otherwise
-        data = ak.unflatten(ak.flatten(data), glob_ids_cts)
+        if out_layout == "non_sparse":
+            # count number of hits per channel for global events with trigger in channel, else 0
+            glob_ids_cts = np.zeros(len(tcm.table_key), dtype=int)
+            glob_ids_cts[glob_ids_ch] = pulse_count
+            # insert empty row [] for global events with no trigger in channel
+            # unflatten to the number of hits in channel otherwise
+            data = ak.unflatten(ak.flatten(data), glob_ids_cts)
 
         # increase the dimensionality by one (events)
         data = ak.unflatten(data, np.full(data.layout.length, 1, dtype="uint8"))
+
+        if out_layout != "non_sparse":
+            # prepare an (union) array like [[[x y]] [] [[z]] [[]]], where triggered events with 0 pulses
+            # show up with [[]], while non-triggered events will have []
+            trigger_mask = np.zeros(len(tcm.table_key), dtype=int)
+            trigger_mask[glob_ids_ch] = 1  # where we have a trigger in this channel
+            data = ak.unflatten(ak.flatten(data), trigger_mask)
 
         concatme.append(data)
 
@@ -141,6 +161,7 @@ def gather_pulse_data(
             t_loc_ns=t_loc_ns,
             dt_range_ns=dt_range_ns,
             t_loc_default_ns=t_loc_default_ns,
+            out_layout="non_sparse" if out_layout == "non_sparse" else "sparse",
             energy_observable=energy_observable,
             t0_observable=t0_observable,
         )
@@ -153,12 +174,13 @@ def gather_pulse_data(
         data = data[pulse_mask]
 
     # remove empty arrays = table_names with no pulses
-    if drop_empty:
+    if out_layout == "drop_empty":
         data = data[ak.count(data, axis=-1) > 0]
 
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
+# NOTE: TCM is always sparse
 def gather_tcm_data(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
@@ -234,11 +256,16 @@ def gather_tcm_data(
 
         # apply the mask
         data = data[ch_mask]
+    elif pulse_mask is not None:
+        log.warning(
+            "pulse_mask provided but drop_empty is False: pulse_mask will be ignored"
+        )
 
     return types.VectorOfVectors(data)
 
 
-# NOTE: the mask never gets the empty arrays removed
+# NOTE: no drop_empty here, as the mask has to match BEFORE
+# empty arrays are removed in gather_pulse_data()
 def make_pulse_data_mask(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
@@ -249,6 +276,7 @@ def make_pulse_data_mask(
     t_loc_ns=None,
     dt_range_ns=None,
     t_loc_default_ns=None,
+    out_layout: str = "sparse",  # only sparse or non-sparse here
     t0_observable="hit.trigger_pos",
     energy_observable="hit.energy_in_pe",
 ) -> types.VectorOfVectors:
@@ -281,6 +309,9 @@ def make_pulse_data_mask(
     energy_observable
         parameter to use for channels energy in the form `tier.param`
     """
+    if out_layout not in ["sparse", "non_sparse"]:
+        msg = f"out_layout {out_layout} not recognized"
+        raise ValueError(msg)
     # get the t0 of each single pulse
     pulse_t0 = gather_pulse_data(
         datainfo,
@@ -288,7 +319,7 @@ def make_pulse_data_mask(
         table_names,
         channel_mapping,
         observable=t0_observable,
-        drop_empty=False,
+        out_layout=out_layout,
     )
 
     pulse_amp = gather_pulse_data(
@@ -297,7 +328,7 @@ def make_pulse_data_mask(
         table_names,
         channel_mapping,
         observable=energy_observable,
-        drop_empty=False,
+        out_layout=out_layout,
     ).view_as("ak")
 
     # (HPGe) trigger position can vary among events!
