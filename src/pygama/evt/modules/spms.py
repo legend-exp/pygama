@@ -118,6 +118,11 @@ def gather_pulse_data(
             )
             raise ValueError(msg)
 
+        if len(tbl_idxs_ch) == 0:
+            msg = f"No entries found in TCM for channel {channel}"
+            log.debug(msg)
+            continue
+
         # read the data in
         lgdo_obj = lh5.read(
             f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=tbl_idxs_ch
