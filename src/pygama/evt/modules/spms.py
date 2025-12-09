@@ -207,7 +207,7 @@ def gather_tcm_data(
     t_loc_ns=None,
     dt_range_ns=None,
     t_loc_default_ns=None,
-    drop_empty=True,
+    drop_empty=False,
 ) -> types.VectorOfVectors:
     """Gather TCM data into a 2D :class:`~lgdo.types.vectorofvectors.VectorOfVectors`.
 
@@ -318,6 +318,12 @@ def make_pulse_data_mask(
     t_loc_default_ns
         default value for `t_loc_ns`, in case the supplied value is
         :any:`numpy.nan`.
+    out_layout
+        specify the desired output layout. If ``sparse``, the output array will
+        be jagged such that non-triggered events in a channel are missing
+        (equivalent to calibration mode for geds).
+        If ``non_sparse``, the output array will have empty arrays for
+        non-triggered events in a channel.
     t0_observable
         parameter to use for channels t0 in the form `tier.param`
     energy_observable
