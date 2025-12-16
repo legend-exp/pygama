@@ -104,6 +104,7 @@ def fit_binned(
         if isinstance(bounds, dict):
             for key, val in bounds.items():
                 m.limits[key] = val
+                log.debug(f"Set bound for {key} to {val}")
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True
@@ -316,6 +317,11 @@ def gauss_mode_width_max(
         vv,
         guess=guess,
         cost_func=cost_func,
+        bounds={
+            "mu": (bins[i_0], bins[i_n+1]),
+            "sigma": (0, None),
+            "a": (0, None),
+            }
     )
     if pars[1] < 0:
         pars[1] = -pars[1]
