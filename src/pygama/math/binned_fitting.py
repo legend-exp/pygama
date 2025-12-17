@@ -304,6 +304,9 @@ def gauss_mode_width_max(
     amp_guess = hist[i_0]
     i_0 -= int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
+    if i_0 < 0 or i_n >= len(hist):
+        msg = f"Fit range exceeds histogram bounds: i_0={i_0}, i_n={i_n}, hist_len={len(hist)}"
+        raise ValueError(msg)
     width_guess = bin_centers[i_n] - bin_centers[i_0]
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
@@ -315,10 +318,10 @@ def gauss_mode_width_max(
         guess=guess,
         cost_func=cost_func,
         bounds={
-            "mu": (bins[i_0], bins[i_n+1]),
+            "mu": (bins[i_0], bins[i_n + 1]),
             "sigma": (0, None),
             "a": (0, None),
-            }
+        },
     )
     if pars[1] < 0:
         pars[1] = -pars[1]
