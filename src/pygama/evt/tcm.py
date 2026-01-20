@@ -46,7 +46,7 @@ def generate_tcm_cols(
     correspond to event 1, and so on.
 
     Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
-        and :meth:`pandas.DataFrame.diff` functions:
+    and :meth:`pandas.DataFrame.diff` functions:
 
     - pull data into a :class:`pandas.DataFrame`
     - sort events by strictly ascending value of `coin_col`

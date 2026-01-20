@@ -1,5 +1,6 @@
 import os
 
+import awkward as ak
 import lgdo
 import numpy as np
 import pytest
@@ -348,3 +349,27 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     tcm_cols = lh5.read("tcm", clone)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+
+
+def test_build_tcm_multiple_files(lgnd_test_data, tmp_dir):
+    f_raw = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
+    )
+
+    tcm_orig = evt.build_tcm(
+        [
+            (f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"]),
+        ],
+        coin_cols="timestamp",
+    ).view_as("ak")
+
+    tcm = evt.build_tcm(
+        [
+            (f_raw, ["ch1084803/raw"]),
+            (f_raw, ["ch1084804/raw", "ch1121600/raw"]),
+        ],
+        coin_cols="timestamp",
+    ).view_as("ak")
+
+    assert tcm_orig.fields == tcm.fields
+    assert all(ak.all(tcm_orig[f] == tcm[f]) for f in tcm.fields)
