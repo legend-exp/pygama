@@ -207,6 +207,11 @@ def test_build_tcm_multiple_cols(lgnd_test_data):
         np.arange(1, 31),
     )
 
+    attrs = tcm.attrs
+    assert "hash_func" in attrs
+    assert "tables" in attrs
+    assert attrs["tables"] == "['ch1084803/raw', 'ch1084804/raw', 'ch1121600/raw']"
+
 
 def test_build_tcm_write(lgnd_test_data, tmp_dir):
     f_raw = lgnd_test_data.get_path(
