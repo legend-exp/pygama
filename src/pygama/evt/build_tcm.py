@@ -133,7 +133,7 @@ def build_tcm(
 
     iterators = []
     table_keys = []
-    all_tables = set()
+    all_tables = []
 
     # determine buffer length automatically
     if buffer_len is None:
@@ -164,7 +164,7 @@ def build_tcm(
         for pattern in patterns:
             for table in lh5.ls(filename, lh5_group=pattern):
                 tables_here.append(table)
-                all_tables.add(table)
+                all_tables.append(table)
 
         msg = f"found tables {tables_here} in file {filename}"
         log.debug(msg)
@@ -215,7 +215,7 @@ def build_tcm(
         try:
             out_tbl = tcm_gen.__next__()
             out_tbl.attrs.update(
-                {"tables": str(list(all_tables)), "hash_func": str(hash_func)}
+                {"tables": str(all_tables), "hash_func": str(hash_func)}
             )
             if out_file is not None:
                 lh5.write(
