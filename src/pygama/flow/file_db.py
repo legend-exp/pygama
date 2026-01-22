@@ -584,7 +584,7 @@ class FileDB:
                     )
 
             # now we can safely concat the dataframes
-            _df = pd.concat([_df, df], ignore_index=True, copy=False)
+            _df = pd.concat([_df, df], ignore_index=True)
 
         self.set_config(_cfg)
         self.df = _df
