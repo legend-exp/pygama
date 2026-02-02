@@ -117,8 +117,11 @@ def gather_pulse_data(
         out[glob_ids_ch] = ak.to_list(data)
 
     out = [entry if entry is not None else [] for entry in out]
-    data = types.VectorOfVectors(flattened_data=types.VectorOfVectors(ak.Array(out)),
-                                 cumulative_length = tcm_vov.cumulative_length.nda, attrs=utils.copy_lgdo_attrs(lgdo_obj))
+    data = types.VectorOfVectors(
+        flattened_data=types.VectorOfVectors(ak.Array(out)),
+        cumulative_length=tcm_vov.cumulative_length.nda,
+        attrs=utils.copy_lgdo_attrs(lgdo_obj),
+    )
 
     # check if user wants to apply a mask
     if pulse_mask is None and any(
@@ -151,7 +154,7 @@ def gather_pulse_data(
     # remove empty arrays = table_names with no pulses
     if drop_empty:
         data = data.view_as("ak")[ak.count(data, axis=-1) > 0]
-    
+
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
