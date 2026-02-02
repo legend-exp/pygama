@@ -94,7 +94,7 @@ def gather_pulse_data(
     # prepare output
     out = np.empty(len(tcm_vov.flattened_data.nda), dtype="object")
 
-    for i, channel in enumerate(sorted(table_names)):
+    for channel in enumerate(table_names):
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
         if table_id is None:
             continue
@@ -152,7 +152,7 @@ def gather_pulse_data(
         data = data.view_as("ak")[pulse_mask]
 
     # remove empty arrays = table_names with no pulses
-    if drop_empty:
+    if out_layout == "drop_empty":
         data = data.view_as("ak")[ak.count(data, axis=-1) > 0]
 
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
