@@ -141,7 +141,7 @@ def gather_pulse_data(
             t0_observable=t0_observable,
         )
 
-    if pulse_mask is None and drop_empty is False:
+    if pulse_mask is None and out_layout != "drop_empty":
         return data
 
     if pulse_mask is not None:
