@@ -94,7 +94,7 @@ def gather_pulse_data(
     # prepare output
     out = np.empty(len(tcm_vov.flattened_data.nda), dtype="object")
 
-    for channel in enumerate(table_names):
+    for channel in table_names:
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
         if table_id is None:
             continue
