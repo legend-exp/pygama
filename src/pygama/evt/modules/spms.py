@@ -90,17 +90,11 @@ def gather_pulse_data(
 
     tierinfo = datainfo._asdict()[tier]
 
-    # loop over selected table_names and load hit data
-    concatme = []
-    # number of triggered channels per event (why not ak.num(array, axis=1)?)
-    evt_length = np.diff(
-        np.insert(types.VectorOfVectors(tcm.table_key).cumulative_length, 0, 0)
-    )
+    tcm_vov = types.VectorOfVectors(tcm.table_key)
+    # prepare output
+    out = np.empty(len(tcm_vov.flattened_data.nda), dtype="object")
 
-    # construct global event ID's
-    glob_ids = np.repeat(np.arange(0, len(tcm.table_key), 1), evt_length)
-
-    for channel in table_names:
+    for i, channel in enumerate(sorted(table_names)):
         table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
         if table_id is None:
             continue
@@ -108,20 +102,6 @@ def gather_pulse_data(
         # determine list of indices found in the TCM that we want to load for channel
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
-
-        if len(tbl_idxs_ch) > len(tcm.table_key):
-            # more indices than events... probably a pileup in TCM
-            msg = (
-                f"table indices size mismatch: len(tbl_idxs_ch)={len(tbl_idxs_ch)} > "
-                f"len(tcm.table_key)={len(tcm.table_key)}, "
-                "maybe TCM clustered two events together"
-            )
-            raise ValueError(msg)
-
-        if len(tbl_idxs_ch) == 0:
-            msg = f"No entries found in TCM for channel {channel}"
-            log.debug(msg)
-            continue
 
         # read the data in
         lgdo_obj = lh5.read(
@@ -132,34 +112,13 @@ def gather_pulse_data(
         # remove nans (this happens when SiPM data is stored as ArrayOfEqualSizedArrays)
         data = ak.drop_none(ak.nan_to_none(data))
 
-        glob_ids_ch = glob_ids[
-            chan_tcm_indexs
-        ]  # global ID's where channel had a trigger
+        glob_ids_ch = np.where(tcm_vov.flattened_data.nda == table_id)[0]
 
-        pulse_count = ak.count(data, axis=1)
+        out[glob_ids_ch] = ak.to_list(data)
 
-        if out_layout == "non_sparse":
-            # count number of hits per channel for global events with trigger in channel, else 0
-            glob_ids_cts = np.zeros(len(tcm.table_key), dtype=int)
-            glob_ids_cts[glob_ids_ch] = pulse_count
-            # insert empty row [] for global events with no trigger in channel
-            # unflatten to the number of hits in channel otherwise
-            data = ak.unflatten(ak.flatten(data), glob_ids_cts)
-
-        # increase the dimensionality by one (events)
-        data = ak.unflatten(data, np.full(data.layout.length, 1, dtype="uint8"))
-
-        if out_layout != "non_sparse":
-            # prepare an (union) array like [[[x y]] [] [[z]] [[]]], where triggered events with 0 pulses
-            # show up with [[]], while non-triggered events will have []
-            trigger_mask = np.zeros(len(tcm.table_key), dtype=int)
-            trigger_mask[glob_ids_ch] = 1  # where we have a trigger in this channel
-            data = ak.unflatten(ak.flatten(data), trigger_mask)
-
-        concatme.append(data)
-
-    # concatenate along the event axes (i.e. gather table_names together)
-    data = ak.concatenate(concatme, axis=1)
+    out = [entry if entry is not None else [] for entry in out]
+    data = types.VectorOfVectors(flattened_data=types.VectorOfVectors(ak.Array(out)),
+                                 cumulative_length = tcm_vov.cumulative_length.nda, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
     # check if user wants to apply a mask
     if pulse_mask is None and any(
@@ -175,22 +134,24 @@ def gather_pulse_data(
             t_loc_ns=t_loc_ns,
             dt_range_ns=dt_range_ns,
             t_loc_default_ns=t_loc_default_ns,
-            out_layout="non_sparse" if out_layout == "non_sparse" else "sparse",
             energy_observable=energy_observable,
             t0_observable=t0_observable,
         )
+
+    if pulse_mask is None and drop_empty is False:
+        return data
 
     if pulse_mask is not None:
         if not isinstance(pulse_mask, ak.Array):
             pulse_mask = pulse_mask.view_as("ak")
 
         # apply the mask
-        data = data[pulse_mask]
+        data = data.view_as("ak")[pulse_mask]
 
     # remove empty arrays = table_names with no pulses
-    if out_layout == "drop_empty":
-        data = data[ak.count(data, axis=-1) > 0]
-
+    if drop_empty:
+        data = data.view_as("ak")[ak.count(data, axis=-1) > 0]
+    
     return types.VectorOfVectors(data, attrs=utils.copy_lgdo_attrs(lgdo_obj))
 
 
