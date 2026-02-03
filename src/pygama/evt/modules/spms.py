@@ -90,14 +90,19 @@ def gather_pulse_data(
 
     tierinfo = datainfo._asdict()[tier]
 
-    tcm_vov = types.VectorOfVectors(tcm.table_key)
-    # prepare output
-    out = np.empty(len(tcm_vov.flattened_data.nda), dtype="object")
+    table_ids = [
+        utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id)
+        for id in table_names
+        if utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, id) is not None
+    ]
 
-    for channel in table_names:
-        table_id = utils.get_tcm_id_by_pattern(tierinfo.table_fmt, channel)
-        if table_id is None:
-            continue
+    tcm_id_padded = types.VectorOfVectors(tcm.table_key).to_aoesa().view_as("np")
+    locs = np.isin(tcm_id_padded, table_ids)
+    tcm_filtered = types.VectorOfVectors(tcm.table_key[ak.from_regular(locs)])
+    # prepare output
+    out = np.empty(len(tcm_filtered.flattened_data.nda), dtype="object")
+
+    for table_id in table_ids:
 
         # determine list of indices found in the TCM that we want to load for channel
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
@@ -112,14 +117,14 @@ def gather_pulse_data(
         # remove nans (this happens when SiPM data is stored as ArrayOfEqualSizedArrays)
         data = ak.drop_none(ak.nan_to_none(data))
 
-        glob_ids_ch = np.where(tcm_vov.flattened_data.nda == table_id)[0]
+        glob_ids_ch = np.where(tcm_filtered.flattened_data.nda == table_id)[0]
 
         out[glob_ids_ch] = ak.to_list(data)
 
     out = [entry if entry is not None else [] for entry in out]
     data = types.VectorOfVectors(
         flattened_data=types.VectorOfVectors(ak.Array(out)),
-        cumulative_length=tcm_vov.cumulative_length.nda,
+        cumulative_length=tcm_filtered.cumulative_length.nda,
         attrs=utils.copy_lgdo_attrs(lgdo_obj),
     )
 
