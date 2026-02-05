@@ -131,11 +131,6 @@ def build_tcm(
             )
             raise ValueError(msg)
 
-    _filenames = [tpl[0] for tpl in input_tables]
-    if len(set(_filenames)) != len(_filenames):
-        msg = "file names specified multiple times in input_tables"
-        raise ValueError(msg)
-
     iterators = []
     table_keys = []
     all_tables = []
@@ -156,17 +151,25 @@ def build_tcm(
         )
         buffer_len = int(10**7 / (ntables * n_fields))
 
+    msg = f"buffer length is {buffer_len}"
+    log.debug(msg)
+
     # loop over files
     for filename, patterns in input_tables:
         if isinstance(patterns, str):
             patterns = [patterns]
 
         # make a list of tables in the file
+        tables_here = []
         for pattern in patterns:
             for table in lh5.ls(filename, lh5_group=pattern):
+                tables_here.append(table)
                 all_tables.append(table)
 
-        for table_idx, table in enumerate(all_tables):
+        msg = f"found tables {tables_here} in file {filename}"
+        log.debug(msg)
+
+        for table_idx, table in enumerate(tables_here):
             if hash_func is not None:
                 if isinstance(hash_func, str):
                     table_key = int(re.search(hash_func, table).group())
@@ -176,6 +179,9 @@ def build_tcm(
                     )
             else:
                 table_key = table_idx
+
+            msg = f"determined hash integer for {table}: {table_key}"
+            log.debug(msg)
 
             h5py_open_mode = "a" if out_file == filename else "r"
 
