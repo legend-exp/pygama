@@ -1,0 +1,163 @@
+channels:
+  spms_on:
+    system: spms
+    selectors:
+      analysis.usability: "on"
+
+outputs:
+  - trigger___timestamp
+  - spms___rawid
+  - spms___hit_idx
+  - spms___is_trig_coin_pulse
+  - spms___quality___is_physical
+  - spms___t0
+  - spms___energy
+  - spms___multiplicity
+  - spms___energy_sum
+
+operations:
+  _trigger___timestamp:
+    description: Gathered timestamps of events for triggering channels
+    channels: spms_on
+    aggregation_mode: gather
+    expression: hit.timestamp
+    initial: 0
+    lgdo_attrs:
+      units: s
+
+  trigger___timestamp:
+    description:
+      Timestamp of the event. Gathering necessary because data was taken in
+      non-sparse mode with zero-suppression.
+      Need to be aware, that some some events have no timestamps.
+    channels: spms_on
+    expression: ak.fill_none(ak.firsts(evt._trigger___timestamp), 0)
+    lgdo_attrs:
+      units: s
+
+  _spms___quality___is_above_thr_pulse:
+    description: >-
+      2D list of booleans. True if the SiPM pulse amplitude is above the noise
+      threshold. Includes afterpulses, i.e. amplitudes located between the
+      noise peak and the 1pe peak in the pe spectrum
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.gather_pulse_data(<...>,
+        observable='hit.is_valid_hit',
+        pulse_mask=None,
+      )
+    dtype: bool
+
+  spms___rawid:
+    description: >-
+      List of `hardware_tcm_1/array_id` values of all SiPM waveforms. This is
+      the rawid, the channel identifier.
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.gather_tcm_data(<...>,
+        tcm_field='table_key',
+      )
+    dtype: uint32
+
+  _spms___is_trig_coin_pulse_all:
+    description: Temporary hack (there is no HPGe t0)
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.make_pulse_data_mask(<...>,
+        t_loc_ns=7_000,
+        dt_range_ns=(-1_000, 5_000)
+      )
+    dtype: bool
+
+  spms___is_trig_coin_pulse:
+    description: >-
+      2D list of booleans. True if the `t0` of SiPM pulses above the noise
+      threshold is in a [-1, 5] us window around the the first HPGe `t0` (or
+      DAQ trigger position, by default)
+    expression: evt._spms___is_trig_coin_pulse_all[evt._spms___quality___is_above_thr_pulse]
+    dtype: bool
+
+  spms___quality___is_physical:
+    description: >-
+      List of booleans. True if the SiPM waveform is classified as physical
+      (i.e. not a cross-talk signal)
+    channels: spms_on
+    aggregation_mode: gather
+    expression: ~hit.has_any_noise
+
+  spms___hit_idx:
+    description: >-
+      List of `hardware_tcm_1/array_idx` values of all SiPM channel hits.
+      Useful to harvest hit data from lower tiers
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.gather_tcm_data(<...>,
+        tcm_field='row_in_table',
+      )
+    dtype: uint32
+
+  spms___t0:
+    description: >-
+      2D list of arrival times of all SiPM pulses above noise threshold
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.gather_pulse_data(<...>,
+        observable='hit.trigger_pos',
+        pulse_mask=evt._spms___quality___is_above_thr_pulse,
+      )
+    lgdo_attrs:
+      units: ns
+    dtype: float32
+
+  spms___energy:
+    description: >-
+      2D list of Amplitude (in p.e.) of all SiPM pulses above noise threshold
+    channels: spms_on
+    aggregation_mode: function
+    expression: >-
+      pygama.evt.modules.spms.gather_pulse_data(<...>,
+        observable='hit.energy_in_pe',
+        pulse_mask=evt._spms___quality___is_above_thr_pulse,
+      )
+    dtype: float32
+
+  _spms___t0_good:
+    description: >-
+      2D list of arrival times of all physical SiPM pulses above noise
+      threshold and in a [-1, 5] us window around the HPGe `t0` (or DAQ trigger
+      position, by default)
+    expression: >-
+      evt.spms___t0[evt.spms___is_trig_coin_pulse & evt.spms___quality___is_physical]
+
+  _spms___energy_good:
+    description: >-
+      2D list of Amplitude (in p.e.) of all physical SiPM pulses above noise
+      threshold and in a [-1, 5] us window around the HPGe `t0` (or DAQ trigger
+      position, by default)
+    expression: >-
+      evt.spms___energy[evt.spms___is_trig_coin_pulse & evt.spms___quality___is_physical]
+
+  spms___multiplicity:
+    description: >-
+      SiPM channel multiplicity, i.e. number of channels observing a physical
+      signal above noise threshold and in a [-1, 5] us window around the HPGe
+      `t0` (or DAQ trigger position, by default)
+    channels: spms_on
+    expression: >-
+      ak.sum(ak.count(evt._spms___energy_good, axis=-1) > 0, axis=-1)
+    dtype: uint16
+
+  spms___energy_sum:
+    description: >-
+      Summed amplitude (in p.e.) over all physical SiPM pulses in all channels
+      above noise threshold and in a [-1, 5] us window around the first HPGe
+      `t0` (or DAQ trigger position, by default)
+    channels: spms_on
+    expression: >-
+      ak.sum(ak.sum(evt._spms___energy_good, axis=-1), axis=-1)
+    dtype: float32

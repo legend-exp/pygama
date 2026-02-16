@@ -10,7 +10,7 @@ config_dir = Path(__file__).parent / "configs"
 @pytest.fixture(scope="session")
 def lgnd_test_data():
     ldata = LegendTestData()
-    ldata.checkout("756aef8")
+    ldata.checkout("229cde0")
     return ldata
 
 
