@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 import yaml
 from dbetto import AttrsDict
-from legendmeta import LegendMetadata
 from lgdo import Array, Table, VectorOfVectors, lh5, read_as
 
 from pygama.evt import build_evt
@@ -147,33 +146,8 @@ def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
         "evt": (outfile, "evt"),
     }
 
-    # see also legend-dataflow/workflow/src/legenddataflow/scripts/tier/evt.py
-    def fill_channel_lists(evt_config: AttrsDict, chmap: AttrsDict) -> None:
-        for field, dic in evt_config.channels.items():
-            if isinstance(dic, dict):
-                chans = chmap.map("system", unique=False)[dic["system"]]
-                if "selectors" in dic:
-                    try:
-                        for k, val in dic["selectors"].items():
-                            chans = chans.map(k, unique=False)[val]
-                    except KeyError:
-                        chans = None
-                if chans is not None:
-                    chans = [f"ch{chan}" for chan in list(chans.map("daq.rawid"))]
-                else:
-                    chans = []
-                evt_config.channels[field] = chans
-
-    def fill_channel_mapping(evt_config: AttrsDict, chmap: AttrsDict) -> None:
-        evt_config["channel_mapping"] = {
-            f"ch{chan}": dic.name for chan, dic in chmap.map("daq.rawid").items()
-        }
-
-    chmap = LegendMetadata(None, lazy=True).channelmap(on="20241210T230220Z")
     with open(f"{config_dir}/spms-p13-config.yaml") as file:
         evt_config = AttrsDict(yaml.safe_load(file))
-    fill_channel_lists(evt_config, chmap)
-    fill_channel_mapping(evt_config, chmap)
 
     build_evt(
         files_config,
