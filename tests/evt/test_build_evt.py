@@ -3,11 +3,10 @@ from pathlib import Path
 import awkward as ak
 import numpy as np
 import pytest
-from lgdo import Array, Table, VectorOfVectors, lh5
+import yaml
 from dbetto import AttrsDict
 from legendmeta import LegendMetadata
-import yaml
-from lgdo import read_as
+from lgdo import Array, Table, VectorOfVectors, lh5, read_as
 
 from pygama.evt import build_evt
 
@@ -125,19 +124,26 @@ def test_field_nesting(files_config_nowrite):
     assert sorted(evt.sub1.keys()) == ["timestamp"]
     assert sorted(evt.sub2.keys()) == ["dummy", "multiplicity"]
 
-@pytest.mark.parametrize("tcm_path", [
-    "lh5/l200-truncated/generated/tier/tcm/ath/p13/r001/l200-p13-r001-ath-20241210T230220Z-tier_tcm.lh5", 
-    "lh5/l200-truncated/generated/tier/tcm/ant/p13/r001/l200-p13-r001-ant-20241210T225016Z-tier_tcm.lh5"
-    ])
+
+@pytest.mark.parametrize(
+    "tcm_path",
+    [
+        "lh5/l200-truncated/generated/tier/tcm/ath/p13/r001/l200-p13-r001-ath-20241210T230220Z-tier_tcm.lh5",
+        "lh5/l200-truncated/generated/tier/tcm/ant/p13/r001/l200-p13-r001-ant-20241210T225016Z-tier_tcm.lh5",
+    ],
+)
 def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
     """Test using sparse (ath) and non-sparse (ant), SiPM-only p13 data (truncated to 50 events)."""
 
-    #tcm_path = "lh5/l200-truncated/generated/tier/tcm/ath/p13/r001/l200-p13-r001-ath-20241210T230220Z-tier_tcm.lh5"
     outfile = f"{tmp_dir}/{Path(tcm_path).name}".replace("tcm", "evt")
     files_config = {
         "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
         "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
-        "hit": (hit_file := lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")), "hit", "ch{}"),
+        "hit": (
+            hit_file := lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+            "hit",
+            "ch{}",
+        ),
         "evt": (outfile, "evt"),
     }
 
@@ -162,7 +168,7 @@ def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
         evt_config["channel_mapping"] = {
             f"ch{chan}": dic.name for chan, dic in chmap.map("daq.rawid").items()
         }
-    
+
     chmap = LegendMetadata(None, lazy=True).channelmap(on="20241210T230220Z")
     with open(f"{config_dir}/spms-p13-config.yaml") as file:
         evt_config = AttrsDict(yaml.safe_load(file))
@@ -182,15 +188,18 @@ def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
     for raw_key in raw_keys:
         hit_e = read_as(f"ch{raw_key}/hit/energy_in_pe", hit_file, "ak")
         hit_is_valid_hit = read_as(f"ch{raw_key}/hit/is_valid_hit", hit_file, "ak")
-        hit_e = hit_e[hit_is_valid_hit] # apply is_valid_hit for hit data
-        
+        hit_e = hit_e[hit_is_valid_hit]  # apply is_valid_hit for hit data
+
         # compute array for one channel; matching hit shape.
         # checks en passant if energy and rawid have the same shape.
-        evt_e = ak.flatten(evt.spms.energy.view_as("ak")[evt.spms.rawid.view_as("ak")==raw_key], axis=1)
+        evt_e = ak.flatten(
+            evt.spms.energy.view_as("ak")[evt.spms.rawid.view_as("ak") == raw_key],
+            axis=1,
+        )
 
         assert ak.all(ak.isclose(hit_e, evt_e, rtol=1e-4, atol=1e-3))
 
-    #check if same shape
+    # check if same shape
     _ = evt.spms.energy.view_as("ak")[evt.spms.quality.is_physical.view_as("ak")]
     _ = evt.spms.energy.view_as("ak")[evt.spms.t0.view_as("ak") > 5e3]
 
