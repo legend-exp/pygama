@@ -15,6 +15,80 @@ log = logging.getLogger(__name__)
 coin_groups = namedtuple("coin_groups", ["name", "window", "window_ref"])
 
 
+def _make_structured_sort_key(df: pd.DataFrame, sort_cols: list[str]) -> np.ndarray:
+    arrays = [df[c].to_numpy() for c in sort_cols]
+    key = np.empty(
+        len(df), dtype=[(c, arr.dtype) for c, arr in zip(sort_cols, arrays, strict=True)]
+    )
+    for c, arr in zip(sort_cols, arrays, strict=True):
+        key[c] = arr
+    return key
+
+
+def _sort_tcm_chunk(df: pd.DataFrame, sort_cols: list[str]) -> pd.DataFrame:
+    if df is None or len(df) == 0:
+        return df
+
+    # Fast-path: if primary key is already monotonic, only sort within equal-key runs
+    primary = sort_cols[0]
+    primary_arr = df[primary].to_numpy()
+    if np.all(primary_arr[:-1] <= primary_arr[1:]):
+        change = np.flatnonzero(primary_arr[1:] != primary_arr[:-1]) + 1
+        starts = np.concatenate(([0], change))
+        stops = np.concatenate((change, [len(df)]))
+
+        order_parts: list[np.ndarray] = []
+        if len(sort_cols) == 1:
+            order = np.arange(len(df), dtype=np.int64)
+        else:
+            rest_cols = sort_cols[1:]
+            rest_arrays = {c: df[c].to_numpy() for c in rest_cols}
+
+            for s, e in zip(starts, stops, strict=True):
+                if e - s <= 1:
+                    order_parts.append(np.arange(s, e, dtype=np.int64))
+                    continue
+
+                keys = tuple(rest_arrays[c][s:e] for c in rest_cols[::-1])
+                order_parts.append(np.lexsort(keys).astype(np.int64) + s)
+
+            order = np.concatenate(order_parts) if order_parts else np.arange(len(df))
+
+        return df.take(order).reset_index(drop=True)
+
+    return df.sort_values(sort_cols, kind="mergesort", ignore_index=True)
+
+
+def _merge_sorted_tcm(tcm: pd.DataFrame, new_tcm: pd.DataFrame, sort_cols: list[str]) -> pd.DataFrame:
+    if tcm is None:
+        return new_tcm
+    if new_tcm is None:
+        return tcm
+
+    a_key = _make_structured_sort_key(tcm, sort_cols)
+    b_key = _make_structured_sort_key(new_tcm, sort_cols)
+
+    n = len(tcm)
+    m = len(new_tcm)
+
+    # Insert each b element into a; b is sorted so insertion positions are nondecreasing.
+    pos_in_a = np.searchsorted(a_key, b_key, side="right")
+    pos_b = pos_in_a + np.arange(m, dtype=np.int64)
+
+    is_b = np.zeros(n + m, dtype=bool)
+    is_b[pos_b] = True
+
+    order = np.empty(n + m, dtype=np.int64)
+    order[~is_b] = np.arange(n, dtype=np.int64)
+    order[is_b] = n + np.arange(m, dtype=np.int64)
+
+    return (
+        pd.concat([tcm, new_tcm], ignore_index=True, copy=False)
+        .take(order)
+        .reset_index(drop=True)
+    )
+
+
 def generate_tcm_cols(
     iterators: list,
     coin_windows: float = 0,
@@ -126,26 +200,17 @@ def generate_tcm_cols(
 
         sort_cols = [entry.name for entry in coin_windows] + ["table_key"]
 
-        print(dfs)
-
         log.debug("sorting new dfs")
         if len(dfs) > 0:
-            new_tcm = pd.concat(dfs).sort_values(sort_cols)
+            new_tcm = _sort_tcm_chunk(
+                pd.concat(dfs, ignore_index=True, copy=False), sort_cols
+            )
         else:
             new_tcm = None
         log.debug("sorting new dfs: done")
 
         log.debug("merging sorted data")
-        if tcm is None:
-            tcm = new_tcm
-        elif new_tcm is None:
-            pass
-        else:
-            # Fast merge of two already-sorted DataFrames
-            tcm = (
-                pd.concat([tcm, new_tcm], ignore_index=True, copy=False)
-                .sort_values(sort_cols, kind="mergesort", ignore_index=True)
-            )
+        tcm = _merge_sorted_tcm(tcm, new_tcm, sort_cols)
         log.debug("merging sorted data: done")
 
         # define mask, true when new event, false if part of same event
