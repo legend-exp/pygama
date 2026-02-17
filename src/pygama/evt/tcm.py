@@ -126,6 +126,8 @@ def generate_tcm_cols(
 
         sort_cols = [entry.name for entry in coin_windows] + ["table_key"]
 
+        print(dfs)
+
         log.debug("sorting new dfs")
         if len(dfs) > 0:
             new_tcm = pd.concat(dfs).sort_values(sort_cols)
