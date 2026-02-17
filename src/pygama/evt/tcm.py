@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import namedtuple
+from heapq import merge
 
 import numpy as np
 import pandas as pd
@@ -124,16 +125,29 @@ def generate_tcm_cols(
         if at_end.all() and len(dfs) == 0 and tcm is None:
             break
 
-        log.debug("concatenating and sorting")
-        if tcm is None:
-            tcm = pd.concat(dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["table_key"]
-            )
+        sort_cols = [entry.name for entry in coin_windows] + ["table_key"]
+
+        log.debug("sorting new dfs")
+        if len(dfs) > 0:
+            new_tcm = pd.concat(dfs).sort_values(sort_cols)
         else:
-            tcm = pd.concat([tcm] + dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["table_key"]
+            new_tcm = None
+        log.debug("sorting new dfs: done")
+
+        log.debug("merging sorted data")
+        if tcm is None:
+            tcm = new_tcm
+        elif new_tcm is None:
+            pass
+        else:
+            tcm = pd.DataFrame(
+                merge(
+                    tcm.to_dict("records"),
+                    new_tcm.to_dict("records"),
+                    key=lambda r: tuple(r[c] for c in sort_cols),
+                )
             )
-        log.debug("concatenating and sorting: done")
+        log.debug("merging sorted data: done")
 
         # define mask, true when new event, false if part of same event
         mask = np.zeros(len(tcm) - 1, dtype=bool)
