@@ -18,7 +18,8 @@ coin_groups = namedtuple("coin_groups", ["name", "window", "window_ref"])
 def _make_structured_sort_key(df: pd.DataFrame, sort_cols: list[str]) -> np.ndarray:
     arrays = [df[c].to_numpy() for c in sort_cols]
     key = np.empty(
-        len(df), dtype=[(c, arr.dtype) for c, arr in zip(sort_cols, arrays, strict=True)]
+        len(df),
+        dtype=[(c, arr.dtype) for c, arr in zip(sort_cols, arrays, strict=True)],
     )
     for c, arr in zip(sort_cols, arrays, strict=True):
         key[c] = arr
@@ -59,7 +60,9 @@ def _sort_tcm_chunk(df: pd.DataFrame, sort_cols: list[str]) -> pd.DataFrame:
     return df.sort_values(sort_cols, kind="mergesort", ignore_index=True)
 
 
-def _merge_sorted_tcm(tcm: pd.DataFrame, new_tcm: pd.DataFrame, sort_cols: list[str]) -> pd.DataFrame:
+def _merge_sorted_tcm(
+    tcm: pd.DataFrame, new_tcm: pd.DataFrame, sort_cols: list[str]
+) -> pd.DataFrame:
     if tcm is None:
         return new_tcm
     if new_tcm is None:
