@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections import namedtuple
-from heapq import merge
 
 import numpy as np
 import pandas as pd
@@ -140,12 +139,10 @@ def generate_tcm_cols(
         elif new_tcm is None:
             pass
         else:
-            tcm = pd.DataFrame(
-                merge(
-                    tcm.to_dict("records"),
-                    new_tcm.to_dict("records"),
-                    key=lambda r: tuple(r[c] for c in sort_cols),
-                )
+            # Fast merge of two already-sorted DataFrames
+            tcm = (
+                pd.concat([tcm, new_tcm], ignore_index=True, copy=False)
+                .sort_values(sort_cols, kind="mergesort", ignore_index=True)
             )
         log.debug("merging sorted data: done")
 
