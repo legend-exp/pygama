@@ -124,6 +124,7 @@ def generate_tcm_cols(
         if at_end.all() and len(dfs) == 0 and tcm is None:
             break
 
+        log.debug("concatenating and sorting (Pandas)")
         if tcm is None:
             tcm = pd.concat(dfs).sort_values(
                 [entry.name for entry in coin_windows] + ["table_key"]
@@ -132,6 +133,7 @@ def generate_tcm_cols(
             tcm = pd.concat([tcm] + dfs).sort_values(
                 [entry.name for entry in coin_windows] + ["table_key"]
             )
+        log.debug("concatenating and sorting: done")
 
         # define mask, true when new event, false if part of same event
         mask = np.zeros(len(tcm) - 1, dtype=bool)
