@@ -124,7 +124,7 @@ def generate_tcm_cols(
         if at_end.all() and len(dfs) == 0 and tcm is None:
             break
 
-        log.debug("concatenating and sorting (Pandas)")
+        log.debug("concatenating and sorting")
         if tcm is None:
             tcm = pd.concat(dfs).sort_values(
                 [entry.name for entry in coin_windows] + ["table_key"]
