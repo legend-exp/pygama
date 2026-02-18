@@ -92,6 +92,58 @@ def generate_tcm_cols(
         order = np.lexsort([table_key_np] + list(reversed(coin_key_nps)))
         return arr[order]
 
+    def _get_sort_keys(arr: ak.Array, coin_windows_local) -> list[np.ndarray]:
+        keys = [ak.to_numpy(arr[entry.name]) for entry in coin_windows_local]
+        keys.append(ak.to_numpy(arr["table_key"]))
+        return keys
+
+    def _merge_sorted_tcms(a: ak.Array, b: ak.Array, coin_windows_local) -> ak.Array:
+        if a is None or len(a) == 0:
+            return b
+        if b is None or len(b) == 0:
+            return a
+
+        a_keys = _get_sort_keys(a, coin_windows_local)
+        b_keys = _get_sort_keys(b, coin_windows_local)
+
+        na = len(a)
+        nb = len(b)
+        out_idx = np.empty(na + nb, dtype=np.int64)
+
+        ia = 0
+        ib = 0
+        io = 0
+
+        while ia < na and ib < nb:
+            take_a = False
+            for ka, kb in zip(a_keys, b_keys):
+                va = ka[ia]
+                vb = kb[ib]
+                if va < vb:
+                    take_a = True
+                    break
+                if va > vb:
+                    take_a = False
+                    break
+            else:
+                # stable: if identical keys, keep existing tcm (a) first
+                take_a = True
+
+            if take_a:
+                out_idx[io] = ia
+                ia += 1
+            else:
+                out_idx[io] = na + ib
+                ib += 1
+            io += 1
+
+        if ia < na:
+            out_idx[io:] = np.arange(ia, na, dtype=np.int64)
+        else:
+            out_idx[io:] = na + np.arange(ib, nb, dtype=np.int64)
+
+        return ak.concatenate([a, b], axis=0)[out_idx]
+
     if isinstance(iterators, list):
         iterators = np.array(iterators)
 
@@ -148,16 +200,16 @@ def generate_tcm_cols(
         if len(arrays) == 0 and tcm is None:
             continue
 
+        new_tcm = ak.concatenate(arrays, axis=0) if len(arrays) > 0 else None
+        new_tcm = _sort_tcm(new_tcm, coin_windows)
+
         if tcm is None:
-            tcm = ak.concatenate(arrays, axis=0) if len(arrays) > 0 else None
+            tcm = new_tcm
         else:
-            if len(arrays) > 0:
-                tcm = ak.concatenate([tcm] + arrays, axis=0)
+            tcm = _merge_sorted_tcms(tcm, new_tcm, coin_windows)
 
         if tcm is None or len(tcm) == 0:
             continue
-
-        tcm = _sort_tcm(tcm, coin_windows)
 
         # define mask, true when new event, false if part of same event
         mask = np.zeros(len(tcm) - 1, dtype=bool)
