@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from collections import namedtuple
 
+import awkward as ak
 import numpy as np
-import pandas as pd
 from lgdo.types import Table, VectorOfVectors
 
 # later on we might want a tcm class, or interface / inherit from an entry list
@@ -45,12 +45,8 @@ def generate_tcm_cols(
     `table_key` and `row_in_table` correspond to the hits in event 0, rows 4 to 6
     correspond to event 1, and so on.
 
-    Makes use of :func:`pandas.concat`, :meth:`pandas.DataFrame.sort_values`,
-        and :meth:`pandas.DataFrame.diff` functions:
-
-    - pull data into a :class:`pandas.DataFrame`
-    - sort events by strictly ascending value of `coin_col`
-    - group hits if the difference in `coin_data` is less than `coin_window`
+    This implementation uses Awkward Arrays for concatenation, sorting, and
+    clustering.
 
     Parameters
     ----------
@@ -85,18 +81,89 @@ def generate_tcm_cols(
         ``row_in_table`` specify the location in ``coin_data`` of each datum
         belonging to the coincidence event.
     """
+
+    def _sort_tcm(arr: ak.Array, coin_windows_local) -> ak.Array:
+        if arr is None or len(arr) == 0:
+            return arr
+
+        # primary keys are coin_cols in given order, with table_key as a tie-breaker
+        table_key_np = ak.to_numpy(arr["table_key"])
+        coin_key_nps = [ak.to_numpy(arr[entry.name]) for entry in coin_windows_local]
+        order = np.lexsort([table_key_np] + list(reversed(coin_key_nps)))
+        return arr[order]
+
+    def _get_sort_keys(arr: ak.Array, coin_windows_local) -> list[np.ndarray]:
+        keys = [ak.to_numpy(arr[entry.name]) for entry in coin_windows_local]
+        keys.append(ak.to_numpy(arr["table_key"]))
+        return keys
+
+    def _merge_sorted_tcms(a: ak.Array, b: ak.Array, coin_windows_local) -> ak.Array:
+        if a is None or len(a) == 0:
+            return b
+        if b is None or len(b) == 0:
+            return a
+
+        a_keys = _get_sort_keys(a, coin_windows_local)
+        b_keys = _get_sort_keys(b, coin_windows_local)
+
+        na = len(a)
+        nb = len(b)
+        out_idx = np.empty(na + nb, dtype=np.int64)
+
+        ia = 0
+        ib = 0
+        io = 0
+
+        while ia < na and ib < nb:
+            take_a = False
+            for ka, kb in zip(a_keys, b_keys):
+                va = ka[ia]
+                vb = kb[ib]
+                if va < vb:
+                    take_a = True
+                    break
+                if va > vb:
+                    take_a = False
+                    break
+            else:
+                # stable: if identical keys, keep existing tcm (a) first
+                take_a = True
+
+            if take_a:
+                out_idx[io] = ia
+                ia += 1
+            else:
+                out_idx[io] = na + ib
+                ib += 1
+            io += 1
+
+        if ia < na:
+            out_idx[io:] = np.arange(ia, na, dtype=np.int64)
+        else:
+            out_idx[io:] = na + np.arange(ib, nb, dtype=np.int64)
+
+        return ak.concatenate([a, b], axis=0)[out_idx]
+
     if isinstance(iterators, list):
         iterators = np.array(iterators)
+
+    if coin_windows in (None, 0):
+        coin_windows = []
+    elif not isinstance(coin_windows, (list, tuple, np.ndarray)):
+        coin_windows = [coin_windows]
 
     tcm = None
     at_end = np.zeros(len(iterators), dtype=bool)
     skip_mask = np.zeros(len(iterators), dtype=bool)
     buffer = None
+
     if table_keys is None:
         table_keys = np.arange(0, len(iterators))
+
     while not at_end.all():
         curr_mask = ~skip_mask & ~at_end
-        dfs = []
+        arrays = []
+
         for _ii, it in enumerate(iterators[curr_mask]):
             ii = np.where(curr_mask)[0][_ii]
             try:
@@ -106,37 +173,48 @@ def generate_tcm_cols(
             except StopIteration:
                 at_end[ii] = True
                 continue
+
             if buf_len < it.buffer_len:
                 at_end[ii] = True
-            table_key = table_keys[ii]
-            table_key = np.full(buf_len, table_key, dtype=int)
-            buffer = buffer.view_as("pd")[:buf_len]
-            buffer["table_key"] = table_key
-            if row_in_tables is not None:
-                buffer["row_in_table"] = row_in_tables.astype(int)[ii][
-                    start : start + buf_len
-                ]
-            else:
-                buffer["row_in_table"] = np.arange(start, start + buf_len, dtype=int)
-            if len(buffer) > 0:
-                dfs.append(buffer)  # don't copy the data!
 
-        if at_end.all() and len(dfs) == 0 and tcm is None:
+            if buf_len <= 0:
+                continue
+
+            buf_ak = buffer.view_as("ak")[:buf_len]
+
+            table_key = int(table_keys[ii])
+            buf_ak = ak.with_field(
+                buf_ak, np.full(buf_len, table_key, dtype=int), "table_key"
+            )
+
+            if row_in_tables is not None:
+                row_in_table = row_in_tables.astype(int)[ii][start : start + buf_len]
+            else:
+                row_in_table = np.arange(start, start + buf_len, dtype=int)
+            buf_ak = ak.with_field(buf_ak, row_in_table, "row_in_table")
+
+            arrays.append(buf_ak)
+
+        if at_end.all() and len(arrays) == 0 and tcm is None:
             break
+        if len(arrays) == 0 and tcm is None:
+            continue
+
+        new_tcm = ak.concatenate(arrays, axis=0) if len(arrays) > 0 else None
+        new_tcm = _sort_tcm(new_tcm, coin_windows)
 
         if tcm is None:
-            tcm = pd.concat(dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["table_key"]
-            )
+            tcm = new_tcm
         else:
-            tcm = pd.concat([tcm] + dfs).sort_values(
-                [entry.name for entry in coin_windows] + ["table_key"]
-            )
+            tcm = _merge_sorted_tcms(tcm, new_tcm, coin_windows)
+
+        if tcm is None or len(tcm) == 0:
+            continue
 
         # define mask, true when new event, false if part of same event
         mask = np.zeros(len(tcm) - 1, dtype=bool)
         for entry in coin_windows:
-            diffs = np.diff(tcm[entry.name])
+            diffs = np.diff(ak.to_numpy(tcm[entry.name]))
             if entry.window_ref == "last":
                 mask = mask | (diffs > entry.window)
             else:
@@ -144,9 +222,8 @@ def generate_tcm_cols(
 
         # grab up to evt including last instance of a channel to know that all channels
         # have been included in previous evts
-        last_instance = {
-            arr_id: index for index, arr_id in enumerate(tcm.table_key.to_numpy())
-        }
+        table_key_np = ak.to_numpy(tcm["table_key"])
+        last_instance = {arr_id: index for index, arr_id in enumerate(table_key_np)}
         log.debug(f"last instance: {last_instance}")
 
         for i, entry in enumerate(table_keys):
@@ -171,9 +248,9 @@ def generate_tcm_cols(
             write_mask = mask
             last_entry = None
         else:
-            last_instance = int(np.min([last_instance[arr] for arr in table_keys]))
-            last_entry = np.where(mask[:last_instance])[0]
-            log.debug(f"last instance: {last_instance}")
+            last_instance_min = int(np.min([last_instance[arr] for arr in table_keys]))
+            last_entry = np.where(mask[:last_instance_min])[0]
+            log.debug(f"last instance: {last_instance_min}")
             log.debug(f"last entry: {last_entry}")
 
             if len(last_entry) == 0:
@@ -198,14 +275,14 @@ def generate_tcm_cols(
             "table_key",
             VectorOfVectors(
                 cumulative_length=cumulative_length,
-                flattened_data=tcm["table_key"].to_numpy()[:last_entry],
+                flattened_data=ak.to_numpy(tcm["table_key"])[:last_entry],
             ),
         )
         out_tbl.add_field(
             "row_in_table",
             VectorOfVectors(
                 cumulative_length=cumulative_length,
-                flattened_data=tcm["row_in_table"].to_numpy()[:last_entry],
+                flattened_data=ak.to_numpy(tcm["row_in_table"])[:last_entry],
             ),
         )
         if fields is not None:
@@ -214,11 +291,13 @@ def generate_tcm_cols(
                     f,
                     VectorOfVectors(
                         cumulative_length=cumulative_length,
-                        flattened_data=tcm[f].to_numpy()[:last_entry],
+                        flattened_data=ak.to_numpy(tcm[f])[:last_entry],
                     ),
                 )
+
         if last_entry is None:
             tcm = None
         else:
             tcm = tcm[last_entry:]
+
         yield out_tbl

@@ -6,7 +6,7 @@ ci:
 exclude: ^(attic|src/pygama/flow/datagroup.py)
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: "v5.0.0"
+  rev: "v6.0.0"
   hooks:
   - id: check-added-large-files
   - id: check-case-conflict
@@ -25,35 +25,35 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/asottile/setup-cfg-fmt
-  rev: "v2.8.0"
+  rev: "v3.2.0"
   hooks:
   - id: setup-cfg-fmt
 
 - repo: https://github.com/PyCQA/isort
-  rev: "6.0.1"
+  rev: "7.0.0"
   hooks:
   - id: isort
 
 - repo: https://github.com/asottile/pyupgrade
-  rev: "v3.20.0"
+  rev: "v3.21.2"
   hooks:
   - id: pyupgrade
     args: ["--py38-plus"]
 
-- repo: https://github.com/psf/black
-  rev: "25.1.0"
+- repo: https://github.com/psf/black-pre-commit-mirror
+  rev: "25.12.0"
   hooks:
   - id: black-jupyter
 
 - repo: https://github.com/pre-commit/mirrors-mypy
-  rev: "v1.16.1"
+  rev: "v1.19.1"
   hooks:
   - id: mypy
     files: src
     stages: [manual]
 
 - repo: https://github.com/hadialqattan/pycln
-  rev: "v2.5.0"
+  rev: "v2.6.0"
   hooks:
   - id: pycln
     args: [--all]
@@ -70,14 +70,14 @@ repos:
     args: ["--extend-ignore", "E203,E501"]
 
 - repo: https://github.com/kynan/nbstripout
-  rev: "0.8.1"
+  rev: "0.8.2"
   hooks:
     - id: nbstripout
       args: ["--drop-empty-cells",
              "--extra-keys", "metadata.kernelspec metadata.language_info"]
 
 - repo: https://github.com/mgedmin/check-manifest
-  rev: "0.50"
+  rev: "0.51"
   hooks:
   - id: check-manifest
     stages: [manual]
@@ -90,7 +90,7 @@ repos:
       - tomli
 
 - repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: "v0.10.0.1"
+  rev: "v0.11.0.1"
   hooks:
   - id: shellcheck
 

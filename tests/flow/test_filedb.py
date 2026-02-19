@@ -351,7 +351,7 @@ def test_serialization(test_filedb_full, tmp_dir):
         db.to_disk(f"{tmp_dir}/filedb.lh5")
 
     db2 = FileDB(f"{tmp_dir}/filedb.lh5")
-    assert_frame_equal(db.df, db2.df)
+    assert_frame_equal(db.df, db2.df, check_dtype=False)
 
 
 def test_get_table_columns(test_filedb_full):

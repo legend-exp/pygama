@@ -86,13 +86,17 @@ def apply_xtalk_correction(
     """
 
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
-    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, xtalk_matrix_rawids)
+    ordered_rawids = [
+        rawid for rawid in xtalk_matrix_rawids if f"ch{rawid}" in table_names
+    ]
+    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, ordered_rawids)
 
     energy_corr = xtalk.get_xtalk_correction(
         tcm,
         datainfo,
         uncal_energy_expr,
         cal_energy_expr,
+        ordered_rawids,
         xtalk_threshold,
         xtalk_matrix_filename,
         xtalk_rawid_obj,
@@ -105,7 +109,7 @@ def apply_xtalk_correction(
         tcm,
         multiplicity_expr,
         energy_corr,
-        xtalk_matrix_rawids,
+        ordered_rawids,
     )
     energy_corr = ak.from_regular(energy_corr)
     multiplicity_mask = ak.from_regular(multiplicity_mask)
@@ -178,13 +182,17 @@ def apply_xtalk_correction_and_calibrate(
     """
 
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
-    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, xtalk_matrix_rawids)
+    ordered_rawids = [
+        rawid for rawid in xtalk_matrix_rawids if f"ch{rawid}" in table_names
+    ]
+    tcm_index_array = xtalk.build_tcm_index_array(tcm, datainfo, ordered_rawids)
 
     energy_corr = xtalk.get_xtalk_correction(
         tcm,
         datainfo,
         uncal_energy_expr,
         cal_energy_expr,
+        ordered_rawids,
         xtalk_threshold,
         xtalk_matrix_filename,
         xtalk_rawid_obj,
@@ -196,7 +204,7 @@ def apply_xtalk_correction_and_calibrate(
         datainfo,
         tcm,
         energy_corr,
-        xtalk_matrix_rawids,
+        ordered_rawids,
         cal_par_files,
         uncal_var,
         recal_var,
@@ -208,7 +216,7 @@ def apply_xtalk_correction_and_calibrate(
         tcm,
         multiplicity_expr,
         calibrated_corr,
-        xtalk_matrix_rawids,
+        ordered_rawids,
     )
 
     calibrated_corr = ak.from_regular(calibrated_corr)

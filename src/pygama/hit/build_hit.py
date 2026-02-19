@@ -131,12 +131,14 @@ def build_hit(
     for cfg in lh5_tables_config.values():
         cfg["operations"] = _reorder_table_operations(cfg["operations"])
 
-    first_done = False
+    wo_current = wo_mode
     for tbl, cfg in lh5_tables_config.items():
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
         write_offset = 0
 
         log.info(f"Processing table '{tbl}' in file {infile}")
+        if wo_mode in ("overwrite", "o"):
+            wo_current = "o"
 
         for tbl_obj in lh5_it:
             start_row = lh5_it.current_i_entry
@@ -197,11 +199,11 @@ def build_hit(
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
                 n_rows=len(tbl_obj),
-                wo_mode=wo_mode if first_done is False else "append",
+                wo_mode=wo_current,
                 write_start=write_offset + start_row,
             )
 
-            first_done = True
+            wo_current = "append"
 
 
 def _reorder_table_operations(

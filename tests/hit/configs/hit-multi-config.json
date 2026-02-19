@@ -1,0 +1,5 @@
+{
+  "ch1084803/dsp": "tests/hit/configs/basic-hit-config.json",
+  "ch1084804/dsp": "tests/hit/configs/basic-hit-config.json",
+  "ch1121600/dsp": "tests/hit/configs/basic-hit-config.json"
+}

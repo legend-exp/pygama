@@ -1237,7 +1237,7 @@ class DataLoader:
                 f_table = utils.dict_to_table(col_dict, attr_dict)
 
                 if in_memory:
-                    load_out.add_field(name=file, obj=f_table)
+                    load_out.add_field(name=str(file), obj=f_table)
                 if output_file:
                     lh5.write(f_table, f"{file}", output_file, wo_mode="o")
                 # end file loop
@@ -1251,9 +1251,7 @@ class DataLoader:
                 if self.output_format == "lgdo.Table":
                     return load_out
                 elif self.output_format == "pd.DataFrame":
-                    for file in load_out.keys():
-                        load_out[file] = load_out[file].view_as("pd")
-                    return load_out
+                    return [tb.view_as("pd") for tb in load_out.values()]
                 else:
                     raise ValueError(
                         f"'{self.output_format}' output format not supported"

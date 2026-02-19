@@ -28,24 +28,21 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
     "Topic :: Scientific/Engineering",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "hist",
     "colorlog",
     "dbetto",
-    "dspeed >=1.7",
+    "dspeed >=2.0",
     "h5py >=3.2",
     "iminuit",
-    "legend-pydataobj >=1.14",
+    "legend-pydataobj >=1.16",
     "pylegendmeta >=0.9",
     "matplotlib",
     "numba !=0.53.*,!=0.54.*,!=0.57",
     "numpy >=1.21",
     "pandas >=1.4.4",
     "tables",
-    "numpy==1.26.4; python_version == '3.9'", # HACK: remove when ending support for python 3.9
-    "pandas==1.5.3; python_version == '3.9'", # HACK: remove when ending support for python 3.9
-    "tables==3.9.2; python_version == '3.9'", # HACK: remove when ending support for python 3.9
     "pint",
     "pyyaml",
     "scikit-learn",

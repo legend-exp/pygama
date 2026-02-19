@@ -38,7 +38,8 @@ def build_tcm_index_array(
 
         # get the event indexes
         table_id = utils.get_tcm_id_by_pattern(
-            datainfo._asdict()["dsp"].table_fmt, f"ch{channel}"
+            datainfo._asdict()["dsp"].table_fmt,
+            f"ch{channel}" if not isinstance(channel, str) else channel,
         )
         if table_id is None:
             continue
@@ -236,6 +237,7 @@ def get_xtalk_correction(
     datainfo: utils.DataInfo,
     uncal_energy_expr: str,
     cal_energy_expr: str,
+    rawids: list,
     xtalk_threshold: float = None,
     xtalk_matrix_filename: str = "",
     xtalk_rawid_obj: str = "xtc/rawid_index",
@@ -244,12 +246,18 @@ def get_xtalk_correction(
 ):
 
     # read lh5 files to numpy
-    xtalk_matrix_numpy = lh5.read_as(xtalk_matrix_obj, xtalk_matrix_filename, "np")
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
+    ordered_rawids = [rawid for rawid in xtalk_matrix_rawids if rawid in rawids]
+
+    xtalk_mask = np.array([rawid in rawids for rawid in xtalk_matrix_rawids])
+
+    xtalk_matrix_numpy = lh5.read_as(xtalk_matrix_obj, xtalk_matrix_filename, "np")[
+        xtalk_mask, :
+    ][:, xtalk_mask]
 
     positive_xtalk_matrix_numpy = lh5.read_as(
         positive_xtalk_matrix_obj, xtalk_matrix_filename, "np"
-    )
+    )[xtalk_mask, :][:, xtalk_mask]
 
     # Combine positive and negative matrixs
     # Now the matrix should have negative values corresponding to negative cross talk
@@ -264,12 +272,8 @@ def get_xtalk_correction(
         0,
     ).T
 
-    uncal_energy_array = gather_energy(
-        uncal_energy_expr, tcm, datainfo, xtalk_matrix_rawids
-    )
-    cal_energy_array = gather_energy(
-        cal_energy_expr, tcm, datainfo, xtalk_matrix_rawids
-    )
+    uncal_energy_array = gather_energy(uncal_energy_expr, tcm, datainfo, ordered_rawids)
+    cal_energy_array = gather_energy(cal_energy_expr, tcm, datainfo, ordered_rawids)
 
     energy_corr = xtalk_correct_energy_impl(
         uncal_energy_array, cal_energy_array, xtalk_matrix, xtalk_threshold
