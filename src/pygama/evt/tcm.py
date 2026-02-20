@@ -224,8 +224,13 @@ def generate_tcm_cols(
         # have been included in previous evts
         table_key_np = ak.to_numpy(tcm["table_key"])
         last_instance = {arr_id: index for index, arr_id in enumerate(table_key_np)}
-        log.debug(f"last instance: {last_instance}")
-
+        log.debug(
+            "tcm progress: tcm_len=%d, unique_table_keys_in_tcm=%d, at_end=%d/%d",
+            len(table_key_np),
+            len(last_instance),
+            int(at_end.sum()),
+            len(at_end),
+        )
         for i, entry in enumerate(table_keys):
             if entry not in last_instance:
                 last_instance[entry] = np.inf
@@ -244,25 +249,18 @@ def generate_tcm_cols(
 
         # want to write entries only up to last entry of a channel to ensure all included in evt
         if at_end.all():
-            log.debug("at end, writing all entries")
             write_mask = mask
             last_entry = None
         else:
             last_instance_min = int(np.min([last_instance[arr] for arr in table_keys]))
             last_entry = np.where(mask[:last_instance_min])[0]
-            log.debug(f"last instance: {last_instance_min}")
-            log.debug(f"last entry: {last_entry}")
 
             if len(last_entry) == 0:
-                log.debug("last entry 0, going to next iteration")
-                log.debug(tcm)
                 continue
             else:
                 last_entry = last_entry[-1] + 1
                 write_mask = mask[:last_entry]
                 if len(write_mask) == 0:
-                    log.debug("no entries, going to next iteration")
-                    log.debug(tcm)
                     continue
 
         # get cumulative_length
