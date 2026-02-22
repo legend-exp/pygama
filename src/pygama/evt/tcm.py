@@ -199,7 +199,10 @@ def generate_tcm_cols(
                 row_in_table = np.arange(start, start + buf_len, dtype=int)
             buf_ak = ak.with_field(buf_ak, row_in_table, "row_in_table")
 
-            arrays.append(buf_ak)
+            # LH5Iterator reuses the same underlying buffer across iterations.
+            # Make an explicit copy so concatenation/merging isn't corrupted when the
+            # iterator advances and overwrites the buffer.
+            arrays.append(ak.copy(buf_ak))
 
         if at_end.all() and len(arrays) == 0 and tcm is None:
             break
@@ -213,6 +216,9 @@ def generate_tcm_cols(
             tcm = new_tcm
         else:
             tcm = _merge_sorted_tcms(tcm, new_tcm, coin_windows)
+
+        # Ensure tcm doesn't retain views into iterator-reused buffers.
+        tcm = ak.copy(tcm)
 
         if tcm is None or len(tcm) == 0:
             continue

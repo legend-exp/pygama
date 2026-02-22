@@ -378,3 +378,30 @@ def test_build_tcm_multiple_files(lgnd_test_data, tmp_dir):
 
     assert tcm_orig.fields == tcm.fields
     assert all(ak.all(tcm_orig[f] == tcm[f]) for f in tcm.fields)
+
+
+def test_build_tcm_buffer_reuse_copy_regression(lgnd_test_data):
+    """
+    Regression test for LH5Iterator's buffer reuse: build_tcm must not retain
+    views into per-chunk buffers across iterations.
+    """
+    f_raw = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/raw/cal/p03/r001/l200-p03-r001-cal-20230318T012144Z-tier_raw.lh5"
+    )
+
+    # small buffer_len forces multiple iterator iterations, which used to expose
+    # corruption if per-chunk buffers weren't copied before concatenation/merge.
+    tcm_small = evt.build_tcm(
+        [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+        coin_cols="timestamp",
+        buffer_len=1,
+    ).view_as("ak")
+
+    tcm_large = evt.build_tcm(
+        [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
+        coin_cols="timestamp",
+        buffer_len=1_000_000,
+    ).view_as("ak")
+
+    assert tcm_small.fields == tcm_large.fields
+    assert all(ak.all(tcm_small[f] == tcm_large[f]) for f in tcm_small.fields)
