@@ -1,16 +1,15 @@
 # Configuration file for the Sphinx documentation builder.
 
 import sys
+from importlib.metadata import version as im_version
 from pathlib import Path
-
-from pkg_resources import get_distribution
 
 sys.path.insert(0, Path("../../src").resolve().as_posix())
 sys.path.append(Path("extensions").resolve().as_posix())
 
 project = "pygama"
 copyright = "2023, the LEGEND Collaboration"
-version = get_distribution("pygama").version
+version = im_version("pygama")
 
 extensions = [
     "sphinx.ext.autodoc",

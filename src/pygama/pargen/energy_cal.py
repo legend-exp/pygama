@@ -1717,7 +1717,8 @@ class HPGeCalibration:
                         label=f'{name}, {interp_fwhm_name} fwhm: {fwhm_dict[f"{interp_fwhm_name}_fwhm_in_kev"]:1.2f} +- {fwhm_dict[f"{interp_fwhm_name}_fwhm_err_in_kev"]:1.2f} keV',
                     )
                     ax1.plot(qbb_line_vx, qbb_line_vy, lw=1, c="r", ls="--")
-
+            else:
+                low_lim = 0
             ax1.set_xlim(erange)
             if np.isnan(low_lim):
                 low_lim = 0
