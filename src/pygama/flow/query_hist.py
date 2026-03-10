@@ -174,15 +174,16 @@ def query_hist(
     )
 
     for (_, alias, path), a in zip(field_info, ax):
-        if not a.name:
-            a.name = path
+        # add lh5 fields to alias map
+        if not path in alias_map:
+            alias_map[path] = alias if alias is not None else path
         if not a.label:
-            a.label = alias_map.get(path, alias if alias is not None else path)
+            a.label = alias_map.get(path)
 
     ret = lh5_it.hist(
         ax,
         where=entries,
-        keys=[f for f, _, _ in field_info],
+        keys=[alias_map[path] for _, _, path in field_info],
         processes=processes,
         executor=executor,
         **hist_kwargs,
