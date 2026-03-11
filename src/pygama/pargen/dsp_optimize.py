@@ -326,6 +326,14 @@ class BayesianOptimizer:
     ----------
     gauss_pr
         Gaussian Process model used.
+    acq_function
+        Acquisition function method corresponding to the specified `acq_func`.
+    batch_size
+        Batch size used in the Gaussian Process optimization.
+    dims
+        List of dimensions (parameters) added to the optimizer's search space.
+    iters
+        Counter for the number of optimization iterations performed.
     best_samples_
         DataFrame storing the best evaluated samples and their acquisition values.
     distances_
@@ -348,10 +356,6 @@ class BayesianOptimizer:
         Acquisition function value for `current_x`. Updated by `update_db_dict()`.
     current_iter
         Optimization iteration counter. Incremented each time `update_db_dict()` is called.
-    lambda_param
-        Class-level exploration parameter.
-    eta_param
-        Class-level stability parameter.
 
     Examples
     --------
@@ -385,10 +389,6 @@ class BayesianOptimizer:
         fig = optimizer.plot()
     """
 
-    np.random.seed(55)
-    lambda_param = 0.01
-    eta_param = 0
-
     def __init__(
         self,
         acq_func: str,
@@ -398,6 +398,12 @@ class BayesianOptimizer:
         fom_value: str = "y_val",
         fom_error: str = "y_val_err",
     ) -> None:
+        
+        np.random.seed(55)
+
+        self.lambda_param = 0.01
+        self.eta_param = 0
+
         self.dims = []
         self.current_iter = 0
 
@@ -416,13 +422,27 @@ class BayesianOptimizer:
         self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
         self.distances_ = []
 
+        # other attrs
+        self.x_init = None
+        self.y_init = None
+        self.yerr_init = None
+        self.y_min = None
+
+        # optimisation results
+        self.current_x = None
+        self.optimal_x = None
+        self.optimal_ei = None
+
         if acq_func == "ei":
             self.acq_function = self._get_expected_improvement
         elif acq_func == "ucb":
             self.acq_function = self._get_ucb
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
-
+        else:
+            msg = f"Unknown acquisition function: {acq_func}. Supported values are 'ei', 'ucb', and 'lcb'."
+            raise ValueError(msg)
+            
         self.fom_value = fom_value
         self.fom_error = fom_error
 
