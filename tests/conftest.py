@@ -29,3 +29,14 @@ def dsp_test_file(lgnd_test_data, tmp_dir):
     assert os.path.exists(out_name)
 
     return out_name
+
+
+@pytest.fixture(scope="session")
+def raw_test_file(lgnd_test_data, tmp_dir):
+
+    out_name = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/raw/phy/p03/r001/l200-p03-r001-phy-20230322T160139Z-tier_raw.lh5"
+    )
+    assert os.path.exists(out_name)
+
+    return out_name
