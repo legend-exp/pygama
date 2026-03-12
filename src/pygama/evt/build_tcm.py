@@ -20,13 +20,15 @@ def readd_attrs(final_table, input_table):
     for key in input_table:
         if hasattr(input_table[key], "attrs"):
             final_table[key].attrs = input_table[key].attrs
-    if isinstance(final_table[key], Table | Struct):
-        readd_attrs(final_table[key], input_table[key])
-    if isinstance(input_table, VectorOfVectors):
-        final_table[key].flattened_data.attrs = input_table[key].flattened_data.attrs
-        final_table[key].cumulative_length.attrs = input_table[
-            key
-        ].cumulative_length.attrs
+        if isinstance(final_table[key], Table | Struct):
+            readd_attrs(final_table[key], input_table[key])
+        if isinstance(input_table[key], VectorOfVectors):
+            final_table[key].flattened_data.attrs = input_table[
+                key
+            ].flattened_data.attrs
+            final_table[key].cumulative_length.attrs = input_table[
+                key
+            ].cumulative_length.attrs
 
 
 def _concat_tables(tbls):
