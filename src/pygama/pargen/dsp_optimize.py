@@ -208,6 +208,7 @@ def run_grid(
     grid_values = np.ndarray(shape=grid.get_shape(), dtype="O")
     iii = grid.get_zero_indices()
     log.info("starting grid calculations...")
+
     while True:
         db_dict = grid.set_dsp_pars(db_dict, iii)
         if verbosity > 1:
@@ -750,13 +751,14 @@ class BayesianOptimizer:
             and new_entry.notnull().any().any()
             and len(new_entry) >= 1
         ):
-            self.best_samples_ = pd.concat(
-                [
-                    self.best_samples_,
-                    new_entry,
-                ],
-                ignore_index=True,
-            )
+
+            if self.best_samples_.empty:
+                self.best_samples_ = new_entry.copy()
+            else:
+                self.best_samples_ = pd.concat(
+                    [self.best_samples_, new_entry],
+                    ignore_index=True,
+                )
 
     def get_best_vals(self):
         """Extract the best observed values in a dictionary format suitable for updating the DSP parameters database."""
@@ -979,10 +981,13 @@ class BayesianOptimizer:
             ticks, labels = plt.xticks()
             labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[1], 5)
+
             plt.xticks(ticks=ticks, labels=labels, rotation=45)
             ticks, labels = plt.yticks()
+
             labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[0], 5)
+
             plt.yticks(ticks=ticks, labels=labels, rotation=45)
             plt.xlabel(
                 f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
@@ -1093,10 +1098,13 @@ def run_bayesian_optimisation(
 
     out_param_dict = {}
     out_results_list = []
+
     for optimiser in optimisers:
+
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results
+
         if np.isnan(results_dict[optimiser.fom_value]):
             log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
         out_results_list.append(results_dict)

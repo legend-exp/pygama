@@ -42,6 +42,10 @@ def test_bayesian_opt():
     acq_fig = optimizer.plot_acq()
     assert isinstance(acq_fig, Figure)
 
+    # test different acq function
+    optimizer = dsp_optimize.BayesianOptimizer(acq_func="ucb", batch_size=1)
+    optimizer = dsp_optimize.BayesianOptimizer(acq_func="lcb", batch_size=1)
+
 
 def test_run_one_dsp(raw_test_file):
 
