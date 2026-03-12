@@ -1,6 +1,7 @@
 """
 pygama convenience functions for fitting ubinned data
 """
+
 from __future__ import annotations
 
 import logging
@@ -52,9 +53,7 @@ def fit_unbinned(
     """
     if guess is None:
         msg = "auto-guessing not yet implemented, you must supply a guess."
-        raise NotImplementedError(
-            msg
-        )
+        raise NotImplementedError(msg)
 
     if cost_func == "LL":
         if extended is True:

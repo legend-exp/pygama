@@ -1,6 +1,7 @@
 """
 pygama convenience functions for linearly fitting data
 """
+
 from __future__ import annotations
 
 import numpy as np

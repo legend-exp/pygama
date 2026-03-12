@@ -1,6 +1,7 @@
 """
 pygama convenience functions for fitting hpge peak shape data
 """
+
 from __future__ import annotations
 
 import logging
@@ -198,7 +199,6 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max=0.5, cov=None):
 
 
 def hpge_peak_mode(mu, sigma, htail, tau, cov=None):
-
     if htail < 0 or htail > 1:
         if cov is not None:
             return np.nan, np.nan

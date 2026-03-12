@@ -10,6 +10,7 @@ Example:
 
 NOTE: the dist.pdf method is a slow scipy method, and the dist.get_pdf method is fast
 """
+
 from __future__ import annotations
 
 import numpy as np

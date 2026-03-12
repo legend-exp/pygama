@@ -1,6 +1,7 @@
 """
 Gaussian distributions for pygama
 """
+
 from __future__ import annotations
 
 import numba as nb
@@ -165,7 +166,6 @@ def nb_gauss_scaled_cdf(
 
 
 class GaussianGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.x_lo = -1 * np.inf

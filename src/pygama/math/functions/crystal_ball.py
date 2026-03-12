@@ -1,6 +1,7 @@
 """
 Crystal ball distributions for Pygama
 """
+
 from __future__ import annotations
 
 from math import erf
@@ -203,7 +204,6 @@ def nb_crystal_ball_scaled_cdf(
 
 
 class CrystalBallGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.x_lo = -1 * np.inf

@@ -142,7 +142,6 @@ def nb_linear_scaled_cdf(
 
 
 class LinearGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None

@@ -1,6 +1,7 @@
 """
 Exponentially modified Gaussian distributions for pygama
 """
+
 from __future__ import annotations
 
 import sys
@@ -241,7 +242,6 @@ def nb_exgauss_scaled_cdf(
 
 
 class ExgaussGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = -1 * np.inf
         self.x_hi = np.inf

@@ -24,6 +24,7 @@ Returns
 gauss_on_linear
     An instance of SumDists and rv_continuous, has methods of pdf, cdf, etc.
 """
+
 from __future__ import annotations
 
 from pygama.math.functions.gauss import gaussian

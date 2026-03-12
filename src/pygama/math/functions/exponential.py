@@ -1,6 +1,7 @@
 """
 Exponential distributions for pygama
 """
+
 from __future__ import annotations
 
 import numba as nb
@@ -143,7 +144,6 @@ def nb_exponential_scaled_cdf(
 
 
 class ExponentialGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = 0
         self.x_hi = np.inf

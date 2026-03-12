@@ -13,6 +13,7 @@ These are just convenience functions, provided for your convenience. Hopefully
 they will help you if you need to do something trickier than is provided (e.g.
 2D hists).
 """
+
 from __future__ import annotations
 
 import logging
@@ -118,7 +119,10 @@ def get_hist(
 
 
 def better_int_binning(
-    x_lo: float = 0, x_hi: float | None = None, dx: float | None = None, n_bins: float | None = None
+    x_lo: float = 0,
+    x_hi: float | None = None,
+    dx: float | None = None,
+    n_bins: float | None = None,
 ) -> tuple[int, int, int, int]:
     """Get a good binning for integer data.
 

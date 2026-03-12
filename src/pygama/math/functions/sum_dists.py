@@ -13,6 +13,7 @@ A class that creates the sum of distributions, with methods for scipy computed :
     moyal_add.draw_pdf(x, *pars)
     moyal_add.required_args()
 """
+
 from __future__ import annotations
 
 import inspect
@@ -54,9 +55,7 @@ def get_dists_and_par_idxs(
     for dist_and_pars in dists_and_pars_array:
         if len(dist_and_pars) != 2:
             msg = "Each tuple needs a distribution and a parameter index array."
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
         dists.append(dist_and_pars[0])
         par_idxs.append(np.array(dist_and_pars[1]))
 
@@ -148,7 +147,7 @@ def get_parameter_names(dists: np.array, par_idxs: np.array, par_size: int) -> n
             new_name = orig_name
             if orig_name in param_names:
                 if orig_name[-1].isdigit():
-                    new_name = orig_name[:-1] + f"{int(orig_name[-1])+1}"
+                    new_name = orig_name[:-1] + f"{int(orig_name[-1]) + 1}"
                 else:
                     new_name = orig_name + "1"
             req_names.append(new_name)
@@ -257,13 +256,9 @@ class SumDists(rv_continuous):
             if (not isinstance(dists[i], PygamaContinuous)) and (
                 not isinstance(dists[i], SumDists)
             ):
-                msg = (
-                    f"Distribution at index {i} has value {dists[i]},\
+                msg = f"Distribution at index {i} has value {dists[i]},\
                 and is an array and not a PygamaContinuous distribution"
-                )
-                raise ValueError(
-                    msg
-                )
+                raise ValueError(msg)
 
         # Get the parameter names for later introspection
         # First, find the length of the eventual single parameter array
@@ -281,9 +276,7 @@ class SumDists(rv_continuous):
         if flag == "fracs":
             if len(area_frac_idxs) != 1:
                 msg = "SumDists only accepts the parameter position of one fraction."
-                raise ValueError(
-                    msg
-                )
+                raise ValueError(msg)
             self.frac_flag = True
             self.area_flag = False
             self.one_area_flag = False
@@ -375,9 +368,9 @@ class SumDists(rv_continuous):
             ), areas[1] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
 
         # This is faster than list comprehension
-        return areas[0] * fracs[0] * pdfs[0].pdf(
-            x, *params[self.par_idxs[0]]
-        ) + areas[1] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
+        return areas[0] * fracs[0] * pdfs[0].pdf(x, *params[self.par_idxs[0]]) + areas[
+            1
+        ] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
 
     def _cdf(self, x, *params):
         """
@@ -400,9 +393,9 @@ class SumDists(rv_continuous):
             ), areas[1] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
 
         # This is faster than list comprehension
-        return areas[0] * fracs[0] * cdfs[0].cdf(
-            x, *params[self.par_idxs[0]]
-        ) + areas[1] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
+        return areas[0] * fracs[0] * cdfs[0].cdf(x, *params[self.par_idxs[0]]) + areas[
+            1
+        ] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
 
     def get_pdf(self, x, *params):
         """
@@ -768,11 +761,14 @@ class SumDists(rv_continuous):
                 for param in self.x_shapes
             ]
             value = copy_signature(inspect.Signature(params), value)
-        if attr in [
-            "pdf_norm",
-            "pdf_ext",
-            "cdf_norm",
-        ]:  # Set these to include the x_lo, x_hi at the correct positions since these always need those params
+        if (
+            attr
+            in [
+                "pdf_norm",
+                "pdf_ext",
+                "cdf_norm",
+            ]
+        ):  # Set these to include the x_lo, x_hi at the correct positions since these always need those params
             params = [
                 inspect.Parameter(param, inspect.Parameter.POSITIONAL_OR_KEYWORD)
                 for param in self.extended_shapes

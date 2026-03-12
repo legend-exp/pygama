@@ -24,6 +24,7 @@ Notes
 The step function shares a mu and sigma with the step function
 The parameter array must have ordering (x_lo, x_hi, area1, mu, sigma, area2, hstep)
 """
+
 from __future__ import annotations
 
 from pygama.math.functions.gauss import gaussian

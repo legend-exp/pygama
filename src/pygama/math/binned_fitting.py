@@ -1,6 +1,7 @@
 """
 pygama convenience functions for fitting binned data
 """
+
 from __future__ import annotations
 
 import logging
@@ -63,12 +64,9 @@ def fit_binned(
     """
     if guess is None:
         msg = "auto-guessing not yet implemented, you must supply a guess."
-        raise NotImplementedError(
-            msg
-        )
+        raise NotImplementedError(msg)
 
     if cost_func == "LL":
-
         if var is not None:
             t_arr = np.zeros((len(hist), 2))
             t_arr[:, 0] = hist
@@ -82,7 +80,6 @@ def fit_binned(
             cost_func = cost.BinnedNLL(hist, bins, func)
 
     elif cost_func == "Least Squares":
-
         if var is None:
             var = hist  # assume Poisson stats if variances are not provided
 
@@ -321,7 +318,9 @@ def gauss_mode_width_max(
     if pars[1] < 0:
         pars[1] = -pars[1]
     if inflate_errors:
-        chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars, method=gof_method)
+        chi2, dof = goodness_of_fit(
+            hist, bins, var, nb_gauss_amp, pars, method=gof_method
+        )
         if chi2 > dof:
             cov *= chi2 / dof
     return np.asarray([pars["mu"], pars["sigma"], pars["a"]]), np.asarray(cov)

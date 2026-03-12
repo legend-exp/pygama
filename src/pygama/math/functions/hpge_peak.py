@@ -43,6 +43,7 @@ Notes
 -----
 The extended Gaussian distribution and the step distribution share the mu, sigma with the Gaussian
 """
+
 from __future__ import annotations
 
 import numpy as np

@@ -1,6 +1,7 @@
 """
 Step distributions for pygama
 """
+
 from __future__ import annotations
 
 from math import erf
@@ -259,7 +260,6 @@ def nb_step_scaled_cdf(
 
 
 class StepGen(PygamaContinuous):
-
     def _argcheck(self, x_lo, x_hi, _mu, _sigma, _hstep):
         return x_hi > x_lo
 

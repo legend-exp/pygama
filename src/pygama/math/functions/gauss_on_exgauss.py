@@ -19,6 +19,7 @@ Notes
 -----
 The extended Gaussian distribution shares the mu, sigma with the Gaussian
 """
+
 from __future__ import annotations
 
 from pygama.math.functions.exgauss import exgauss

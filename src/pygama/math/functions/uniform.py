@@ -1,6 +1,7 @@
 """
 Uniform distributions for pygama
 """
+
 from __future__ import annotations
 
 import numba as nb
@@ -129,7 +130,6 @@ def nb_uniform_scaled_cdf(x: np.ndarray, area: float, a: float, b: float) -> np.
 
 
 class UniformGen(PygamaContinuous):
-
     def _get_support(self, a, b):
         return a, b
 
