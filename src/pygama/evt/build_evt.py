@@ -640,7 +640,7 @@ def evaluate_expression(
             )
 
         msg = (
-            "{type(ch_comp).__name__} not supported "
+            f"{type(ch_comp).__name__} not supported "
             "(only Array and VectorOfVectors are supported)"
         )
         raise NotImplementedError(msg)
