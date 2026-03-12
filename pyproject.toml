@@ -125,6 +125,7 @@ testpaths = "tests"
 
 [tool.ruff]
 src = ["src"]
+force-exclude = true
 exclude = [
   "src/pygama/__init__.py",
   "src/pygama/cli.py",
