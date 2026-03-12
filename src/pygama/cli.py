@@ -2,10 +2,12 @@
 pygama's command line interface utilities.
 """
 
+from __future__ import annotations
+
 import argparse
 import logging
-import os
 import sys
+from pathlib import Path
 
 import pygama
 import pygama.logging
@@ -156,20 +158,19 @@ def build_hit_cli(args):
     """Passes command line arguments to :func:`.hit.build_hit.build_hit`."""
 
     if len(args.dsp_lh5_file) > 1 and args.output is not None:
-        raise NotImplementedError("not possible to set multiple output file names yet")
+        msg = "not possible to set multiple output file names yet"
+        raise NotImplementedError(msg)
 
     out_files = []
     if len(args.dsp_lh5_file) == 1:
         if args.output is None:
-            basename = os.path.splitext(os.path.basename(args.dsp_lh5_file[0]))[0]
-            basename = basename.removesuffix("_dsp")
+            basename = Path(args.dsp_lh5_file[0]).stem.removesuffix("_dsp")
             out_files.append(f"{basename}_hit.lh5")
         else:
             out_files.append(args.output)
     else:
         for file in args.dsp_lh5_file:
-            basename = os.path.splitext(os.path.basename(file))[0]
-            basename = basename.removesuffix("_dsp")
+            basename = Path(file).stem.removesuffix("_dsp")
             out_files.append(f"{basename}_hit.lh5")
 
     for i in range(len(args.dsp_lh5_file)):

@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-from collections.abc import MutableMapping
+from collections.abc import Iterator, MutableMapping
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import yaml
 
@@ -19,10 +19,7 @@ def getenv_bool(name: str, default: bool = False) -> bool:
     val = os.getenv(name)
     if not val:
         return default
-    elif val.lower() in ("1", "t", "true"):
-        return True
-    else:
-        return False
+    return val.lower() in ("1", "t", "true")
 
 
 class NumbaPygamaDefaults(MutableMapping):

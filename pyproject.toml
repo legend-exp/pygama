@@ -127,10 +127,6 @@ testpaths = "tests"
 src = ["src"]
 force-exclude = true
 exclude = [
-  "src/pygama/__init__.py",
-  "src/pygama/cli.py",
-  "src/pygama/logging.py",
-  "src/pygama/utils.py",
   "src/pygama/flow",
   "src/pygama/math",
   "src/pygama/pargen",
