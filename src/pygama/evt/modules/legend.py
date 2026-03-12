@@ -27,8 +27,8 @@ def metadata(params: dict) -> list:
         if chmap.map("daq.rawid")[e]["system"] == params["system"]
     ]
 
-    if "selectors" in params.keys():
-        for k in params["selectors"].keys():
+    if "selectors" in params:
+        for k in params["selectors"]:
             s = ""
             for e in k.split("."):
                 s += f"['{e}']"
@@ -67,7 +67,7 @@ def convert_rawid(
         return types.VectorOfVectors(
             flattened_data=detector, cumulative_length=rawid_obj.cumulative_length
         )
-    elif isinstance(rawid_obj, types.Array):
+    if isinstance(rawid_obj, types.Array):
         rawids = rawid_obj.nda
         detector = np.array(
             [
@@ -80,5 +80,5 @@ def convert_rawid(
             ]
         )
         return types.Array(detector)
-    else:
-        raise TypeError("rawid_obj must be a VectorOfVectors or Array")
+    msg = "rawid_obj must be a VectorOfVectors or Array"
+    raise TypeError(msg)

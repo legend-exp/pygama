@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, WaveformTable
@@ -45,7 +47,7 @@ def test_dpz_model_fit():
     xs = np.arange(0, wf_len - tp0)
     ys = pz_correct.dpz_model(xs, 1000, tau1, tau2, frac)
     test_wf = np.insert(ys, 0, np.zeros(tp0))
-    tau1_fit, tau2_fit, frac_fit, plot_dict_out = pz_correct.dpz_model_fit(
+    tau1_fit, tau2_fit, frac_fit, _plot_dict_out = pz_correct.dpz_model_fit(
         test_wf, percent_tau1_fit=0.1, percent_tau2_fit=0.2, idx_shift=2, plot=0
     )
 
@@ -96,54 +98,52 @@ def test_get_dpz_decay_constants():
 
     assert isinstance(tb_data["waveform"]["values"], ArrayOfEqualSizedArrays)
 
-    dpz_opt_dsp_dict = dict(
-        {
-            "outputs": ["tau1", "tau2", "frac"],
-            "processors": {
-                "bl_mean , bl_std, bl_slope, bl_intercept": {
-                    "function": "linear_slope_fit",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform[0:200]",
-                        "bl_mean",
-                        "bl_std",
-                        "bl_slope",
-                        "bl_intercept",
-                    ],
-                    "unit": ["ADC", "ADC", "ADC", "ADC"],
-                },
-                "wf_bl": {
-                    "function": "bl_subtract",
-                    "module": "dspeed.processors",
-                    "args": ["waveform", "bl_mean", "wf_bl"],
-                    "unit": "ADC",
-                },
-                "tau1, tau2, frac": {
-                    "function": "optimize_2pz",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform",
-                        "bl_mean",
-                        "round(52*us/waveform.period)",
-                        "len(waveform)",
-                        "1*ms/waveform.period",
-                        "0.5",
-                        "db.pz.tau1",
-                        "db.pz.tau2",
-                        "db.pz.frac",
-                        "tau1",
-                        "tau2",
-                        "frac",
-                    ],
-                    "defaults": {
-                        "db.pz.tau1": 28000,
-                        "db.pz.tau2": 900,
-                        "db.pz.frac": 0.145,
-                    },
+    dpz_opt_dsp_dict = {
+        "outputs": ["tau1", "tau2", "frac"],
+        "processors": {
+            "bl_mean , bl_std, bl_slope, bl_intercept": {
+                "function": "linear_slope_fit",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform[0:200]",
+                    "bl_mean",
+                    "bl_std",
+                    "bl_slope",
+                    "bl_intercept",
+                ],
+                "unit": ["ADC", "ADC", "ADC", "ADC"],
+            },
+            "wf_bl": {
+                "function": "bl_subtract",
+                "module": "dspeed.processors",
+                "args": ["waveform", "bl_mean", "wf_bl"],
+                "unit": "ADC",
+            },
+            "tau1, tau2, frac": {
+                "function": "optimize_2pz",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform",
+                    "bl_mean",
+                    "round(52*us/waveform.period)",
+                    "len(waveform)",
+                    "1*ms/waveform.period",
+                    "0.5",
+                    "db.pz.tau1",
+                    "db.pz.tau2",
+                    "db.pz.frac",
+                    "tau1",
+                    "tau2",
+                    "frac",
+                ],
+                "defaults": {
+                    "db.pz.tau1": 28000,
+                    "db.pz.tau2": 900,
+                    "db.pz.frac": 0.145,
                 },
             },
-        }
-    )
+        },
+    }
 
     wf_field = "waveform"
     percent_tau1_fit = 0.1

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -10,7 +12,7 @@ config_dir = Path(__file__).parent / "configs"
 
 @pytest.fixture(scope="module")
 def test_filedb(lgnd_test_data):
-    with open(config_dir / "filedb-config.json") as f:
+    with (config_dir / "filedb-config.json").open() as f:
         config = json.load(f)
 
     config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
@@ -21,7 +23,7 @@ def test_filedb(lgnd_test_data):
 
 @pytest.fixture(scope="module")
 def test_filedb_full(lgnd_test_data):
-    with open(config_dir / "filedb-config.json") as f:
+    with (config_dir / "filedb-config.json").open() as f:
         config = json.load(f)
 
     config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")

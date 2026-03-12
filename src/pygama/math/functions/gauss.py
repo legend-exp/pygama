@@ -2,6 +2,8 @@
 Gaussian distributions for pygama
 """
 
+from __future__ import annotations
+
 import numba as nb
 import numpy as np
 
@@ -30,10 +32,7 @@ def nb_gauss(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         TODO:: remove this in favor of using nb_gauss_pdf with a different normalization
     """
 
-    if sigma == 0:
-        invs = np.inf
-    else:
-        invs = 1.0 / sigma
+    invs = np.inf if sigma == 0 else 1.0 / sigma
     z = (x - mu) * invs
     return np.exp(-0.5 * z**2)
 
@@ -60,10 +59,7 @@ def nb_gauss_amp(x: np.ndarray, mu: float, sigma: float, a: float) -> np.ndarray
         TODO:: potentially remove this, redundant with ``nb_gauss_scaled_pdf``
     """
 
-    if sigma == 0:
-        invs = np.inf
-    else:
-        invs = 1.0 / sigma
+    invs = np.inf if sigma == 0 else 1.0 / sigma
     z = (x - mu) * invs
     return a * np.exp(-0.5 * z**2)
 
@@ -89,10 +85,7 @@ def nb_gauss_pdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         The standard deviation of the Gaussian
     """
 
-    if sigma == 0:
-        invs = np.inf
-    else:
-        invs = 1.0 / sigma
+    invs = np.inf if sigma == 0 else 1.0 / sigma
     z = (x - mu) * invs
     invnorm = invs / np.sqrt(2 * np.pi)
     return np.exp(-0.5 * z**2) * invnorm
@@ -119,10 +112,7 @@ def nb_gauss_cdf(x: np.ndarray, mu: float, sigma: float) -> np.ndarray:
         The standard deviation of the Gaussian
     """
 
-    if sigma == 0:
-        invs = np.inf
-    else:
-        invs = 1.0 / sigma
+    invs = np.inf if sigma == 0 else 1.0 / sigma
 
     return 1 / 2 * (1 + nb_erf(invs * (x - mu) / (np.sqrt(2))))
 
@@ -176,7 +166,6 @@ def nb_gauss_scaled_cdf(
 
 
 class GaussianGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.x_lo = -1 * np.inf

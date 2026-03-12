@@ -5,6 +5,8 @@ separately using the optimiser, then the resulting grids are interpolated
 to provide the best energy resolution at Qbb
 """
 
+from __future__ import annotations
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -50,10 +52,10 @@ def simple_guess(energy, func, fit_range=None, bin_width=None):
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
     # make binning dynamic based on max, % of events/ n of events?
-    hist, bins, var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
+    hist, bins, _var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
 
-    if func == pgd.hpge_peak or func == pgd.gauss_on_step:
-        mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
+    if func in (pgd.hpge_peak, pgd.gauss_on_step):
+        mu, sigma, _amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
         step = bg - np.mean(hist[:10])
@@ -80,7 +82,7 @@ def simple_guess(energy, func, fit_range=None, bin_width=None):
             parguess["tau"] = tau
 
     else:
-        log.error(f"simple_guess not implemented for {func.__name__}")
+        log.error("simple_guess not implemented for %s", func.__name__)
         return return_nans(func)
 
     return convert_to_minuit(parguess, func).values
@@ -185,7 +187,7 @@ def get_peak_fwhm_with_dt_corr(
 
         if display > 0:
             plt.figure()
-            hist, bins, var = pgh.get_hist(
+            hist, bins, _var = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
             plt.step(pgh.get_bin_centers(bins), hist)
@@ -275,7 +277,7 @@ def fom_fwhm_with_alpha_fit(
                 _,
                 _,
                 _,
-                fit_pars,
+                _fit_pars,
             ) = get_peak_fwhm_with_dt_corr(
                 energies,
                 alpha,
@@ -291,17 +293,15 @@ def fom_fwhm_with_alpha_fit(
                 fwhms = np.append(fwhms, fwhm_o_max)
                 final_alphas = np.append(final_alphas, alpha)
                 fwhm_errs = np.append(fwhm_errs, fwhm_o_max_err)
-                if fwhms[-1] < best_fwhm:
-                    best_fwhm = fwhms[-1]
-            log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
+                best_fwhm = min(best_fwhm, fwhms[-1])
+            log.info("alpha: %s, fwhm/max:%.4f+-%.4f", alpha, fwhm_o_max, fwhm_o_max_err)
 
             ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
                 fwhm_errs > 1e-10
             )
-            if len(fwhms[ids]) > 5:
-                if (np.diff(fwhms[ids])[-3:] > 0).all():
-                    early_break = True
-                    break
+            if len(fwhms[ids]) > 5 and (np.diff(fwhms[ids])[-3:] > 0).all():
+                early_break = True
+                break
 
         # Make sure fit isn't based on only a few points
         if len(fwhms) < nsteps * 0.2 and early_break is False:
@@ -380,7 +380,7 @@ def fom_fwhm_with_alpha_fit(
             display=display,
         )
         if np.isnan(final_fwhm) or np.isnan(final_err):
-            log.debug(f"final fit failed, alpha was {alpha}")
+            log.debug("final fit failed, alpha was %s", alpha)
             raise RuntimeError
         return {
             "fwhm": final_fwhm,
@@ -493,7 +493,7 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
     frac_max = kwarg_dict.get("frac_max", 0.2)
-    out_dict = fom_fwhm_with_alpha_fit(
+    return fom_fwhm_with_alpha_fit(
         data,
         peak_dicts[0],
         ctc_param,
@@ -501,7 +501,6 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
         frac_max=frac_max,
         display=display,
     )
-    return out_dict
 
 
 def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
@@ -547,7 +546,7 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     fwhm_errs.append(out_dict["fwhm_err"])
     n_sig.append(out_dict["n_sig"])
     n_sig_err.append(out_dict["n_sig_err"])
-    log.info(f"fwhms are {fwhms}keV +- {fwhm_errs}")
+    log.info("fwhms are %skeV +- %s", fwhms, fwhm_errs)
 
     fwhms = np.array(fwhms)
     fwhm_errs = np.array(fwhm_errs)
@@ -558,26 +557,26 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     nan_mask = np.isnan(fwhms) | (fwhms < 0)
     if len(fwhms[~nan_mask]) < 2:
         return np.nan, np.nan, np.nan
-    else:
-        results = pgc.HPGeCalibration.fit_energy_res_curve(
-            fwhm_func, peaks[~nan_mask], fwhms[~nan_mask], fwhm_errs[~nan_mask]
-        )
-        results = pgc.HPGeCalibration.interpolate_energy_res(
-            fwhm_func, peaks[~nan_mask], results, interp_energy
-        )
-        interp_res = results[f"{list(interp_energy)[0]}_fwhm_in_kev"]
-        interp_res_err = results[f"{list(interp_energy)[0]}_fwhm_err_in_kev"]
+    results = pgc.HPGeCalibration.fit_energy_res_curve(
+        fwhm_func, peaks[~nan_mask], fwhms[~nan_mask], fwhm_errs[~nan_mask]
+    )
+    results = pgc.HPGeCalibration.interpolate_energy_res(
+        fwhm_func, peaks[~nan_mask], results, interp_energy
+    )
+    interp_res = results[f"{next(iter(interp_energy))}_fwhm_in_kev"]
+    interp_res_err = results[f"{next(iter(interp_energy))}_fwhm_err_in_kev"]
 
-        if nan_mask[-1] is True or nan_mask[-2] is True:
-            interp_res_err = np.nan
-        if interp_res_err / interp_res > 0.1:
-            interp_res_err = np.nan
+    if nan_mask[-1] is True or nan_mask[-2] is True:
+        interp_res_err = np.nan
+    if interp_res_err / interp_res > 0.1:
+        interp_res_err = np.nan
 
-    log.info(f"{list(interp_energy)[0]} fwhm is {interp_res} keV +- {interp_res_err}")
+    log.info("%s fwhm is %s keV +- %s", next(iter(interp_energy)), interp_res, interp_res_err)
+
 
     return {
-        f"{list(interp_energy)[0]}_fwhm": interp_res,
-        f"{list(interp_energy)[0]}_fwhm_err": interp_res_err,
+        f"{next(iter(interp_energy))}_fwhm": interp_res,
+        f"{next(iter(interp_energy))}_fwhm_err": interp_res_err,
         "alpha": alpha,
         "peaks": peaks.tolist(),
         "fwhms": fwhms,

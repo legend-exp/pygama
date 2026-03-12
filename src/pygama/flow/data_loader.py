@@ -7,15 +7,16 @@ import logging
 import os
 import re
 import string
+from collections.abc import Iterator
 from itertools import product
 from keyword import iskeyword
-from typing import Iterator
+from pathlib import Path
 
-import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
 from awkward_pandas import AwkwardDtype
 from dspeed.vis import WaveformBrowser
+from lgdo import lh5
 from lgdo.lh5 import LH5Iterator
 from lgdo.lh5.utils import expand_vars
 from lgdo.types import Array, Struct, Table
@@ -97,7 +98,7 @@ class DataLoader:
         self,
         config: str | dict,
         filedb: str | dict | FileDB = None,
-        file_query: str = None,
+        file_query: str | None = None,
     ) -> None:
         """
         Parameters
@@ -166,7 +167,7 @@ class DataLoader:
         # - if a JSON file is provided, it is set to the directory where the
         #   file is located
         # - if a dict is provided, it is set to the current directory
-        config_dir = os.getcwd()
+        config_dir = Path.cwd()
         if isinstance(config, str):
             # the config string supports this syntax:
             #  file.json[level1/level2[/...]]
@@ -181,13 +182,13 @@ class DataLoader:
 
             # if a directory is provided, try looking for a file named
             # config.json
-            if os.path.isdir(config):
+            if Path(config).is_dir():
                 config_dir = config
-                config = os.path.join(config, "config.json")
+                config = str(Path(config) / "config.json")
             else:
-                config_dir = os.path.dirname(config)
+                config_dir = str(Path(config).parent)
 
-            with open(config) as f:
+            with Path(config).open() as f:
                 config = json.load(f)
 
             if config_loc is not None:
@@ -200,10 +201,9 @@ class DataLoader:
             value = expand_vars(config["filedb"], substitute={"_": config_dir})
             self.filedb = FileDB(value)
 
-        if not os.path.isdir(self.filedb.data_dir):
-            raise FileNotFoundError(
-                f"{self.filedb.data_dir} (path to data root directory in FileDB) does not exist"
-            )
+        if not Path(self.filedb.data_dir).is_dir():
+            msg = f"{self.filedb.data_dir} (path to data root directory in FileDB) does not exist"
+            raise FileNotFoundError(msg)
 
         self.config = config
         self.data_dir = self.filedb.data_dir
@@ -216,7 +216,7 @@ class DataLoader:
         for level in self.levels:
             self.tiers[level] = config["levels"][level]["tiers"]
             # Set cut priority
-            if "parent" in config["levels"][level].keys():  # This level is a TCM
+            if "parent" in config["levels"][level]:  # This level is a TCM
                 parent = config["levels"][level]["parent"]
                 child = config["levels"][level]["child"]
                 self.tcms[level] = config["levels"][level]
@@ -225,10 +225,9 @@ class DataLoader:
                 self.evts[child] = {"tcm": level, "parent": parent}
 
                 # Set TCM columns to lookup
-                if "tcm_cols" not in config["levels"][level].keys():
-                    log.warning(
-                        f"TCM levels, e.g. {level}, need to specify the TCM lookup columns"
-                    )
+                if "tcm_cols" not in config["levels"][level]:
+                    log.warning("TCM levels, e.g. %s, need to specify the TCM lookup columns", level)
+
             else:
                 self.cut_priority[level] = 0
 
@@ -272,14 +271,15 @@ class DataLoader:
                     self.filedb.df.query(query, engine="python", inplace=False).index
                 )
         else:
-            raise ValueError("bad query format")
+            msg = "bad query format"
+            raise ValueError(msg)
 
         if not inds:
             log.warning("no files matching selection found")
 
         if append and self.file_list is not None:
             self.file_list += inds
-            self.file_list = sorted(list(set(self.file_list)))
+            self.file_list = sorted(set(self.file_list))
         else:
             self.file_list = inds
 
@@ -332,9 +332,9 @@ class DataLoader:
 
             if word == keyword:
                 found = True
-                if level in self.table_list.keys():
+                if level in self.table_list:
                     self.table_list[level] += ds
-                    self.table_list[level] = sorted(list(set(self.table_list[level])))
+                    self.table_list[level] = sorted(set(self.table_list[level]))
                 else:
                     self.table_list[level] = ds
 
@@ -366,10 +366,9 @@ class DataLoader:
             # verify the correct structure
             for key, value in cuts.items():
                 if not (key in self.levels and isinstance(value, str)):
-                    raise ValueError(
-                        r"cuts dictionary must be in the format \{ level: string \}"
-                    )
-                if key in self.cuts.keys() and append:
+                    msg = r"cuts dictionary must be in the format \{ level: string \}"
+                    raise ValueError(msg)
+                if key in self.cuts and append:
                     self.cuts[key] += " and " + value
                 else:
                     self.cuts[key] = value
@@ -380,10 +379,10 @@ class DataLoader:
 
     def set_output(
         self,
-        fmt: str = None,
-        merge_files: bool = None,
-        columns: list = None,
-        aoesa_to_vov: bool = None,
+        fmt: str | None = None,
+        merge_files: bool | None = None,
+        columns: list | None = None,
+        aoesa_to_vov: bool | None = None,
     ) -> None:
         """
         Set the parameters for the output format of load
@@ -409,7 +408,8 @@ class DataLoader:
         ... )
         """
         if fmt not in ["lgdo.Table", "pd.DataFrame", None]:
-            raise ValueError(f"'{fmt}' output format not supported")
+            msg = f"'{fmt}' output format not supported"
+            raise ValueError(msg)
 
         if fmt is not None:
             self.output_format = fmt
@@ -436,12 +436,12 @@ class DataLoader:
 
     def build_entry_list(
         self,
-        tcm_level: str = None,
-        tcm_table: int | str = None,
+        tcm_level: str | None = None,
+        tcm_table: int | str | None = None,
         mode: str = "only",
         save_output_columns: bool = False,
         in_memory: bool = True,
-        output_file: str = None,
+        output_file: str | None = None,
     ) -> dict[int, pd.DataFrame] | pd.DataFrame | None:
         """Applies cuts to the tables and files of interest.
 
@@ -480,10 +480,12 @@ class DataLoader:
         :meth:`.load`.
         """
         if self.file_list is None:
-            raise ValueError("You need to make a query on filedb, use set_files()")
+            msg = "You need to make a query on filedb, use set_files()"
+            raise ValueError(msg)
 
         if not in_memory and output_file is None:
-            raise ValueError("If in_memory is False, need to specify an output file")
+            msg = "If in_memory is False, need to specify an output file"
+            raise ValueError(msg)
 
         if in_memory:
             entries = {}
@@ -512,7 +514,7 @@ class DataLoader:
 
         for level in [child, parent]:
             cut_cols[level] = []
-            if self.cuts is not None and level in self.cuts.keys():
+            if self.cuts is not None and level in self.cuts:
                 cut = self.cuts[level]
             else:
                 cut = ""
@@ -524,13 +526,12 @@ class DataLoader:
                 if term.isidentifier() and not iskeyword(term):
                     cut_cols[level].append(term)
                     # Add column to entry_cols if they are needed for both the cut and the output
-                    if self.output_columns is not None:
-                        if (
-                            term in self.output_columns
-                            and term not in entry_cols
-                            and save_output_columns
-                        ):
-                            for_output.append(term)
+                    if self.output_columns is not None and (
+                        term in self.output_columns
+                        and term not in entry_cols
+                        and save_output_columns
+                    ):
+                        for_output.append(term)
             col_tiers_dict[level] = self.get_tiers_for_col(
                 cut_cols[level], merge_files=False
             )
@@ -559,34 +560,32 @@ class DataLoader:
             tcm_tier = self.tiers[tcm_level][0]
             tcm_tables = self.filedb.df.loc[file, f"{tcm_tier}_tables"]
             if len(tcm_tables) > 1 and tcm_table is None:
-                raise ValueError(
-                    f"There are {len(tcm_tables)} TCM tables, need to specify which to use"
-                )
-            else:
-                if tcm_table is not None:
-                    if tcm_table in tcm_tables:
-                        tcm_tb = tcm_table
-                    else:
-                        raise ValueError(
-                            f"Table {tcm_table} doesn't exist in {tcm_level}"
-                        )
+                msg = f"There are {len(tcm_tables)} TCM tables, need to specify which to use"
+                raise ValueError(msg)
+            if tcm_table is not None:
+                if tcm_table in tcm_tables:
+                    tcm_tb = tcm_table
                 else:
-                    tcm_tb = tcm_tables[0]
+                    msg = f"Table {tcm_table} doesn't exist in {tcm_level}"
+                    raise ValueError(msg)
+            else:
+                tcm_tb = tcm_tables[0]
 
-            tcm_path = os.path.join(
-                self.data_dir,
-                self.filedb.tier_dirs[tcm_tier].lstrip("/"),
-                self.filedb.df.iloc[file][f"{tcm_tier}_file"].lstrip("/"),
+            tcm_path = str(
+                Path(self.data_dir)
+                / self.filedb.tier_dirs[tcm_tier].lstrip("/")
+                / self.filedb.df.iloc[file][f"{tcm_tier}_file"].lstrip("/")
             )
 
-            if not os.path.exists(tcm_path):
-                raise FileNotFoundError(f"Can't find TCM file for {tcm_level}")
+            if not Path(tcm_path).exists():
+                msg = f"Can't find TCM file for {tcm_level}"
+                raise FileNotFoundError(msg)
 
             tcm_table_name = self.filedb.get_table_name(tcm_tier, tcm_tb)
             try:
                 tcm_lgdo = lh5.read(tcm_table_name, tcm_path)
             except KeyError:
-                log.warning(f"Cannot find table {tcm_table_name} in file {tcm_path}")
+                log.warning("Cannot find table %s in file %s", tcm_table_name, tcm_path)
                 continue
             # vector of tables should have a better explode method
             # Have to do some hacky stuff until I get a view_as("pd") method
@@ -595,13 +594,13 @@ class DataLoader:
                 if isinstance(f_entries[col].dtype, AwkwardDtype):
                     f_entries[col] = f_entries[col].to_list()
             f_entries = f_entries.explode(list(f_entries.columns))
-            f_entries.reset_index(inplace=True)
+            f_entries = f_entries.reset_index()
             renaming = {
                 "index": f"{child}_idx",
                 self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
                 self.tcms[tcm_level]["tcm_cols"]["parent_idx"]: f"{parent}_idx",
             }
-            f_entries.rename(columns=renaming, inplace=True)
+            f_entries = f_entries.rename(columns=renaming)
             if self.merge_files:
                 f_entries["file"] = file
             # At this point, should have a list of all available hits/evts joined by tcm
@@ -613,16 +612,15 @@ class DataLoader:
             for level in [child, parent]:
                 # Extract the cut condition if given, otherwise set to ""
                 cut = ""
-                if self.cuts is not None:
-                    if level in self.cuts.keys():
-                        cut = self.cuts[level]
+                if self.cuts is not None and level in self.cuts:
+                    cut = self.cuts[level]
 
                 col_tiers = col_tiers_dict[level]
 
                 # Tables in first tier of event should be the same for all tiers in one level
                 tables = self.filedb.df.loc[file, f"{self.tiers[level][0]}_tables"]
                 if self.table_list is not None:
-                    if level in self.table_list.keys():
+                    if level in self.table_list:
                         tables = self.table_list[level]
                     else:
                         continue
@@ -631,7 +629,7 @@ class DataLoader:
 
                 # Cut any rows of TCM not relating to requested tables
                 if level == parent:
-                    f_entries.query(f"{level}_table in {tables}", inplace=True)
+                    f_entries = f_entries.query(f"{level}_table in {tables}")
 
                 for tb in tables:
                     tb_table = None
@@ -641,12 +639,12 @@ class DataLoader:
                         tcm_idx = f_entries.index
                     idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
                     for tier in self.tiers[level]:
-                        tier_path = os.path.join(
-                            self.data_dir,
-                            self.filedb.tier_dirs[tier].lstrip("/"),
-                            self.filedb.df.loc[file, f"{tier}_file"].lstrip("/"),
+                        tier_path = str(
+                            Path(self.data_dir)
+                            / self.filedb.tier_dirs[tier].lstrip("/")
+                            / self.filedb.df.loc[file, f"{tier}_file"].lstrip("/")
                         )
-                        if tier in col_tiers[file]["tables"].keys():
+                        if tier in col_tiers[file]["tables"]:
                             if tb in col_tiers[file]["tables"][tier]:
                                 table_name = self.filedb.get_table_name(tier, tb)
                                 try:
@@ -657,9 +655,8 @@ class DataLoader:
                                         idx=idx_mask.tolist(),
                                     )
                                 except KeyError:
-                                    log.warning(
-                                        f"Cannot find {table_name} in file {tier_path}"
-                                    )
+                                    log.warning("Cannot find %s in file %s", table_name, tier_path)
+
                                     continue
                                 if tb_table is None:
                                     tb_table = tier_table
@@ -668,7 +665,7 @@ class DataLoader:
                     if tb_table is None:
                         continue
                     tb_df = tb_table.view_as("pd")
-                    tb_df.query(cut, inplace=True)
+                    tb_df = tb_df.query(cut)
                     idx_match = f_entries.query(f"{level}_idx in {list(tb_df.index)}")
                     if level == parent:
                         idx_match = idx_match.query(f"{level}_table == {tb}")
@@ -677,7 +674,7 @@ class DataLoader:
                         drop_idx = set.symmetric_difference(
                             set(tcm_idx), list(keep_idx)
                         )
-                        f_entries.drop(drop_idx, inplace=True)
+                        f_entries = f_entries.drop(drop_idx)
                     elif mode == "any":
                         evts = idx_match[f"{child}_idx"].unique().tolist()
                         keep_idx = f_entries.query(f"{child}_idx in {evts}").index
@@ -689,18 +686,18 @@ class DataLoader:
                         else:
                             drop_idx = set.intersection(drop_idx, drop)
                     else:
-                        raise ValueError("mode must be either 'any' or 'only'")
+                        msg = "mode must be either 'any' or 'only'"
+                        raise ValueError(msg)
 
                     if save_output_columns:
                         for col in tb_df.columns:
                             if col in for_output:
                                 f_entries.loc[keep_idx, col] = tb_df[col].tolist()
 
-            if mode == "any":
-                if drop_idx is not None:
-                    f_entries.drop(index=drop_idx, inplace=True)
+            if mode == "any" and drop_idx is not None:
+                f_entries = f_entries.drop(index=drop_idx)
 
-            f_entries.reset_index(inplace=True, drop=True)
+            f_entries = f_entries.reset_index(drop=True)
 
             if in_memory:
                 entries[file] = f_entries
@@ -720,12 +717,13 @@ class DataLoader:
             if self.merge_files:
                 entries = pd.concat(entries.values(), ignore_index=True)
             return entries
+        return None
 
     def build_hit_entries(
         self,
         save_output_columns: bool = False,
         in_memory: bool = True,
-        output_file: str = None,
+        output_file: str | None = None,
     ) -> dict[int, pd.DataFrame] | pd.DataFrame | None:
         """Called by :meth:`.build_entry_list` to handle the case when
         `tcm_level` is unspecified.
@@ -754,14 +752,13 @@ class DataLoader:
             entries = {}
         entry_cols = [f"{low_level}_table", f"{low_level}_idx"]
 
-        log.debug(
-            f"generating (hit-oriented) entry list corresponding to cuts on the {low_level} level"
-        )
+        log.debug("generating (hit-oriented) entry list corresponding to cuts on the %s level", low_level)
+
 
         # find out which columns are needed for the cut
         cut_cols = []
         cut = ""
-        if self.cuts is not None and low_level in self.cuts.keys():
+        if self.cuts is not None and low_level in self.cuts:
             cut = self.cuts[low_level]
             # do cut expression string parsing to determine which columns need to be loaded
             # this matches any valid python variable name
@@ -770,15 +767,14 @@ class DataLoader:
                 if not iskeyword(term):
                     cut_cols.append(term)
                     # Add column to entry_cols if they are needed for both the cut and the output
-                    if self.output_columns is not None:
-                        if (
-                            term in self.output_columns
-                            and term not in entry_cols
-                            and save_output_columns
-                        ):
-                            entry_cols.append(term)
+                    if self.output_columns is not None and (
+                        term in self.output_columns
+                        and term not in entry_cols
+                        and save_output_columns
+                    ):
+                        entry_cols.append(term)
 
-        log.debug(f"need to load {cut_cols} columns for applying cuts")
+        log.debug("need to load %s columns for applying cuts", cut_cols)
         col_tiers = self.get_tiers_for_col(cut_cols, merge_files=False)
 
         if log.getEffectiveLevel() >= logging.INFO:
@@ -797,9 +793,8 @@ class DataLoader:
                     key=self.filedb.df.iloc[file][self.filedb.sortby]
                 )
 
-            log.debug(
-                f"building entry list for cycle {self.filedb.df.iloc[file][self.filedb.sortby]}"
-            )
+            log.debug("building entry list for cycle %s", self.filedb.df.iloc[file][self.filedb.sortby])
+
 
             # this dataframe will be associated with the file and will contain
             # the columns needed for the cut as well as the columns requested
@@ -808,7 +803,7 @@ class DataLoader:
 
             # check if we were asked to consider only certain data streams
             if self.table_list is not None:
-                if low_level in self.table_list.keys():
+                if low_level in self.table_list:
                     tables = self.table_list[low_level]
             else:
                 tables = self.filedb.df.loc[file, f"{self.tiers[low_level][0]}_tables"]
@@ -821,17 +816,17 @@ class DataLoader:
                 if cut == "":
                     tier = self.tiers[low_level][0]
                     # reconstruct absolute path to tier file
-                    tier_path = os.path.join(
-                        self.data_dir,
-                        self.filedb.tier_dirs[tier].lstrip("/"),
-                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                    tier_path = str(
+                        Path(self.data_dir)
+                        / self.filedb.tier_dirs[tier].lstrip("/")
+                        / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                     )
                     # now read how many rows are there in the file
                     table_name = self.filedb.get_table_name(tier, tb)
                     try:
                         n_rows = lh5.read_n_rows(table_name, tier_path)
                     except KeyError:
-                        log.warning(f"Cannot find {table_name} in file {tier_path}")
+                        log.warning("Cannot find %s in file %s", table_name, tier_path)
                         continue
                     tb_df = pd.DataFrame(
                         {
@@ -846,14 +841,14 @@ class DataLoader:
                     for tier in self.tiers[low_level]:
                         # is the tier involved, considered the columns on which cuts are applied?
                         if (
-                            tier in col_tiers[file]["tables"].keys()
+                            tier in col_tiers[file]["tables"]
                             and tb in col_tiers[file]["tables"][tier]
                         ):
                             # reconstruct absolute path to tier file
-                            tier_path = os.path.join(
-                                self.data_dir,
-                                self.filedb.tier_dirs[tier].lstrip("/"),
-                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                            tier_path = str(
+                                Path(self.data_dir)
+                                / self.filedb.tier_dirs[tier].lstrip("/")
+                                / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                             )
 
                             # load the data from the tier file, just the columns needed for the cut
@@ -863,9 +858,8 @@ class DataLoader:
                                     table_name, tier_path, field_mask=cut_cols
                                 )
                             except KeyError:
-                                log.warning(
-                                    f"Cannot find {table_name} in file {tier_path}"
-                                )
+                                log.warning("Cannot find %s in file %s", table_name, tier_path)
+
                                 continue
                             # join everything in one table
                             if tb_table is None:
@@ -878,7 +872,7 @@ class DataLoader:
 
                     # convert to DataFrame and apply cuts
                     tb_df = tb_table.view_as("pd")
-                    tb_df.query(cut, inplace=True)
+                    tb_df = tb_df.query(cut)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
 
@@ -910,6 +904,7 @@ class DataLoader:
             if self.merge_files:
                 entries = pd.concat(entries.values(), ignore_index=True)
             return entries
+        return None
 
     def next(
         self, entry_list: pd.DataFrame = None, chunk_size: int = 10000, **kwargs
@@ -949,7 +944,7 @@ class DataLoader:
         """
         if entry_list is None:
             entry_list = self.build_entry_list(
-                tcm_level=kwargs.get("tcm_level", None), save_output_columns=True
+                tcm_level=kwargs.get("tcm_level"), save_output_columns=True
             )
 
         start = stop = 0
@@ -970,9 +965,9 @@ class DataLoader:
         self,
         entry_list: pd.DataFrame = None,
         in_memory: bool = True,
-        output_file: str = None,
+        output_file: str | None = None,
         orientation: str = "hit",
-        tcm_level: str = None,
+        tcm_level: str | None = None,
     ) -> None | Table | Struct | pd.DataFrame:
         """Loads the requested data from disk.
 
@@ -1009,26 +1004,26 @@ class DataLoader:
             )
 
         if not in_memory and output_file is None:
-            raise ValueError("if in_memory is False, need to specify an output file")
+            msg = "if in_memory is False, need to specify an output file"
+            raise ValueError(msg)
 
         if self.output_columns is None or not self.output_columns:
-            raise ValueError("need to set output columns to load data")
+            msg = "need to set output columns to load data"
+            raise ValueError(msg)
 
         if orientation == "hit":
             self.data = self.load_hits(entry_list, in_memory, output_file, tcm_level)
         elif orientation == "evt":
             if tcm_level is None:
                 if len(self.tcms) == 1:
-                    tcm_level = list(self.tcms.keys())[0]
+                    tcm_level = next(iter(self.tcms.keys()))
                 else:
-                    raise ValueError(
-                        "need to specify which coincidence map to use to return event-oriented data"
-                    )
+                    msg = "need to specify which coincidence map to use to return event-oriented data"
+                    raise ValueError(msg)
             self.data = self.load_evts(entry_list, in_memory, output_file, tcm_level)
         else:
-            raise ValueError(
-                f"I don't understand what orientation={orientation} means!"
-            )
+            msg = f"I don't understand what orientation={orientation} means!"
+            raise ValueError(msg)
 
         return self.data
 
@@ -1036,8 +1031,8 @@ class DataLoader:
         self,
         entry_list: pd.DataFrame,
         in_memory: bool = False,
-        output_file: str = None,
-        tcm_level: str = None,
+        output_file: str | None = None,
+        tcm_level: str | None = None,
     ) -> None | Table | Struct | pd.DataFrame:
         """Called by :meth:`.load` when orientation is ``hit``."""
         if tcm_level is None:
@@ -1057,7 +1052,7 @@ class DataLoader:
                 cum_length,
                 [a.nda for a in tier_table.values()],
             )
-            tier_table.update(zip(tier_table.keys(), exp_cols))
+            tier_table.update(zip(tier_table.keys(), exp_cols, strict=False))
             return tier_table
 
         if self.merge_files:
@@ -1102,10 +1097,10 @@ class DataLoader:
 
                     tb_name = self.filedb.get_table_name(tier, tb)
                     tier_paths = [
-                        os.path.join(
-                            self.data_dir,
-                            self.filedb.tier_dirs[tier].lstrip("/"),
-                            self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                        str(
+                            Path(self.data_dir)
+                            / self.filedb.tier_dirs[tier].lstrip("/")
+                            / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                         )
                         for file in files
                     ]
@@ -1140,12 +1135,10 @@ class DataLoader:
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return f_table
-                elif self.output_format == "pd.DataFrame":
+                if self.output_format == "pd.DataFrame":
                     return f_table.view_as("pd")
-                else:
-                    raise ValueError(
-                        f"'{self.output_format}' output format not supported"
-                    )
+                msg = f"'{self.output_format}' output format not supported"
+                raise ValueError(msg)
         else:  # not merge_files
             if in_memory:
                 load_out = Struct(attrs={"int_keys": True})
@@ -1166,9 +1159,8 @@ class DataLoader:
                         key=self.filedb.df.iloc[file][self.filedb.sortby]
                     )
 
-                log.debug(
-                    f"loading data for cycle key {self.filedb.df.iloc[file][self.filedb.sortby]}"
-                )
+                log.debug("loading data for cycle key %s", self.filedb.df.iloc[file][self.filedb.sortby])
+
 
                 field_mask = []
 
@@ -1183,7 +1175,7 @@ class DataLoader:
                     attr_dict[key] = None
                 table_length = len(f_entries)
 
-                log.debug(f"will load new columns {field_mask}")
+                log.debug("will load new columns %s", field_mask)
 
                 # loop through each table in entry list and
                 # loop through each level we're asked to load from
@@ -1198,18 +1190,17 @@ class DataLoader:
                         if tb not in col_tiers[file]["tables"][tier]:
                             continue
 
-                        log.debug(
-                            f"...for stream '{self.filedb.get_table_name(tier, tb)}' (at {level} level)"
-                        )
+                        log.debug("...for stream ")
+
 
                         # path to tier file
-                        tier_path = os.path.join(
-                            self.data_dir,
-                            self.filedb.tier_dirs[tier].lstrip("/"),
-                            self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                        tier_path = str(
+                            Path(self.data_dir)
+                            / self.filedb.tier_dirs[tier].lstrip("/")
+                            / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                         )
                         # this should not happen
-                        if not os.path.exists(tier_path):
+                        if not Path(tier_path).exists():
                             raise FileNotFoundError(tier_path)
 
                         table_name = self.filedb.get_table_name(tier, tb)
@@ -1250,19 +1241,18 @@ class DataLoader:
             if in_memory:
                 if self.output_format == "lgdo.Table":
                     return load_out
-                elif self.output_format == "pd.DataFrame":
+                if self.output_format == "pd.DataFrame":
                     return [tb.view_as("pd") for tb in load_out.values()]
-                else:
-                    raise ValueError(
-                        f"'{self.output_format}' output format not supported"
-                    )
+                msg = f"'{self.output_format}' output format not supported"
+                raise ValueError(msg)
+        return None
 
     def load_evts(
         self,
         entry_list: pd.DataFrame = None,
         in_memory: bool = False,
-        output_file: str = None,
-        tcm_level: str = None,
+        output_file: str | None = None,
+        tcm_level: str | None = None,
     ) -> None | Table | Struct | pd.DataFrame:
         """Called by :meth:`load` when orientation is ``evt``."""
         raise NotImplementedError
@@ -1273,73 +1263,68 @@ class DataLoader:
 
         if self.merge_files:  # Try to load all information at once
             raise NotImplementedError
-        else:  # Not merge_files
-            if in_memory:
-                load_out = Struct(attrs={"int_keys": True})
-            for file, f_entries in entry_list.items():
-                field_mask = []
-                f_table = None
-                # Pre-allocate memory for output columns
-                for col in self.output_columns:
-                    if col not in f_entries.columns:
-                        f_entries[col] = None
-                        field_mask.append(col)
-                col_tiers = self.get_tiers_for_col(field_mask)
-                col_dict = f_entries.to_dict("list")
-                for col in col_dict.keys():
-                    nda = np.array(col_dict[col])
-                    col_dict[col] = Array(nda=nda)
+        # Not merge_files
+        if in_memory:
+            load_out = Struct(attrs={"int_keys": True})
+        for file, f_entries in entry_list.items():
+            field_mask = []
+            f_table = None
+            # Pre-allocate memory for output columns
+            for col in self.output_columns:
+                if col not in f_entries.columns:
+                    f_entries[col] = None
+                    field_mask.append(col)
+            col_tiers = self.get_tiers_for_col(field_mask)
+            col_dict = f_entries.to_dict("list")
+            for col in col_dict:
+                nda = np.array(col_dict[col])
+                col_dict[col] = Array(nda=nda)
 
-                # Loop through each table in entry list
-                for tb in f_entries[f"{parent}_table"].unique():
-                    tcm_idx = f_entries.query(f"{parent}_table == {tb}").index
-                    for level in load_levels:
-                        idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
+            # Loop through each table in entry list
+            for tb in f_entries[f"{parent}_table"].unique():
+                tcm_idx = f_entries.query(f"{parent}_table == {tb}").index
+                for level in load_levels:
+                    idx_mask = f_entries.loc[tcm_idx, f"{level}_idx"]
 
-                        for tier in self.tiers[level]:
-                            if tb in col_tiers["tables"][tier]:
-                                tier_path = os.path.join(
-                                    self.data_dir,
-                                    self.filedb.tier_dirs[tier].lstrip("/"),
-                                    self.filedb.df.iloc[file][f"{tier}_file"].lstrip(
-                                        "/"
-                                    ),
+                    for tier in self.tiers[level]:
+                        if tb in col_tiers["tables"][tier]:
+                            tier_path = str(
+                                Path(self.data_dir)
+                                / self.filedb.tier_dirs[tier].lstrip("/")
+                                / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
+                            )
+                            if Path(tier_path).exists():
+                                table_name = self.filedb.get_table_name(tier, tb)
+                                tier_table = lh5.read(
+                                    table_name,
+                                    tier_path,
+                                    idx=idx_mask,
+                                    field_mask=field_mask,
                                 )
-                                if os.path.exists(tier_path):
-                                    table_name = self.filedb.get_table_name(tier, tb)
-                                    tier_table = lh5.read(
-                                        table_name,
-                                        tier_path,
-                                        idx=idx_mask,
-                                        field_mask=field_mask,
-                                    )
-                                    for col in tier_table.keys():
-                                        f_table[col].nda[tcm_idx] = tier_table[
-                                            col
-                                        ].tolist()
-                    # end tb loop
-                if in_memory:
-                    load_out[file] = f_table
-                if output_file:
-                    lh5.write(f_table, f"file{file}", output_file, wo_mode="o")
-                # end file loop
-
+                                for col in tier_table:
+                                    f_table[col].nda[tcm_idx] = tier_table[col].tolist()
+                # end tb loop
             if in_memory:
-                if self.output_format == "lgdo.Table":
-                    return load_out
-                elif self.output_format == "pd.DataFrame":
-                    for file in load_out.keys():
-                        load_out[file] = load_out[file].view_as("pd")
-                    return load_out
-                else:
-                    raise ValueError(
-                        f"'{self.output_format}' output format not supported"
-                    )
+                load_out[file] = f_table
+            if output_file:
+                lh5.write(f_table, f"file{file}", output_file, wo_mode="o")
+            # end file loop
+
+        if in_memory:
+            if self.output_format == "lgdo.Table":
+                return load_out
+            if self.output_format == "pd.DataFrame":
+                for file in load_out:
+                    load_out[file] = load_out[file].view_as("pd")
+                return load_out
+            msg = f"'{self.output_format}' output format not supported"
+            raise ValueError(msg)
+        return None
 
     def load_iterator(
         self,
         entry_list: pd.DataFrame = None,
-        tcm_level: str = None,
+        tcm_level: str | None = None,
         buffer_len: int = 3200,
     ) -> LH5Iterator:
         """Creates an :class:LH5Iterator that will load the requested columns
@@ -1398,11 +1383,11 @@ class DataLoader:
                             continue
                         gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                         lh5_files += [
-                            os.path.join(
-                                self.filedb.tier_dirs[tier].lstrip("/"),
-                                self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                            str(
+                                Path(self.filedb.tier_dirs[tier].lstrip("/"))
+                                / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                             )
-                            for file in gb.groups.keys()
+                            for file in gb.groups
                         ]
                         tb_names += [[self.filedb.get_table_name(tier, tb)]] * len(gb)
                         idx_list += [
@@ -1423,8 +1408,8 @@ class DataLoader:
                         )
 
             return lh5_it
-        else:  # not merge_files
-            raise NotImplementedError
+        # not merge_files
+        raise NotImplementedError
 
     def load_detector(self, det_id):
         """
@@ -1496,11 +1481,11 @@ class DataLoader:
             for tb in tables:
                 gb = entry_list.query(f"{parent}_table == {tb}").groupby("file")
                 lh5_files += [
-                    os.path.join(
-                        self.filedb.tier_dirs[tier].lstrip("/"),
-                        self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/"),
+                    str(
+                        Path(self.filedb.tier_dirs[tier].lstrip("/"))
+                        / self.filedb.df.iloc[file][f"{tier}_file"].lstrip("/")
                     )
-                    for file in gb.groups.keys()
+                    for file in gb.groups
                 ]
                 tb_names += [[self.filedb.get_table_name(tier, tb)]] * len(gb)
                 idx_list += [
@@ -1521,7 +1506,7 @@ class DataLoader:
         return WaveformBrowser(lh5_it, buffer_len=buffer_len, **kwargs)
 
     def get_tiers_for_col(
-        self, columns: list | np.ndarray, merge_files: bool = None
+        self, columns: list | np.ndarray, merge_files: bool | None = None
     ) -> dict:
         """For each column given, get the tiers and tables in that tier where
         that column can be found.
@@ -1580,7 +1565,7 @@ class DataLoader:
                 # Rows of FileDB.columns that include columns that we are interested in
                 col_inds = set()
                 for i, col_list in enumerate(self.filedb.columns):
-                    if not set(list(col_list)).isdisjoint(columns):
+                    if not set(col_list).isdisjoint(columns):
                         col_inds.add(i)
 
                 # Loop over tiers

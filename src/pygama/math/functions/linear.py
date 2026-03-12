@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numba as nb
 import numpy as np
 from numba import prange
@@ -140,7 +142,6 @@ def nb_linear_scaled_cdf(
 
 
 class LinearGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None

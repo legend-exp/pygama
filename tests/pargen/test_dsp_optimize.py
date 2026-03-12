@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from lgdo import Table, lh5
 from matplotlib.figure import Figure

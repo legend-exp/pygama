@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import awkward as ak
@@ -146,7 +148,7 @@ def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
         "evt": (outfile, "evt"),
     }
 
-    with open(f"{config_dir}/spms-p13-config.yaml") as file:
+    with (config_dir / "spms-p13-config.yaml").open() as file:
         evt_config = AttrsDict(yaml.safe_load(file))
 
     build_evt(

@@ -8,11 +8,12 @@ import os
 import re
 import string
 import warnings
+from pathlib import Path
 
 import h5py
-import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
+from lgdo import lh5
 from lgdo.lh5 import ls
 from lgdo.lh5.utils import expand_path, expand_vars
 from lgdo.types import Array, Scalar, VectorOfVectors
@@ -127,7 +128,7 @@ class FileDB:
         if isinstance(config, str):
             config_path = config
             try:
-                with open(config) as f:
+                with Path(config).open() as f:
                     config = json.load(f)
             # can otherwise be (wildcard of) HDF5 file(s)
             except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError):
@@ -139,7 +140,8 @@ class FileDB:
             return
 
         if not isinstance(config, dict):
-            raise ValueError("Bad FileDB configuration value")
+            msg = "Bad FileDB configuration value"
+            raise ValueError(msg)
 
         self.set_config(config, config_path)
 
@@ -161,7 +163,7 @@ class FileDB:
             self.scan_files()
 
             # Use config columns and tables if provided
-            if "columns" in self.config.keys() and "tables" in self.config.keys():
+            if "columns" in self.config and "tables" in self.config:
                 log.debug("setting columns/tables from config")
                 self.columns = list(self.config["columns"].values())
                 for tier in self.tiers:
@@ -173,7 +175,7 @@ class FileDB:
                         * len(self.df[f"{tier}_tables"].iloc[0])
                     ] * len(self.df)
 
-    def set_config(self, config: dict, config_path: str = None) -> None:
+    def set_config(self, config: dict, config_path: str | None = None) -> None:
         """Read in the configuration dictionary."""
         self.config = config
         self.tiers = list(self.config["tier_dirs"].keys())
@@ -185,7 +187,7 @@ class FileDB:
         # $_ expands to the location of the config file
         subst_vars = {}
         if config_path is not None:
-            subst_vars["_"] = os.path.dirname(str(config_path))
+            subst_vars["_"] = str(Path(str(config_path)).parent)
 
         data_dir = expand_path(self.config["data_dir"], substitute=subst_vars)
         self.data_dir = data_dir
@@ -195,7 +197,7 @@ class FileDB:
             tier_dirs[k] = expand_vars(val, substitute=subst_vars)
         self.tier_dirs = tier_dirs
 
-    def scan_files(self, dirs: list[str] = None) -> None:
+    def scan_files(self, dirs: list[str] | None = None) -> None:
         """Scan the directory containing files from the lowest tier and fill the dataframe.
 
         The lowest tier is defined as the first element of the `tiers` array.
@@ -214,8 +216,8 @@ class FileDB:
         n_files = 0
         low_tier = self.tiers[0]
         template = self.file_format[low_tier]
-        root_scan_dir = os.path.join(
-            self.data_dir, self.tier_dirs[low_tier].lstrip("/")
+        root_scan_dir = str(
+            Path(self.data_dir) / self.tier_dirs[low_tier].lstrip("/")
         )
 
         scan_dirs = dirs
@@ -224,24 +226,24 @@ class FileDB:
         elif not isinstance(dirs, list):
             scan_dirs = [dirs]
 
-        log.info(f"scanning {scan_dirs} with template {template}")
+        log.info("scanning %s with template %s", scan_dirs, template)
 
         for scan_dir in scan_dirs:
             # some logic to guess where the scan directory is
-            if not os.path.isabs(scan_dir):
+            if not Path(scan_dir).is_absolute():
                 # first check if it's relative to lowest tier directory
-                if os.path.isdir(os.path.join(root_scan_dir, scan_dir)):
-                    scan_dir = os.path.join(root_scan_dir, scan_dir)
+                if (Path(root_scan_dir) / scan_dir).is_dir():
+                    scan_dir = str(Path(root_scan_dir) / scan_dir)
                 # or maybe relative to the data dir?
-                elif os.path.isdir(os.path.join(self.data_dir, scan_dir)):
-                    scan_dir = os.path.join(self.data_dir, scan_dir)
+                elif (Path(self.data_dir) / scan_dir).is_dir():
+                    scan_dir = str(Path(self.data_dir) / scan_dir)
                 else:
-                    scan_dir = os.path.join(os.getcwd(), scan_dir)
+                    scan_dir = str(Path.cwd() / scan_dir)
 
-            log.debug(f"scanning {scan_dir}")
+            log.debug("scanning %s", scan_dir)
 
             for path, _, files in os.walk(scan_dir):
-                log.debug(f"scanning {path}")
+                log.debug("scanning %s", path)
                 n_files += len(files)
 
                 for f in files:
@@ -262,7 +264,8 @@ class FileDB:
                         file_keys.append(finfo)
 
         if n_files == 0:
-            raise FileNotFoundError(f"no {low_tier} files found")
+            msg = f"no {low_tier} files found"
+            raise FileNotFoundError(msg)
 
         if len(file_keys) == 0:
             raise FileNotFoundError(f"no {low_tier} files matched pattern " + template)
@@ -297,12 +300,12 @@ class FileDB:
         def check_status(row):
             status = 0
             for i, tier in enumerate(self.tiers):
-                path_name = os.path.join(
-                    self.data_dir,
-                    self.tier_dirs[tier].lstrip("/"),
-                    row[f"{tier}_file"].lstrip("/"),
+                path_name = str(
+                    Path(self.data_dir)
+                    / self.tier_dirs[tier].lstrip("/")
+                    / row[f"{tier}_file"].lstrip("/")
                 )
-                if os.path.exists(path_name):
+                if Path(path_name).exists():
                     status |= 1 << len(self.tiers) - i - 1
 
             return status
@@ -317,13 +320,13 @@ class FileDB:
 
         def get_size(row, tier):
             size = 0
-            path_name = os.path.join(
-                self.data_dir,
-                self.tier_dirs[tier].lstrip("/"),
-                row[f"{tier}_file"].lstrip("/"),
+            path_name = str(
+                Path(self.data_dir)
+                / self.tier_dirs[tier].lstrip("/")
+                / row[f"{tier}_file"].lstrip("/")
             )
-            if os.path.exists(path_name):
-                size = os.path.getsize(path_name)
+            if Path(path_name).exists():
+                size = Path(path_name).stat().st_size
             return size
 
         for tier in self.tiers:
@@ -331,7 +334,7 @@ class FileDB:
 
     def scan_tables_columns(
         self,
-        to_file: str = None,
+        to_file: str | None = None,
         override: bool = False,
         dir_files_conform: bool = False,
     ) -> list[str]:
@@ -366,26 +369,27 @@ class FileDB:
                 log.warning(
                     "LH5 tables/columns names already set, if you want to perform the scan anyway, set override=True"
                 )
-                return
-            else:
-                log.warning("overwriting existing LH5 tables/columns names")
+                return None
+            log.warning("overwriting existing LH5 tables/columns names")
 
-        def update_tables_cols(row, tier: str, utc_cache: dict = None) -> pd.Series:
-            fpath = os.path.join(
-                self.data_dir,
-                self.tier_dirs[tier].lstrip("/"),
-                row[f"{tier}_file"].lstrip("/"),
+        def update_tables_cols(
+            row, tier: str, utc_cache: dict | None = None
+        ) -> pd.Series:
+            fpath = str(
+                Path(self.data_dir)
+                / self.tier_dirs[tier].lstrip("/")
+                / row[f"{tier}_file"].lstrip("/")
             )
             this_dir = fpath[: fpath.rfind("/")]
             if utc_cache is not None and this_dir in utc_cache:
                 return utc_cache[this_dir]
 
-            log.debug(f"reading column names for tier '{tier}' from {fpath}")
+            log.debug("reading column names for tier '%s' from %s", tier, fpath)
 
-            if os.path.exists(fpath):
+            if Path(fpath).exists():
                 f = h5py.File(fpath)
             else:
-                log.debug(f"{fpath} doesn't exist")
+                log.debug("%s doesn't exist", fpath)
                 return pd.Series({f"{tier}_tables": None, f"{tier}_col_idx": None})
 
             # Get tables in each tier
@@ -397,9 +401,11 @@ class FileDB:
             braces = list(re.finditer("{|}", template))
 
             if len(braces) > 2:
-                raise ValueError("tables can only have one identifier")
+                msg = "tables can only have one identifier"
+                raise ValueError(msg)
             if len(braces) % 2 != 0:
-                raise ValueError("braces mismatch in table format")
+                msg = "braces mismatch in table format"
+                raise ValueError(msg)
             if len(braces) == 0:
                 tier_tables.append(0)
             else:
@@ -412,10 +418,10 @@ class FileDB:
                 # TODO this call here is really expensive!
                 groups = ls(f, wildcard)
                 if len(groups) > 0 and parse(template, groups[0]) is None:
-                    log.warning(f"groups in {fpath} don't match template")
+                    log.warning("groups in %s don't match template", fpath)
                 else:
                     tier_tables = [
-                        list(parse(template, g).named.values())[0] for g in groups
+                        next(iter(parse(template, g).named.values())) for g in groups
                     ]
 
             # Get columns
@@ -436,7 +442,7 @@ class FileDB:
                 try:
                     col = ls(f[table_name])
                 except KeyError:
-                    log.warning(f"cannot find '{table_name}' in {fpath}")
+                    log.warning("cannot find '%s' in %s", table_name, fpath)
                     continue
                 if col not in columns:
                     columns.append(col)
@@ -467,7 +473,7 @@ class FileDB:
         self.columns = columns
 
         if to_file is not None:
-            log.debug(f"writing column names to '{to_file}'")
+            log.debug("writing column names to '%s'", to_file)
             flattened = []
             length = []
             for i, col in enumerate(columns):
@@ -495,7 +501,7 @@ class FileDB:
         path
             file or file pattern (or list of the latter).
         """
-        log.debug(f"reading FileDB from disk at {path}")
+        log.debug("reading FileDB from disk at %s", path)
 
         if not isinstance(path, list):
             path = [path]
@@ -536,9 +542,8 @@ class FileDB:
             if _cfg is None:
                 _cfg = cfg
             elif cfg != _cfg:
-                raise RuntimeError(
-                    "cannot merge FileDBs created with different configuration files"
-                )
+                msg = "cannot merge FileDBs created with different configuration files"
+                raise RuntimeError(msg)
 
             # read in unique columns
             vov = lh5.read("columns", p)
@@ -554,7 +559,7 @@ class FileDB:
                 _df = df
                 continue
 
-            elif _columns != columns:
+            if _columns != columns:
                 log.debug("found inconsistent FileDB, trying to merge")
                 # if columns are not the same, need to merge the two dataframes
                 # in the right way. loop over new columns
@@ -602,7 +607,7 @@ class FileDB:
         wo_mode
             passed to :meth:`~.lgdo.lh5.write`.
         """
-        log.debug(f"writing database to {filename}")
+        log.debug("writing database to %s", filename)
 
         lh5.write(Scalar(json.dumps(self.config)), "config", filename, wo_mode=wo_mode)
 
@@ -659,10 +664,12 @@ class FileDB:
                     finfo[f"{tier}_file"] = self.file_format[tier].format(**finfo)
 
         if n_files == 0:
-            raise FileNotFoundError("No DAQ files found")
+            msg = "No DAQ files found"
+            raise FileNotFoundError(msg)
 
         if len(file_keys) == 0:
-            raise FileNotFoundError("No DAQ files matched pattern ", daq_template)
+            msg = "No DAQ files matched pattern "
+            raise FileNotFoundError(msg, daq_template)
 
         temp_df = pd.DataFrame(file_keys)
 

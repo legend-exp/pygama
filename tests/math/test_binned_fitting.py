@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from pytest import approx
 
@@ -47,8 +49,8 @@ def test_gauss_mode_width_max():
     from pygama.math.histogram import get_hist
 
     np.random.seed(42)
-    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
-    fit, cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
+    hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    fit, _cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
 
     assert fit[0] == approx(-0.006127842485254326)
     assert fit[1] == approx(1.0066159284176235)
@@ -59,7 +61,7 @@ def test_gauss_mode_width_max():
     assert fit[0] == approx(-0.0028635117051317638)
     assert fit[1] == approx(400.2130565573762)
 
-    fit, err = pgbf.gauss_mode(hist, bins)
+    fit, _err = pgbf.gauss_mode(hist, bins)
 
     assert fit == approx(-0.0028635117051317638)
 
@@ -70,8 +72,8 @@ def test_taylor_mode_max():
     from pygama.math.histogram import get_hist
 
     np.random.seed(42)
-    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
-    fit, err = pgbf.taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5)
+    hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    fit, _err = pgbf.taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5)
 
     assert fit[0] == approx(-0.005714285714285219)
     assert fit[1] == approx(400.4864285714285)

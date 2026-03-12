@@ -1,5 +1,7 @@
-import lgdo.lh5 as lh5
+from __future__ import annotations
+
 import numpy as np
+from lgdo import lh5
 
 import pygama.pargen.AoE_cal as Coe
 

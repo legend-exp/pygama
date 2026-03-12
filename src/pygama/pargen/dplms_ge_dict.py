@@ -14,7 +14,6 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
@@ -63,7 +62,7 @@ def dplms_ge_dict(
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
 
     cut_dict = generate_cuts(dsp_fft, cut_dict=dplms_dict["bls_cut_pars"])
-    log.debug(f"Cuts are {cut_dict}")
+    log.debug("Cuts are %s", cut_dict)
     idxs = np.full(len(dsp_fft), True, dtype=bool)
     for outname, info in cut_dict.items():
         outcol = dsp_fft.eval(info["expression"], info.get("parameters", None))
@@ -73,24 +72,22 @@ def dplms_ge_dict(
     log.debug("Applied Cuts")
 
     bl_field = dplms_dict["bl_field"]
-    log.info(f"... {len(dsp_fft[bl_field].values.nda[idxs, :])} baselines after cuts")
+    log.info("... %s baselines after cuts", len(dsp_fft[bl_field].values.nda[idxs, :]))
 
     bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
     bls_par = {}
-    bls_cut_pars = [par for par in dplms_dict["bls_cut_pars"]]
+    bls_cut_pars = list(dplms_dict["bls_cut_pars"])
     for par in bls_cut_pars:
         bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
-    log.info(
-        f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
-    )
-    log.info(
-        f'Calculating noise matrix of length {dplms_dict["length"]} n. events: {bls.shape[0]}, size: {bls.shape[1]}'
-    )
+    log.info("total events %s, %s baseline selected in %.2f s", len(raw_fft), len(bls), (t1 - t0))
+
+    log.info("Calculating noise matrix of length %s", dplms_dict)
+
 
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
-    log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
+    log.info("Time to calculate noise matrix %.2f s", (t2 - t1))
 
     log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
@@ -98,10 +95,10 @@ def dplms_ge_dict(
     peaks_kev = np.array(dplms_dict["peaks_kev"])
     kev_widths = [tuple(kev_width) for kev_width in dplms_dict["kev_widths"]]
 
-    log.info(f"Produce dsp data for {len(raw_cal)} events")
+    log.info("Produce dsp data for %s events", len(raw_cal))
     dsp_cal = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
     t3 = time.time()
-    log.info(f"Time to run dsp production {(t3-t2):.2f} s")
+    log.info("Time to run dsp production %.2f s", (t3 - t2))
 
     dsp_config["outputs"] = [ene_par, ctc_par]
 
@@ -119,8 +116,8 @@ def dplms_ge_dict(
 
     # penalized coefficients
     dp_coeffs = dplms_dict["dp_coeffs"]
-    coeff_keys = [key for key in dp_coeffs.keys()]
-    lists = [dp_coeffs[key] for key in dp_coeffs.keys()]
+    coeff_keys = list(dp_coeffs.keys())
+    lists = [dp_coeffs[key] for key in dp_coeffs]
 
     prod = list(itertools.product(*lists))
     grid_dict = {}
@@ -128,7 +125,7 @@ def dplms_ge_dict(
     min_idx = None
 
     for i, values in enumerate(prod):
-        coeff_values = dict(zip(coeff_keys, values))
+        coeff_values = dict(zip(coeff_keys, values, strict=False))
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
             log_msg += f" {key} = {value}"
@@ -138,7 +135,7 @@ def dplms_ge_dict(
 
         sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
         wfs = dsp_cal[wf_field].nda[sel_dict["idxs"], :]
-        log.info(f"... {len(wfs)} signals after signal selection")
+        log.info("... %s signals after signal selection", len(wfs))
 
         ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
 
@@ -158,9 +155,8 @@ def dplms_ge_dict(
             wsize,
         )
         par_dsp["dplms"] = {"length": dplms_dict["length"], "coefficients": x}
-        log.info(
-            f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area {np.sum(x)}"
-        )
+        log.info("Filter synthesis in %.1f s, filter area %s", time.time() - t_tmp, np.sum(x))
+
 
         t_tmp = time.time()
         dsp_opt = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
@@ -184,9 +180,8 @@ def dplms_ge_dict(
             res["chisquare"],
         )
         p_val = chi2.sf(chisquare[0], chisquare[1])
-        log.info(
-            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time()-t_tmp:.1f} s"
-        )
+        log.info("FWHM = %.2f ± %.2f keV, p_val=%s evaluated in %.1f s", fwhm, fwhm_err, p_val, time.time() - t_tmp)
+
         grid_dict[i]["fwhm"] = fwhm
         grid_dict[i]["fwhm_err"] = fwhm_err
         grid_dict[i]["alpha"] = alpha
@@ -195,15 +190,14 @@ def dplms_ge_dict(
             and fwhm_err < dplms_dict["err_limit"]
             and p_val > dplms_dict["p_val_lim"]
             and ~np.isnan(fwhm)
-        ):
-            if fwhm < min_fom:
-                min_idx, min_fom = i, fwhm
+        ) and fwhm < min_fom:
+            min_idx, min_fom = i, fwhm
 
     if min_idx is not None:
         min_result = grid_dict[min_idx]
-        best_case_values = {key: min_result[key] for key in min_result.keys()}
+        best_case_values = {key: min_result[key] for key in min_result}
 
-        fwhm = best_case_values.get("fwhm", None)
+        fwhm = best_case_values.get("fwhm")
         fwhm_err = best_case_values.get("fwhm_err", 0)
         alpha = best_case_values.get("alpha", 0)
         nm_coeff = best_case_values.get("nm", dplms_dict["dp_def"]["nm"])
@@ -226,7 +220,7 @@ def dplms_ge_dict(
                 pt_coeff,
             ]
         ):
-            log.info(f"\nBest case: {best_case_values}")
+            log.info("\nBest case: %s", best_case_values)
         else:
             log.debug("Some values are missing in the best case results")
     else:
@@ -246,7 +240,7 @@ def dplms_ge_dict(
     wfs = dsp_cal[wf_field].nda[idxs, :]
     ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
 
-    x, y, refy = filter_synthesis(
+    x, _y, _refy = filter_synthesis(
         ref,
         nm_coeff * nmat,
         rmat,
@@ -279,7 +273,7 @@ def dplms_ge_dict(
     }
     out_dict.update({"ctc_params": out_alpha_dict})
 
-    log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
+    log.info("Time to complete DPLMS filter synthesis %.1f", time.time() - t0)
 
     if display > 0:
         plot_dict = {"ref": ref, "coefficients": x}
@@ -397,8 +391,7 @@ def dplms_ge_dict(
         ax.indicate_inset_zoom(axin)
 
         return out_dict, plot_dict
-    else:
-        return out_dict
+    return out_dict
 
 
 def is_valid_centroid(
@@ -428,7 +421,7 @@ def is_not_pile_up(
     llow, lupp = bin_edges[idx_low], bin_edges[idx_upp]
 
     idxs = []
-    for n, nn in zip(peak_pos, peak_pos_neg):
+    for n, nn in zip(peak_pos, peak_pos_neg, strict=False):
         condition1 = np.count_nonzero(n > 0) == 1
         condition2 = (
             np.count_nonzero((n > 0) & ((n < llow) | (n > lupp) & (n < size))) == 0
@@ -456,26 +449,20 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
     bsize = dplms_dict["bsize"]
 
     centroid_lim = dplms_dict["centroid_lim"]
-    if "rt" in coeff_values:
-        perc = coeff_values["rt"]
-    else:
-        perc = dplms_dict["dp_def"]["rt"]
-    if "pt" in coeff_values:
-        thr = coeff_values["pt"]
-    else:
-        thr = dplms_dict["dp_def"]["rt"]
+    perc = coeff_values["rt"] if "rt" in coeff_values else dplms_dict["dp_def"]["rt"]
+    thr = coeff_values["pt"] if "pt" in coeff_values else dplms_dict["dp_def"]["rt"]
 
     idxs_ct, ct_ll, ct_hh = is_valid_centroid(centroid, centroid_lim, wsize, bsize)
-    log.info(f"... {len(peak_pos[idxs_ct, :])} signals after alignment")
+    log.info("... %s signals after alignment", len(peak_pos[idxs_ct, :]))
 
     idxs_pp, pp_ll, pp_hh = is_not_pile_up(peak_pos, peak_pos_neg, thr, peak_lim, wsize)
-    log.info(f"... {len(peak_pos[idxs_pp, :])} signals after pile-up cut")
+    log.info("... %s signals after pile-up cut", len(peak_pos[idxs_pp, :]))
 
     idxs_rt, rt_ll, rt_hh = is_valid_risetime(risetime, rt_low, perc)
-    log.info(f"... {len(peak_pos[idxs_rt, :])} signals after risetime cut")
+    log.info("... %s signals after risetime cut", len(peak_pos[idxs_rt, :]))
 
     idxs = idxs_ct & idxs_pp & idxs_rt
-    sel_dict = {
+    return {
         "idxs": idxs,
         "ct_ll": ct_ll,
         "ct_hh": ct_hh,
@@ -484,7 +471,6 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
         "rt_ll": rt_ll,
         "rt_hh": rt_hh,
     }
-    return sel_dict
 
 
 def noise_matrix(bls: np.array, length: int) -> np.array:
@@ -494,14 +480,13 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
     bls = bls - offset
     nmat = np.matmul(bls.T, bls, dtype=float) / nev
     kernel = np.identity(size - length + 1)
-    nmat = convolve2d(nmat, kernel, boundary="symm", mode="valid") / (size - length + 1)
-    return nmat
+    return convolve2d(nmat, kernel, boundary="symm", mode="valid") / (size - length + 1)
 
 
 def noise_matrix_corr(
     bls: np.ndarray, bls_corr: list[np.ndarray], length: int
 ) -> np.ndarray:
-    all_bls = [bls] + bls_corr
+    all_bls = [bls, *bls_corr]
     n = len(all_bls)
 
     processed = []
@@ -535,8 +520,7 @@ def noise_matrix_corr(
                     block_mat[i][j]
                 )
 
-    nmat = 0.5 * (nmat + nmat.T)
-    return nmat
+    return 0.5 * (nmat + nmat.T)
 
 
 def signal_matrices(
@@ -555,10 +539,7 @@ def signal_matrices(
     rmat = np.outer(ref[flo:fhi], ref[flo:fhi])
 
     # Pile-up matrix
-    if decay_const > 0:
-        decay = -np.arange(length) * decay_const
-    else:
-        decay = np.zeros(length)
+    decay = -np.arange(length) * decay_const if decay_const > 0 else np.zeros(length)
     pmat = np.outer(decay, decay)
 
     # Flat top matrix
@@ -604,8 +585,7 @@ def filter_synthesis(
 
     if flip:
         return np.flip(x), y, refy
-    else:
-        return x, y, refy
+    return x, y, refy
 
 
 def filter_synthesis_corr(
@@ -658,5 +638,4 @@ def filter_synthesis_corr(
 
     if flip:
         return [np.flip(x[n * length : (n + 1) * length]) for n in range(n_geds)]
-    else:
-        return [x[n * length : (n + 1) * length] for n in range(n_geds)]
+    return [x[n * length : (n + 1) * length] for n in range(n_geds)]

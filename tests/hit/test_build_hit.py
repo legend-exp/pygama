@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 import os
 from pathlib import Path
@@ -40,7 +42,7 @@ def test_basics(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    assert os.path.exists(outfile)
+    assert Path(outfile).exists()
     assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
     tbl = lh5.read("ch1084803/hit", outfile)
@@ -78,7 +80,7 @@ def test_lh5_table_configs(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    assert os.path.exists(outfile)
+    assert Path(outfile).exists()
     assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
     lh5_tables_config = {
@@ -101,7 +103,7 @@ def test_lh5_table_configs(dsp_test_file, tmp_dir):
         wo_mode="overwrite",
     )
 
-    assert os.path.exists(outfile)
+    assert Path(outfile).exists()
     assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
 
 
@@ -165,12 +167,12 @@ def test_build_hit_multiconfig(dsp_test_file, tmp_dir):
     out_file = f"{tmp_dir}/test_cal_geds_hit.lh5"
 
     # append the tmp_dir to the start of paths in the hit-multi-config.json
-    with open(f"{config_dir}/hit-multi-config.json") as f:
+    with (config_dir / "hit-multi-config.json").open() as f:
         configdict = json.load(f)
-    for key in configdict.keys():
+    for key in configdict:
         configdict[key] = f"{config_dir}/" + configdict[key].split("/")[-1]
     newdict = json.dumps(configdict)
-    with open(f"{tmp_dir}/hit-multi-config.json", "w") as file:
+    with Path(f"{tmp_dir}/hit-multi-config.json").open("w") as file:
         file.write(newdict)
 
     build_hit(

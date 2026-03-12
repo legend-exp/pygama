@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from pytest import approx
 
@@ -127,7 +129,7 @@ def test_get_gaussian_guess():
     from numpy.random import normal
 
     np.random.seed(42)
-    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    hist, bins, _var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
 
     gauss_params = pgh.get_gaussian_guess(hist, bins)
     assert np.allclose(

@@ -2,6 +2,8 @@
 Step distributions for pygama
 """
 
+from __future__ import annotations
+
 from math import erf
 
 import numba as nb
@@ -85,9 +87,7 @@ def nb_unnorm_step_pdf(x: float, mu: float, sigma: float, hstep: float) -> float
     invs = np.sqrt(2) * sigma
     if invs == 0:
         return 1 + hstep
-    else:
-        step_f = 1 + hstep * erf((x - mu) / invs)
-        return step_f
+    return 1 + hstep * erf((x - mu) / invs)
 
 
 @nb.njit(**nb_kwargs)
@@ -260,7 +260,6 @@ def nb_step_scaled_cdf(
 
 
 class StepGen(PygamaContinuous):
-
     def _argcheck(self, x_lo, x_hi, mu, sigma, hstep):
         return x_hi > x_lo
 

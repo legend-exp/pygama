@@ -2,9 +2,10 @@
 pygama convenience functions for fitting hpge peak shape data
 """
 
+from __future__ import annotations
+
 import logging
 import math
-from typing import Optional
 
 import numpy as np
 from scipy.optimize import brentq, minimize_scalar
@@ -18,7 +19,7 @@ log = logging.getLogger(__name__)
 
 
 def hpge_peak_fwhm(
-    sigma: float, htail: float, tau: float, cov: Optional[float] = None
+    sigma: float, htail: float, tau: float, cov: float | None = None
 ) -> tuple[float, float]:
     """
     Return the FWHM of the hpge_peak function, ignoring background and step
@@ -48,7 +49,8 @@ def hpge_peak_fwhm(
         )[0]
 
     if htail < 0 or htail > 1:
-        raise ValueError("htail outside allowed limits of 0 and 1")
+        msg = "htail outside allowed limits of 0 and 1"
+        raise ValueError(msg)
 
     res = minimize_scalar(
         neg_hpge_peak_peak_bgfree,
@@ -130,7 +132,8 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max=0.5, cov=None):
         return -gauss_on_exgauss.get_pdf(np.array([e]), 0, sigma, htail, tau)[0]
 
     if htail < 0 or htail > 1:
-        raise ValueError("htail outside allowed limits of 0 and 1")
+        msg = "htail outside allowed limits of 0 and 1"
+        raise ValueError(msg)
 
     res = minimize_scalar(
         neg_radford_peak_bgfree,
@@ -200,8 +203,7 @@ def hpge_peak_mode(mu, sigma, htail, tau, cov=None):
     if htail < 0 or htail > 1:
         if cov is not None:
             return np.nan, np.nan
-        else:
-            return np.nan
+        return np.nan
 
     try:
         mode = brentq(
@@ -223,15 +225,14 @@ def hpge_peak_mode(mu, sigma, htail, tau, cov=None):
 
     if cov is None:
         return mode
-    else:
-        # nsig set to 1, hstep+nbkg set to 0
-        pars = np.array([1, mu, sigma, htail, tau, 0, 0])
-        rng = np.random.default_rng(1)
-        par_b = rng.multivariate_normal(pars, cov, size=10000)
-        modes = np.array([hpge_peak_mode(p[1], p[2], p[3], p[4]) for p in par_b])
-        mode_err_boot = np.nanstd(modes, axis=0)
+    # nsig set to 1, hstep+nbkg set to 0
+    pars = np.array([1, mu, sigma, htail, tau, 0, 0])
+    rng = np.random.default_rng(1)
+    par_b = rng.multivariate_normal(pars, cov, size=10000)
+    modes = np.array([hpge_peak_mode(p[1], p[2], p[3], p[4]) for p in par_b])
+    mode_err_boot = np.nanstd(modes, axis=0)
 
-        return mode, mode_err_boot
+    return mode, mode_err_boot
 
 
 def hpge_peak_peakshape_derivative(

@@ -2,6 +2,8 @@
 Poisson distributions for pygama
 """
 
+from __future__ import annotations
+
 import numba as nb
 import numpy as np
 from scipy.stats import rv_discrete
@@ -129,7 +131,6 @@ def nb_poisson_scaled_cdf(
 
 
 class PoissonGen(rv_discrete):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = 0
         self.x_hi = np.inf

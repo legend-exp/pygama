@@ -16,11 +16,7 @@ def convert_to_minuit(pars, func):
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
     except AttributeError:
         c = cost.UnbinnedNLL(np.array([0]), func)
-    if isinstance(pars, dict):
-        m = Minuit(c, **pars)
-    else:
-        m = Minuit(c, *pars)
-    return m
+    return Minuit(c, **pars) if isinstance(pars, dict) else Minuit(c, *pars)
 
 
 def return_nans(input):
@@ -28,10 +24,9 @@ def return_nans(input):
         args = input.__code__.co_varnames[: input.__code__.co_argcount][1:]
         m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
-    else:
-        args = input.required_args()
-        m = convert_to_minuit(np.full(len(args), np.nan), input)
-        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
+    args = input.required_args()
+    m = convert_to_minuit(np.full(len(args), np.nan), input)
+    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
 
 
 def load_data(
@@ -118,9 +113,8 @@ def load_data(
         )
         df_fields = params & (fields | set(cal_dict))
         if df_fields != params:
-            log.debug(
-                f"load_data(): params not found in data files or cal_dict: {params-df_fields}"
-            )
+            log.debug("load_data(): params not found in data files or cal_dict: %s", params - df_fields)
+
         df = pd.DataFrame(columns=list(df_fields))
 
         for table in lh5_it:
@@ -143,12 +137,11 @@ def load_data(
         # Evaluate threshold mask and drop events below threshold
         if threshold is not None:
             masks = df[cal_energy_param] > threshold
-            df.drop(np.where(~masks)[0], inplace=True)
+            df = df.drop(np.where(~masks)[0])
         else:
             masks = np.ones(len(df), dtype=bool)
 
     log.debug("data loaded")
     if return_selection_mask:
         return df, masks
-    else:
-        return df
+    return df

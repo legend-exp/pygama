@@ -85,9 +85,7 @@ def l200_test_stat(relative_t0, amp, ts_bkg_prob, rc_density):
     ts_amp = [l200_rc_amp_logpdf(n, rc_density) for n in n_pe_tot]
 
     # for events with no light, set the test statistic value to +inf
-    t_stat = np.where(np.isnan(n_pe_tot), np.inf, ts_time / n_pe_tot + ts_amp)
-
-    return t_stat
+    return np.where(np.isnan(n_pe_tot), np.inf, ts_time / n_pe_tot + ts_amp)
 
 
 # need to define this function and use it with ak.transform() because scipy
@@ -103,8 +101,8 @@ def _ak_l200_test_stat_time_term(layouts, ts_bkg_prob, **kwargs):
     # sanity check
     assert len(layouts) == 2
 
-    if not all([lay.is_numpy for lay in layouts]):
-        return
+    if not all(lay.is_numpy for lay in layouts):
+        return None
 
     # these are the two supported arguments
     t0 = layouts[0].data
@@ -221,5 +219,4 @@ def l200_rc_amp_logpdf(
     if n_pes <= limit:
         return np.log(rc_density[int(n_pes)])
     # analytical continuation: log of an exponential function.
-    else:
-        return logexp_cont_slope * (n_pes - int(limit)) + np.log(rc_density[int(limit)])
+    return logexp_cont_slope * (n_pes - int(limit)) + np.log(rc_density[int(limit)])

@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+from pathlib import Path
 
 import awkward as ak
 import lgdo
@@ -138,7 +141,7 @@ def test_generate_tcm_cols(lgnd_test_data):
         "timestamp",
         out_fields="timestamp",
     )
-    assert "timestamp" in tcm_cols.keys()
+    assert "timestamp" in tcm_cols
 
     # test channel appearing multiple times in single entry
     tcm_cols = evt.build_tcm(
@@ -226,7 +229,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         wo_mode="of",
     )
 
-    assert os.path.exists(out_file)
+    assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
@@ -265,7 +268,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         wo_mode="of",
         buffer_len=1,
     )
-    assert os.path.exists(out_file)
+    assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
@@ -304,7 +307,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         wo_mode="of",
         buffer_len=1,
     )
-    assert os.path.exists(out_file)
+    assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
@@ -350,7 +353,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         wo_mode="write_safe",
         buffer_len=1,
     )
-    assert os.path.exists(clone)
+    assert Path(clone).exists()
     tcm_cols = lh5.read("tcm", clone)
     assert isinstance(tcm_cols, lgdo.Struct)
     assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]

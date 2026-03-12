@@ -3,6 +3,8 @@ This module contains the functions for performing the filter optimisation.
 This happens with a grid search performed on ENC peak.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -74,11 +76,11 @@ def noise_optimization(
         plt.close()
 
     result_dict = {}
-    ene_pars = [par for par in opt_dict_par.keys()]
-    log.info(f"\nRunning optimization for {ene_pars}")
+    ene_pars = list(opt_dict_par.keys())
+    log.info("\nRunning optimization for %s", ene_pars)
     for i, x in enumerate(samples):
         x = f"{x:.1f}"
-        log.info(f"\nCase {i}, par = {x} us")
+        log.info("\nCase %s, par = %s us", i, x)
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
             filter_par = opt_dict_par[ene_par]["filter_par"]
@@ -89,7 +91,7 @@ def noise_optimization(
 
         t1 = time.time()
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
-        log.info(f"Time to process dsp data {time.time()-t1:.2f} s")
+        log.info("Time to process dsp data %.2f s", time.time() - t1)
 
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
@@ -116,15 +118,15 @@ def noise_optimization(
             par_dict_res[x]["fom_err"] = fom_results["fom_err"]
 
     for ene_par in ene_pars:
-        log.info(f"\nOptimization for {ene_par}")
+        log.info("\nOptimization for %s", ene_par)
         dict_str = opt_dict_par[ene_par]["dict_str"]
         par_dict_res = result_dict[dict_str]
-        sample_list = np.array([float(x) for x in result_dict[dict_str].keys()])
+        sample_list = np.array([float(x) for x in result_dict[dict_str]])
         fom_list = np.array(
-            [result_dict[dict_str][x]["fom"] for x in result_dict[dict_str].keys()]
+            [result_dict[dict_str][x]["fom"] for x in result_dict[dict_str]]
         )
         fom_err_list = np.array(
-            [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str].keys()]
+            [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str]]
         )
 
         guess_par = sample_list[np.nanargmin(fom_list)]
@@ -135,9 +137,8 @@ def noise_optimization(
         result = minimize(splev, guess_par, args=(tck))
         best_par = result.x[0]
         if (best_par < np.min(sample_list)) or (best_par > np.max(sample_list)):
-            log.info(
-                f"Par from minimization not accepted {best_par:.2f}, setting par to guess"
-            )
+            log.info("Par from minimization not accepted %.2f, setting par to guess", best_par)
+
             best_par = guess_par
 
         best_val = splev(best_par, tck)
@@ -149,7 +150,7 @@ def noise_optimization(
             b_fom_list = fom_list[indices]
             b_best_pars[i] = b_sample_list[np.nanargmin(b_fom_list)]
         best_par_err = np.std(b_best_pars)
-        log.info(f"best par: {best_par:.2f} ± {best_par_err:.2f} us")
+        log.info("best par: %.2f ± %.2f us", best_par, best_par_err)
 
         par_dict_res["best_par"] = best_par
         par_dict_res["best_par_err"] = best_par_err
@@ -168,7 +169,7 @@ def noise_optimization(
                 x = f"{x:.1f}"
                 energies = par_dict_res[x]["energies"]
                 par_dict_res[x].pop("energies")
-                hist, bins, var = get_hist(
+                hist, bins, _var = get_hist(
                     energies, range=plot_range, dx=opt_dict["dx"]
                 )
                 bc = (bins[:-1] + bins[1:]) / 2.0
@@ -220,11 +221,10 @@ def noise_optimization(
             par_dict_res["optimization"] = fig
             plot_dict["nopt"][dict_str] = par_dict_res
 
-    log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
+    log.info("Time to complete the optimization %.2f s", time.time() - t0)
     if display > 0:
         return res_dict, plot_dict
-    else:
-        return res_dict
+    return res_dict
 
 
 def calculate_spread(energies, percentile_low, percentile_high, n_samples):
@@ -264,7 +264,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     fwhm = pars[1] * 2 * np.sqrt(2 * np.log(2))
     fwhm_err = errs[1] * 2 * np.sqrt(2 * np.log(2))
 
-    hist, bins, var = get_hist(energies_fit, range=fit_range, dx=dx)
+    hist, bins, _var = get_hist(energies_fit, range=fit_range, dx=dx)
     gof_pars = pars
     gof_pars[2] *= dx
     chisq, dof = goodness_of_fit(
@@ -279,12 +279,12 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     ):
         log.debug("fit failed, cov estimation failed")
         fit_failed = True
-    elif (np.abs(np.array(errs)[2:] / np.array(pars)[2:]) < 1e-7).any() or np.isnan(
-        np.array(errs)[2:]
-    ).any():
-        log.debug("fit failed, parameter error too low")
-        fit_failed = True
-    elif p_val < allowed_p_val or np.isnan(p_val):
+    elif (
+        (np.abs(np.array(errs)[2:] / np.array(pars)[2:]) < 1e-7).any()
+        or np.isnan(np.array(errs)[2:]).any()
+        or p_val < allowed_p_val
+        or np.isnan(p_val)
+    ):
         log.debug("fit failed, parameter error too low")
         fit_failed = True
     else:
@@ -297,7 +297,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
         fwhm = guess[1] * 2 * np.sqrt(2 * np.log(2))
         fwhm_err = 0
 
-    results = {
+    return {
         "pars": pars,
         "errors": errs,
         "covariance": cov,
@@ -308,7 +308,6 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
         "chisq": chisq / dof,
         "p_val": p_val,
     }
-    return results
 
 
 def simple_gaussian_guess(hist, bins, func, toll=0.2):
@@ -343,10 +342,10 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
     }
 
     for par in func.required_args():
-        if par == "x_lo" or par == "x_hi":
+        if par in {"x_lo", "x_hi"}:
             guess[par] = np.inf
             bounds[par] = None
-        elif par == "n_bkg" or par == "hstep":
+        elif par in {"n_bkg", "hstep"}:
             guess[par] = 0
             bounds[par] = None
     return guess, bounds

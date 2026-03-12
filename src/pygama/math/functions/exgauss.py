@@ -2,6 +2,8 @@
 Exponentially modified Gaussian distributions for pygama
 """
 
+from __future__ import annotations
+
 import sys
 from math import erf, erfc
 
@@ -56,19 +58,15 @@ def nb_gauss_tail_exact(
     """
 
     abstau = np.absolute(tau)
-    if tmp < limit:
-        tmp = tmp
-    else:
-        tmp = limit
+    tmp = tmp if tmp < limit else limit
     if sigma == 0 or abstau == 0:
         return x * 0
     z = (x - mu) / sigma
-    tail_f = (
+    return (
         (1 / (2 * abstau))
         * np.exp(tmp)
         * erfc((tau * z + sigma) / (np.sqrt(2) * abstau))
     )
-    return tail_f
 
 
 @nb.njit(**nb_defaults(parallel=False))
@@ -96,13 +94,10 @@ def nb_gauss_tail_approx(
     --------
     :func:`nb_exgauss_pdf`
     """
-    if sigma == 0:
-        return x * 0
-    elif (sigma + tau * (x - mu) / sigma) == 0:
+    if sigma == 0 or (sigma + tau * (x - mu) / sigma) == 0:
         return x * 0
     den = 1 / (sigma + tau * (x - mu) / sigma)
-    tail_f = sigma * nb_gauss_pdf(x, mu, sigma) * den * (1.0 - tau * tau * den * den)
-    return tail_f
+    return sigma * nb_gauss_pdf(x, mu, sigma) * den * (1.0 - tau * tau * den * den)
 
 
 @nb.njit(**nb_kwargs)
@@ -247,7 +242,6 @@ def nb_exgauss_scaled_cdf(
 
 
 class ExgaussGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = -1 * np.inf
         self.x_hi = np.inf

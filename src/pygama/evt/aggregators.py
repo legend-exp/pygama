@@ -109,7 +109,8 @@ def evaluate_to_first_or_last(
             )
 
             if sort_field.ndim > 1:
-                raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
+                msg = f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array"
+                raise ValueError(msg)
 
             ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
 
@@ -565,15 +566,14 @@ def evaluate_to_vector(
             missing_value=np.nan,
         )
 
-        if "ascend_by" == md:
+        if md == "ascend_by":
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
 
-        elif "descend_by" == md:
+        elif md == "descend_by":
             out = out[np.arange(len(out))[:, None], np.argsort(-s_val)]
         else:
-            raise ValueError(
-                "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
-            )
+            msg = "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
+            raise ValueError(msg)
 
     return types.VectorOfVectors(
         ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), dtype)

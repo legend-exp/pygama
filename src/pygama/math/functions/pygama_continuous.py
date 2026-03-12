@@ -11,6 +11,8 @@ Example:
 NOTE: the dist.pdf method is a slow scipy method, and the dist.get_pdf method is fast
 """
 
+from __future__ import annotations
+
 import numpy as np
 from scipy.stats._distn_infrastructure import rv_continuous, rv_frozen
 
@@ -150,8 +152,7 @@ class PygamaContinuous(rv_continuous):
 
         if norm == 0:
             return np.full_like(x, np.inf)
-        else:
-            return self.get_pdf(x, *args) / norm
+        return self.get_pdf(x, *args) / norm
 
     def _cdf_norm(self, x, x_lo, x_hi, *args, **kwds):
         r"""
@@ -184,8 +185,7 @@ class PygamaContinuous(rv_continuous):
 
         if norm == 0:
             return np.full_like(x, np.inf)
-        else:
-            return (self.get_cdf(x, *args)) / norm
+        return (self.get_cdf(x, *args)) / norm
 
     def __call__(self, *args, **kwds):
         return NumbaFrozen(self, *args, **kwds)

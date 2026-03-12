@@ -23,10 +23,10 @@ def gather_pulse_data(
     *,
     observable: str,
     pulse_mask: types.VectorOfVectors = None,
-    a_thr_pe: float = None,
-    t_loc_ns: float = None,
-    dt_range_ns: Sequence[float] = None,
-    t_loc_default_ns: float = None,
+    a_thr_pe: float | None = None,
+    t_loc_ns: float | None = None,
+    dt_range_ns: Sequence[float] | None = None,
+    t_loc_default_ns: float | None = None,
     out_layout: str = "sparse",
     energy_observable: str = "hit.energy_in_pe",
     t0_observable: str = "hit.trigger_pos",
@@ -133,7 +133,7 @@ def gather_pulse_data(
 
     # check if user wants to apply a mask
     if pulse_mask is None and any(
-        [kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)]
+        kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)
     ):
         # generate the time/amplitude mask from parameters
         pulse_mask = make_pulse_data_mask(

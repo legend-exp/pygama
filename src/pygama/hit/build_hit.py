@@ -7,11 +7,12 @@ from __future__ import annotations
 import logging
 import os
 from collections import OrderedDict
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from pathlib import Path
 
 import lgdo
-import lgdo.lh5 as lh5
 import numpy as np
+from lgdo import lh5
 from lgdo.lh5 import LH5Iterator, ls
 
 from .. import utils
@@ -21,10 +22,10 @@ log = logging.getLogger(__name__)
 
 def build_hit(
     infile: str,
-    outfile: str = None,
-    hit_config: str | Mapping = None,
-    lh5_tables: Iterable[str] = None,
-    lh5_tables_config: str | Mapping[str, Mapping] = None,
+    outfile: str | None = None,
+    hit_config: str | Mapping | None = None,
+    lh5_tables: Iterable[str] | None = None,
+    lh5_tables_config: str | Mapping[str, Mapping] | None = None,
     n_max: int = np.inf,
     wo_mode: str = "write_safe",
     buffer_len: int = 3200,
@@ -84,14 +85,16 @@ def build_hit(
     """
 
     if lh5_tables_config is None and hit_config is None:
-        raise ValueError("either lh5_tables_config or hit_config must be specified")
+        msg = "either lh5_tables_config or hit_config must be specified"
+        raise ValueError(msg)
 
     if lh5_tables_config is not None and (
         hit_config is not None or lh5_tables is not None
     ):
-        raise ValueError(
+        msg = (
             "lh5_tables_config and hit_config/lh5_tables options are mutually exclusive"
         )
+        raise ValueError(msg)
 
     if lh5_tables_config is not None:
         tbl_cfg = lh5_tables_config
@@ -116,14 +119,14 @@ def build_hit(
                 lh5_tables_config["dsp"] = hit_config
             for el in ls(infile):
                 if f"{el}/dsp" in ls(infile, f"{el}/"):
-                    log.debug(f"found candidate table /{el}/dsp")
+                    log.debug("found candidate table /%s/dsp", el)
                     lh5_tables_config[f"{el}/dsp"] = hit_config
         else:
             for tbl in lh5_tables:
                 lh5_tables_config[tbl] = hit_config
 
     if outfile is None:
-        outfile = os.path.splitext(os.path.basename(infile))[0]
+        outfile = Path(infile).stem
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
 
     # reorder blocks in "operations" based on dependency
@@ -136,7 +139,7 @@ def build_hit(
         lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
         write_offset = 0
 
-        log.info(f"Processing table '{tbl}' in file {infile}")
+        log.info("Processing table '%s' in file %s", tbl, infile)
         if wo_mode in ("overwrite", "o"):
             wo_current = "o"
 
@@ -154,7 +157,7 @@ def build_hit(
                 if "lgdo_attrs" in info:
                     outcol.attrs |= info["lgdo_attrs"]
 
-                log.debug(f"made new column {outname!r}={outcol!r}")
+                log.debug("made new column %r=%r", outname, outcol)
                 outtbl_obj.add_column(outname, outcol)
 
             # make high level flags
@@ -181,18 +184,17 @@ def build_hit(
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary
-            if "outputs" in cfg:
-                if isinstance(cfg["outputs"], list):
-                    # add missing columns (forwarding)
-                    for out in cfg["outputs"]:
-                        if out not in outtbl_obj:
-                            outtbl_obj.add_column(out, tbl_obj[out])
+            if "outputs" in cfg and isinstance(cfg["outputs"], list):
+                # add missing columns (forwarding)
+                for out in cfg["outputs"]:
+                    if out not in outtbl_obj:
+                        outtbl_obj.add_column(out, tbl_obj[out])
 
-                    # remove non-required columns
-                    existing_cols = list(outtbl_obj.keys())
-                    for col in existing_cols:
-                        if col not in cfg["outputs"]:
-                            outtbl_obj.remove_column(col, delete=True)
+                # remove non-required columns
+                existing_cols = list(outtbl_obj.keys())
+                for col in existing_cols:
+                    if col not in cfg["outputs"]:
+                        outtbl_obj.remove_column(col, delete=True)
 
             lh5.write(
                 obj=outtbl_obj,
@@ -224,7 +226,8 @@ def _reorder_table_operations(
                 continue
 
             if outname in ordered_keys:
-                raise RuntimeError(f"duplicated operation '{outname}' detected")
+                msg = f"duplicated operation '{outname}' detected"
+                raise RuntimeError(msg)
 
             # loop over existing reordered keys and figure out where to place
             # the new key
@@ -238,8 +241,7 @@ def _reorder_table_operations(
                 # if we need "outname" for this expression, insert it before!
                 if outname in c.co_names:
                     break
-                else:
-                    idx += 1
+                idx += 1
 
             ordered_keys.insert(idx, outname)
 
@@ -258,8 +260,7 @@ def _reorder_table_operations(
 
         if new == current:
             return new
-        else:
-            current = new
+        current = new
 
 
 def _get_dependencies(config, par, pars=None):

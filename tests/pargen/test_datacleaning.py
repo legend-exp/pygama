@@ -1,4 +1,6 @@
-import lgdo.lh5 as lh5
+from __future__ import annotations
+
+from lgdo import lh5
 from pytest import approx
 
 import pygama.pargen.data_cleaning as dc

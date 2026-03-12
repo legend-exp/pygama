@@ -253,8 +253,7 @@ def dpz_model_fit(
     # order so tau1 largest
     if m.values[1] > m.values[2]:
         return m.values[1], m.values[2], m.values[3], out_plot_dict
-    else:
-        return m.values[2], m.values[1], 1 - m.values[3], out_plot_dict
+    return m.values[2], m.values[1], 1 - m.values[3], out_plot_dict
 
 
 def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.array:
@@ -292,8 +291,7 @@ def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.
             <= median_tp100 + tp100_window_width
         ):
             wf_win = wf[
-                tp100s[i]
-                - (median_tp100 - tp100_window_width) : wf_len
+                tp100s[i] - (median_tp100 - tp100_window_width) : wf_len
                 - (-1 * tp100s[i] + median_tp100 + tp100_window_width)
             ]
             time_aligned_wfs.append(wf_win)
@@ -332,8 +330,8 @@ class PZCorrect:
 
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]
-        tau = f"{tau*sampling_rate}*{units}"
-        err = f"{err*sampling_rate}*{units}"
+        tau = f"{tau * sampling_rate}*{units}"
+        err = f"{err * sampling_rate}*{units}"
 
         if "pz" in self.output_dict:
             self.output_dict["pz"].update({"tau1": tau, "tau1_err": err})
@@ -345,10 +343,8 @@ class PZCorrect:
         )
 
         if display <= 0:
-            return
-        else:
-            out_plot_dict = {}
-            return out_plot_dict
+            return None
+        return {}
 
     def get_dpz_decay_constants(
         self,
@@ -439,7 +435,7 @@ class PZCorrect:
             "tau2": f"{tau2s_fit * sampling_rate}*{units}",
             "frac": f2s_fit,
         }.items():
-            log.debug(f"{item}: {value}")
+            log.debug("%s: %s", item, value)
 
         self.results_dict.update(
             {
@@ -453,9 +449,7 @@ class PZCorrect:
         dpz_opt_tb_out = opt.run_one_dsp(
             tb_data,
             self.dsp_config,
-            db_dict=dict(
-                {"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}
-            ),
+            db_dict={"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}},
         )
 
         # Update tau_dict with the dpz constants
@@ -478,20 +472,20 @@ class PZCorrect:
         if "units" in dpz_opt_tb_out["tau1"].attrs and dpz_opt_tb_out["tau1"].attrs[
             "units"
         ] not in ["ADC", "sample"]:
-            tau1 = f'{tau1}*{dpz_opt_tb_out["tau1"].attrs["units"]}'
-            tau1_err = f'{tau1_err}*{dpz_opt_tb_out["tau1"].attrs["units"]}'
+            tau1 = f"{tau1}*{dpz_opt_tb_out['tau1'].attrs['units']}"
+            tau1_err = f"{tau1_err}*{dpz_opt_tb_out['tau1'].attrs['units']}"
         else:
-            tau1 = f"{tau1*sampling_rate}*{units}"
-            tau1_err = f"{tau1_err*sampling_rate}*{units}"
+            tau1 = f"{tau1 * sampling_rate}*{units}"
+            tau1_err = f"{tau1_err * sampling_rate}*{units}"
 
         if "units" in dpz_opt_tb_out["tau2"].attrs and dpz_opt_tb_out["tau2"].attrs[
             "units"
         ] not in ["ADC", "sample"]:
-            tau2 = f'{tau2}*{dpz_opt_tb_out["tau2"].attrs["units"]}'
-            tau2_err = f'{tau2_err}*{dpz_opt_tb_out["tau2"].attrs["units"]}'
+            tau2 = f"{tau2}*{dpz_opt_tb_out['tau2'].attrs['units']}"
+            tau2_err = f"{tau2_err}*{dpz_opt_tb_out['tau2'].attrs['units']}"
         else:
-            tau2 = f"{tau2*sampling_rate}*{units}"
-            tau2_err = f"{tau2_err*sampling_rate}*{units}"
+            tau2 = f"{tau2 * sampling_rate}*{units}"
+            tau2_err = f"{tau2_err * sampling_rate}*{units}"
 
         output_dict = {
             "tau1": tau1,
@@ -507,9 +501,8 @@ class PZCorrect:
             self.output_dict["pz"] = output_dict
 
         if display <= 0:
-            return
-        else:
-            return out_plot_dict
+            return None
+        return out_plot_dict
 
     def plot_waveforms_after_correction(
         self,
@@ -578,7 +571,7 @@ class PZCorrect:
             np.nanpercentile(slopes, 99),
             np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
         )
-        counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
+        _counts, bins, _bars = ax.hist(slopes, bins=bins, histtype="step")
         plt.xlabel("Slope")
         plt.ylabel("Counts")
         if "single_decay_constant" in self.results_dict:
@@ -596,10 +589,7 @@ class PZCorrect:
             axins.axvline(high_bin, color="red")
             axins.set_xlim(in_min, in_max)
             ax.set_xlim(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99))
-        if with_correction:
-            out_plot_dict = {"corrected_slope": fig}
-        else:
-            out_plot_dict = {"slope": fig}
+        out_plot_dict = {"corrected_slope": fig} if with_correction else {"slope": fig}
         if display > 1:
             plt.show()
         else:

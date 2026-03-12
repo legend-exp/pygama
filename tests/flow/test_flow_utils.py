@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime, timezone
 
 from pygama.flow.utils import to_datetime, to_unixtime

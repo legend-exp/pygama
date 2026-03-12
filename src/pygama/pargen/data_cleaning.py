@@ -9,11 +9,11 @@ import re
 from collections.abc import Collection, Mapping
 
 import awkward as ak
-import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from lgdo import lh5
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
@@ -130,7 +130,7 @@ def get_mode_stdev(par_array):
 
         fwhm = pgh.get_fwhm(counts, bins)[0]
         mean = float(bin_centres[np.argmax(counts)])
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, _cov = pgf.gauss_mode_width_max(
             counts,
             bins,
             mode_guess=mean,
@@ -163,7 +163,7 @@ def get_mode_stdev(par_array):
             if dx == 0:
                 dx = bin_width
 
-            counts, bins, var = pgh.get_hist(
+            counts, bins, _var = pgh.get_hist(
                 par_array,
                 dx=dx,
                 range=(lower_bound, upper_bound),
@@ -364,10 +364,7 @@ def fit_distributions(x_lo, x_hi, norm_par_array, display=0):
         double_exgauss_csqr[0],
     ]
 
-    if (pvals == 0).all():
-        idx = np.nanargmin(csqrs)
-    else:
-        idx = np.nanargmax(pvals)
+    idx = np.nanargmin(csqrs) if (pvals == 0).all() else np.nanargmax(pvals)
     func = funcs[idx]
     pars = pars[idx]
     return func, pars
@@ -486,7 +483,8 @@ def generate_cuts(
             bad_entries = (~np.isnan(all_par_array)) & (~np.isinf(all_par_array))
 
             if len(np.where(bad_entries)[0]) == 0:
-                raise RuntimeError(f"no valid entries for {par}")
+                msg = f"no valid entries for {par}"
+                raise RuntimeError(msg)
 
             mean, std = get_mode_stdev(
                 all_par_array[(~np.isnan(all_par_array)) & (~np.isinf(all_par_array))]
@@ -535,12 +533,10 @@ def generate_cuts(
                 up_val = np.nanpercentile(all_par_array, 95)
                 if upper is not None:
                     plt.axvline(upper)
-                    if up_val < upper:
-                        up_val = upper
+                    up_val = max(up_val, upper)
                 if lower is not None:
                     plt.axvline(lower)
-                    if low_val > lower:
-                        low_val = lower
+                    low_val = min(low_val, lower)
 
                 plt.hist(
                     all_par_array,
@@ -558,8 +554,7 @@ def generate_cuts(
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
-    else:
-        return output_dict
+    return output_dict
 
 
 def get_cut_indexes(data, cut_parameters):
@@ -567,7 +562,7 @@ def get_cut_indexes(data, cut_parameters):
     Get the indexes of the data that pass the cuts in
     """
     cut_dict = generate_cuts(data, cut_dict=cut_parameters)
-    log.debug(f"Cuts are {cut_dict}")
+    log.debug("Cuts are %s", cut_dict)
 
     if isinstance(data, Table):
         ct_mask = np.full(len(data), True, dtype=bool)
@@ -589,7 +584,8 @@ def get_cut_indexes(data, cut_parameters):
             data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
             ct_mask = ct_mask & data[outname]
     else:
-        raise ValueError("Data must be a Table or DataFrame")
+        msg = "Data must be a Table or DataFrame"
+        raise ValueError(msg)
 
     return ct_mask
 
@@ -756,12 +752,13 @@ def generate_cut_classifiers(
                             pars["mu"],
                             pars["sigma"],
                         )
-                    elif func == gauss_on_exgauss_areas or func == double_exgauss:
+                    elif func in (gauss_on_exgauss_areas, double_exgauss):
                         cdf = func.cdf_norm(xs, range_low, range_high, *pars[2:])
                     elif func == skewed_fit:
                         cdf = skewnorm.cdf(xs, pars["alpha"], pars["mu"], pars["sigma"])
                     else:
-                        raise ValueError("unknown func")
+                        msg = "unknown func"
+                        raise ValueError(msg)
 
                     if isinstance(percentile, (int, float)):
                         cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
@@ -779,20 +776,19 @@ def generate_cut_classifiers(
                         else:
                             cut_right = None
 
-                else:
-                    if isinstance(percentile, (int, float)):
-                        cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
-                        cut_right = np.nanpercentile(norm_par_array, percentile)
+                elif isinstance(percentile, (int, float)):
+                    cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
+                    cut_right = np.nanpercentile(norm_par_array, percentile)
 
-                    elif isinstance(percentile, dict):
-                        if "low_side" in percentile:
-                            cut_left = np.nanpercentile(norm_par_array, percentile)
-                        else:
-                            cut_left = None
-                        if "high_side" in percentile:
-                            cut_right = np.nanpercentile(norm_par_array, percentile)
-                        else:
-                            cut_right = None
+                elif isinstance(percentile, dict):
+                    if "low_side" in percentile:
+                        cut_left = np.nanpercentile(norm_par_array, percentile)
+                    else:
+                        cut_left = None
+                    if "high_side" in percentile:
+                        cut_right = np.nanpercentile(norm_par_array, percentile)
+                    else:
+                        cut_right = None
 
             if default is not None:
                 value = default["value"]
@@ -812,20 +808,17 @@ def generate_cut_classifiers(
 
                 if default_mode == "higher_limit":
                     if cut_left is not None:
-                        if cut_left < default_cut_left:
-                            cut_left = default_cut_left
+                        cut_left = max(cut_left, default_cut_left)
                     if cut_right is not None:
-                        if cut_right > default_cut_right:
-                            cut_right = default_cut_right
+                        cut_right = min(cut_right, default_cut_right)
                 elif default_mode == "lower_limit":
                     if cut_left is not None:
-                        if cut_left > default_cut_left:
-                            cut_left = default_cut_left
+                        cut_left = min(cut_left, default_cut_left)
                     if cut_right is not None:
-                        if cut_right < default_cut_right:
-                            cut_right = default_cut_right
+                        cut_right = max(cut_right, default_cut_right)
                 else:
-                    raise ValueError("unknown mode")
+                    msg = "unknown mode"
+                    raise ValueError(msg)
 
             if mode == "inclusive":
                 if cut_right is not None and cut_left is not None:
@@ -858,7 +851,7 @@ def generate_cut_classifiers(
                 fig = plt.figure()
                 low = -10 if cut_left is None or cut_left > -10 else cut_left
                 hi = 10 if cut_right is None or cut_right < 10 else cut_right
-                hist, _, _ = plt.hist(
+                _hist, _, _ = plt.hist(
                     norm_par_array,
                     bins=np.arange(low, hi, 0.1),
                     histtype="step",
@@ -881,8 +874,7 @@ def generate_cut_classifiers(
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
-    else:
-        return output_dict
+    return output_dict
 
 
 def find_pulser_properties(df, energy="daqenergy"):
@@ -903,7 +895,7 @@ def find_pulser_properties(df, energy="daqenergy"):
         var[np.where(var == 0)] = 1
     imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 3)
     peak_energies = pgh.get_bin_centers(bins)[imaxes]
-    pt_pars, pt_covs = pgc.hpge_fit_E_peak_tops(
+    pt_pars, _pt_covs = pgc.hpge_fit_E_peak_tops(
         hist, bins, var, peak_energies, n_to_fit=10
     )
     peak_e_err = pt_pars[:, 1] * 4
@@ -913,22 +905,21 @@ def find_pulser_properties(df, energy="daqenergy"):
         i += 1
         if peak_e_err[i] > allowed_err:
             continue
-        if i == 1:
-            if (
-                e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
-                and peak_e_err[i - 1] < allowed_err
-            ):
-                overlap = (
-                    peak_energies[i - 1]
-                    + peak_e_err[i - 1]
-                    - (peak_energies[i] - peak_e_err[i])
-                )
-                peak_e_err[i] -= overlap * (
-                    peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
-                peak_e_err[i - 1] -= overlap * (
-                    peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
+        if i == 1 and (
+            e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
+            and peak_e_err[i - 1] < allowed_err
+        ):
+            overlap = (
+                peak_energies[i - 1]
+                + peak_e_err[i - 1]
+                - (peak_energies[i] - peak_e_err[i])
+            )
+            peak_e_err[i] -= overlap * (
+                peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
+            peak_e_err[i - 1] -= overlap * (
+                peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
 
         if (
             e + peak_e_err[i] > peak_energies[i + 1] - peak_e_err[i + 1]
@@ -968,21 +959,20 @@ def find_pulser_properties(df, energy="daqenergy"):
             super_max = super_max[super_max > 20]
             if len(maxs) < 2:
                 continue
-            else:
-                max_locs = np.array([0.0])
-                max_locs = np.append(max_locs, bcs[np.array(maxs)])
-                if (
-                    len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0]) > 1
-                    or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
-                    or len(super_max) > 0
-                ):
-                    pulser_e = e
-                    period = stats.mode(tsl).mode[0]
-                    if period > 0.1:
-                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+            max_locs = np.array([0.0])
+            max_locs = np.append(max_locs, bcs[np.array(maxs)])
+            if (
+                len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0]) > 1
+                or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
+                or len(super_max) > 0
+            ):
+                pulser_e = e
+                period = stats.mode(tsl).mode[0]
+                if period > 0.1:
+                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
 
-                else:
-                    continue
+            else:
+                continue
         except Exception:
             continue
     return out_pulsers
@@ -990,10 +980,7 @@ def find_pulser_properties(df, energy="daqenergy"):
 
 def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
     if isinstance(channel, str):
-        if channel[:2] == "ch":
-            chan = int(channel[2:])
-        else:
-            chan = int(channel)
+        chan = int(channel[2:]) if channel[:2] == "ch" else int(channel)
     else:
         chan = channel
     if isinstance(tcm_file, list):

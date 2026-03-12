@@ -25,7 +25,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=No
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
-    if func_i == hpge_peak or func_i == gauss_on_step:
+    if func_i in (hpge_peak, gauss_on_step):
         parguess = pgc.get_hpge_energy_peak_par_guess(
             energy, func_i, fit_range=fit_range
         )
@@ -41,7 +41,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=No
                 parguess[i] = 0
 
     else:
-        log.error(f"energy_guess not implemented for {func_i}")
+        log.error("energy_guess not implemented for %s", func_i)
         return None
     return parguess
 
@@ -62,9 +62,9 @@ def fix_all_but_nevents(func):
         fixed = ["x_lo", "x_hi", "mu", "sigma", "htail", "tau", "hstep"]
 
     else:
-        log.error(f"get_hpge_E_fixed not implemented for {func}")
+        log.error("get_hpge_E_fixed not implemented for %s", func)
         return None, None
-    mask = ~np.in1d(func.required_args(), fixed)
+    mask = ~np.isin(func.required_args(), fixed)
     return fixed, mask
 
 
@@ -72,7 +72,7 @@ def get_bounds(func, parguess):
     """
     Gets bounds for the fit parameters
     """
-    if func == hpge_peak or func == gauss_on_step:
+    if func in (hpge_peak, gauss_on_step):
         bounds = pgc.get_hpge_energy_bounds(func, parguess)
 
         bounds["mu"] = (parguess["mu"] - 1, parguess["mu"] + 1)
@@ -80,7 +80,7 @@ def get_bounds(func, parguess):
         bounds["n_bkg"] = (0, 2 * (parguess["n_sig"] + parguess["n_bkg"]))
 
     else:
-        log.error(f"get_bounds not implemented for {func}")
+        log.error("get_bounds not implemented for %s", func)
         return None
     return bounds
 
@@ -186,8 +186,7 @@ def update_guess(func, parguess, energies):
     """
     Updates guess for the number of signal and background events
     """
-    if func == gauss_on_step or func == hpge_peak:
-
+    if func in (gauss_on_step, hpge_peak):
         total_events = len(energies)
         parguess["n_sig"] = len(
             energies[
@@ -210,9 +209,8 @@ def update_guess(func, parguess, energies):
         parguess["n_bkg"] = total_events - parguess["n_sig"]
         return parguess
 
-    else:
-        log.error(f"update_guess not implemented for {func}")
-        return parguess
+    log.error("update_guess not implemented for %s", func)
+    return parguess
 
 
 def get_survival_fraction(
@@ -221,8 +219,8 @@ def get_survival_fraction(
     cut_val: float,
     peak: float,
     eres_pars: float,
-    fit_range: tuple = None,
-    high_cut: float = None,
+    fit_range: tuple | None = None,
+    high_cut: float | None = None,
     pars: ValueView = None,
     data_mask: np.ndarray = None,
     mode: str = "greater",
@@ -290,16 +288,16 @@ def get_survival_fraction(
     nan_idxs = np.isnan(cut_param)
     if high_cut is not None:
         idxs = (cut_param > cut_val) & (cut_param < high_cut) & data_mask
+    elif mode == "greater":
+        idxs = (cut_param > cut_val) & data_mask
+    elif mode == "less":
+        idxs = (cut_param < cut_val) & data_mask
     else:
-        if mode == "greater":
-            idxs = (cut_param > cut_val) & data_mask
-        elif mode == "less":
-            idxs = (cut_param < cut_val) & data_mask
-        else:
-            raise ValueError("mode not recognised")
+        msg = "mode not recognised"
+        raise ValueError(msg)
 
     if pars is None:
-        (pars, errs, cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
+        (pars, _errs, _cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
             energy,
             func,
             guess_func=energy_guess,
@@ -348,7 +346,8 @@ def get_survival_fraction(
         ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_gos)
 
     else:
-        raise ValueError("Unknown func")
+        msg = "Unknown func"
+        raise ValueError(msg)
 
     m = Minuit(lh, **parguess)
     fixed = ["x_lo", "x_hi", "n_sig", "n_bkg", "mu", "sigma"]  # "hstep"
@@ -368,7 +367,7 @@ def get_survival_fraction(
     err = m.errors["epsilon_sig"] * 100
 
     if display > 1:
-        fig, (ax1, ax2) = plt.subplots(1, 2)
+        _fig, (ax1, ax2) = plt.subplots(1, 2)
         bins = np.arange(1552, 1612, 1)
         ax1.hist(energy[(~nan_idxs) & (idxs)], bins=bins, histtype="step")
 
@@ -389,9 +388,9 @@ def get_survival_fraction(
 def get_sf_sweep(
     energy: np.array,
     cut_param: np.array,
-    final_cut_value: float = None,
+    final_cut_value: float | None = None,
     peak: float = 1592.5,
-    eres_pars: list = None,
+    eres_pars: list | None = None,
     data_mask=None,
     cut_range=(-5, 5),
     n_samples=26,
@@ -452,7 +451,7 @@ def get_sf_sweep(
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
     out_df = pd.DataFrame()
 
-    (pars, errs, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
+    (pars, _errs, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy,
         hpge_peak,
         guess_func=energy_guess,
@@ -479,11 +478,9 @@ def get_sf_sweep(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
             )
         except BaseException as e:
-            if e == KeyboardInterrupt:
+            if e == KeyboardInterrupt or debug_mode:
                 raise (e)
-            elif debug_mode:
-                raise (e)
-    out_df.set_index("cut_val", inplace=True)
+    out_df = out_df.set_index("cut_val")
     if final_cut_value is not None:
         sf, sf_err, _, _ = get_survival_fraction(
             energy,
@@ -542,13 +539,13 @@ def compton_sf(
 
     if high_cut_val is not None:
         mask = (cut_param > low_cut_val) & (cut_param < high_cut_val) & data_mask
+    elif mode == "greater":
+        mask = (cut_param > low_cut_val) & data_mask
+    elif mode == "less":
+        mask = (cut_param < low_cut_val) & data_mask
     else:
-        if mode == "greater":
-            mask = (cut_param > low_cut_val) & data_mask
-        elif mode == "less":
-            mask = (cut_param < low_cut_val) & data_mask
-        else:
-            raise ValueError("mode not recognised")
+        msg = "mode not recognised"
+        raise ValueError(msg)
 
     sf = len(cut_param[mask]) / len(cut_param)
     err = 100 * np.sqrt((sf * (1 - sf)) / len(cut_param))
@@ -624,7 +621,7 @@ def compton_sf_sweep(
             ]
         )
         out_df = pd.concat([out_df, df])
-    out_df.set_index("cut_val", inplace=True)
+    out_df = out_df.set_index("cut_val")
 
     sf_dict = compton_sf(cut_param, final_cut_value, mode=mode, data_mask=data_mask)
 

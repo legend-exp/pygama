@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from datetime import datetime
@@ -38,9 +39,7 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
 
     left_edge = mu - 2.5 * sigma
     right_edge = mu + 2.5 * sigma
-    fit_range = (left_edge, right_edge)
-
-    return fit_range
+    return (left_edge, right_edge)
 
 
 def get_lq_hist(
@@ -80,19 +79,18 @@ def get_lq_hist(
 
         return final_hist, bins, var
 
-    else:
-        # Return a histogram in a 13 keV range surrounding the specified peak
+    # Return a histogram in a 13 keV range surrounding the specified peak
 
-        df_peak = df.query(
-            f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
-        )
+    df_peak = df.query(
+        f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
+    )
 
-        fit_range = get_fit_range(df_peak[lq_param].to_numpy())
-        dep_hist, bins, var = pgh.get_hist(
-            df_peak[lq_param].to_numpy(), bins=100, range=fit_range
-        )
+    fit_range = get_fit_range(df_peak[lq_param].to_numpy())
+    dep_hist, bins, var = pgh.get_hist(
+        df_peak[lq_param].to_numpy(), bins=100, range=fit_range
+    )
 
-        return dep_hist, bins, var
+    return dep_hist, bins, var
 
 
 def binned_lq_fit(
@@ -137,7 +135,7 @@ def binned_lq_fit(
         Array of bin edges used for the binned fit
     """
 
-    hist, bins, var = get_lq_hist(df, lq_param, cal_energy_param, peak, sidebands)
+    hist, bins, _var = get_lq_hist(df, lq_param, cal_energy_param, peak, sidebands)
 
     # Temporary fix for negative bin counts
     # TODO: Adjust fitting to handle negative bin counts
@@ -253,7 +251,7 @@ class LQCal:
         self.debug_mode = debug_mode
 
     def update_cal_dicts(self, update_dict):
-        if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+        if re.match(r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))):
             for tstamp in self.cal_dicts:
                 if tstamp in update_dict:
                     self.cal_dicts[tstamp].update(update_dict[tstamp])
@@ -302,9 +300,7 @@ class LQCal:
                             ]
                         )
                     except BaseException as e:
-                        if e == KeyboardInterrupt:
-                            raise (e)
-                        elif self.debug_mode:
+                        if e == KeyboardInterrupt or self.debug_mode:
                             raise (e)
 
                         self.timecorr_df = pd.concat(
@@ -324,7 +320,7 @@ class LQCal:
                             ]
                         )
 
-                self.timecorr_df.set_index("run_timestamp", inplace=True)
+                self.timecorr_df = self.timecorr_df.set_index("run_timestamp")
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
                     np.array(self.timecorr_df["mean"]),
@@ -375,9 +371,7 @@ class LQCal:
                         ]
                     )
                 except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
+                    if e == KeyboardInterrupt or self.debug_mode:
                         raise (e)
                     self.timecorr_df = pd.concat(
                         [
@@ -406,9 +400,7 @@ class LQCal:
                 )
                 log.info("LQ time correction finished")
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ time correction failed")
             self.update_cal_dicts(
@@ -467,9 +459,7 @@ class LQCal:
             )
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
@@ -494,7 +484,6 @@ class LQCal:
 
         log.info("Starting LQ Cut calculation")
         try:
-
             pars, errs, hist, bins = binned_lq_fit(
                 df, lq_param, cal_energy_param, peak=1592.5
             )
@@ -508,9 +497,7 @@ class LQCal:
             df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
@@ -562,7 +549,7 @@ class LQCal:
                     emin = 2 * fwhm
                     emax = 2 * fwhm
                     peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
                     cut_df, sf, sf_err = compton_sf_sweep(
@@ -604,11 +591,9 @@ class LQCal:
                         ]
                     )
                     self.low_side_peak_dfs[peak] = cut_df
-                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
+                log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
             except BaseException as e:
-                if e == KeyboardInterrupt:
-                    raise (e)
-                elif self.debug_mode:
+                if e == KeyboardInterrupt or self.debug_mode:
                     raise (e)
                 self.low_side_sf = pd.concat(
                     [
@@ -616,8 +601,8 @@ class LQCal:
                         pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
-                log.error(f"LQ Survival fraction determination failed for {peak} peak")
-        self.low_side_sf.set_index("peak", inplace=True)
+                log.error("LQ Survival fraction determination failed for %s peak", peak)
+        self.low_side_sf = self.low_side_sf.set_index("peak")
 
 
 def plot_lq_mean_time(
@@ -690,7 +675,7 @@ def plot_drift_time_correction(
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    fig, ax = plt.subplots(1, 1)
+    fig, _ax = plt.subplots(1, 1)
 
     try:
         dep_range = (1590, 1595)
@@ -807,18 +792,16 @@ def plot_survival_fraction_curves(
         )
 
         for peak, survival_df in lq_class.low_side_peak_dfs.items():
-            try:
+            with contextlib.suppress(Exception):
                 plt.errorbar(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
-                    label=f'{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]["sf"]:2.1f} +/- {lq_class.low_side_sf.loc[peak]["sf_err"]:2.1f} %',
+                    label=f"{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]['sf']:2.1f} +/- {lq_class.low_side_sf.loc[peak]['sf_err']:2.1f} %",
                 )
-            except Exception:
-                pass
     except Exception:
         pass
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.legend(loc="lower right")
     plt.xlabel("cut value")
@@ -855,7 +838,7 @@ def plot_sf_vs_energy(
     except Exception:
         pass
     plt.ylim([0, 100])
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.xlabel("energy (keV)")
     plt.ylabel("survival percentage")
@@ -969,7 +952,7 @@ def plot_classifier(
     plt.rcParams["font.size"] = fontsize
 
     fig = plt.figure()
-    try:
+    with contextlib.suppress(Exception):
         plt.hist2d(
             data.query(lq_class.selection_string)[lq_class.cal_energy_param],
             data.query(lq_class.selection_string)[lq_param],
@@ -979,8 +962,6 @@ def plot_classifier(
             ],
             norm=LogNorm(),
         )
-    except Exception:
-        pass
     plt.xlabel("energy (keV)")
     plt.ylabel(lq_param)
     plt.xlim(xrange)
