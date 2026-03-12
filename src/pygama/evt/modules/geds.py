@@ -13,10 +13,10 @@ from . import xtalk
 
 
 def apply_recovery_cut(
-    datainfo: utils.DataInfo,
-    tcm: utils.TCMData,
-    table_names: Sequence[str],
-    channel_mapping: dict,
+    _datainfo: utils.DataInfo,
+    _tcm: utils.TCMData,
+    _table_names: Sequence[str],
+    _channel_mapping: dict,
     *,
     timestamps: types.Array,
     flag: types.Array,
@@ -43,7 +43,7 @@ def apply_xtalk_correction(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
-    channel_mapping: dict,
+    _channel_mapping: dict,
     *,
     return_mode: str,
     uncal_energy_expr: str,

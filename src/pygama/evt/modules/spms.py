@@ -338,7 +338,7 @@ def make_pulse_data_mask(
 
     # start with all-true mask
     pulse_t0_ns = pulse_t0.view_as("ak")
-    mask = pulse_t0_ns == pulse_t0_ns
+    mask = ~np.isnan(pulse_t0_ns)
 
     # apply p.e. threshold
     if a_thr_pe is not None:
@@ -359,10 +359,10 @@ def make_pulse_data_mask(
 
 
 def geds_coincidence_classifier(
-    datainfo: utils.DataInfo,
-    tcm: utils.TCMData,
-    table_names: Sequence[str],
-    channel_mapping: dict,
+    _datainfo: utils.DataInfo,
+    _tcm: utils.TCMData,
+    _table_names: Sequence[str],
+    _channel_mapping: dict,
     *,
     spms_t0: types.VectorOfVectors,
     spms_amp: types.VectorOfVectors,

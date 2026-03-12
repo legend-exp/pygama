@@ -44,8 +44,8 @@ def metadata(params: dict) -> list:
 
 def convert_rawid(
     datainfo: utils.DataInfo,
-    tcm: utils.TCMData,
-    table_names: Sequence[str],
+    _tcm: utils.TCMData,
+    _table_names: Sequence[str],
     channel_mapping: dict,
     *,
     rawid_obj: types.VectorOfVectors | types.Array,

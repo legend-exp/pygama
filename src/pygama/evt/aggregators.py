@@ -25,7 +25,7 @@ def evaluate_to_first_or_last(
     pars_dict=None,
     default_value=np.nan,
     is_first: bool = True,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
@@ -147,7 +147,7 @@ def evaluate_to_scalar(
     n_rows,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.Array:
     """Aggregates by summation across channels.
 
@@ -247,7 +247,7 @@ def evaluate_at_channel(
     ch_comp,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.Array:
     """Aggregates by evaluating the expression at a given channel.
 
@@ -319,7 +319,7 @@ def evaluate_at_channel_vov(
     channels_skip,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
@@ -403,7 +403,7 @@ def evaluate_to_aoesa(
     pars_dict=None,
     default_value=np.nan,
     missing_value=np.nan,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
@@ -503,7 +503,7 @@ def evaluate_to_vector(
     pars_dict=None,
     default_value=np.nan,
     sorter=None,
-    channel_mapping=None,
+    _channel_mapping=None,
 ) -> types.VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.

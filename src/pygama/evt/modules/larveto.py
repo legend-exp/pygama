@@ -90,7 +90,7 @@ def l200_test_stat(relative_t0, amp, ts_bkg_prob, rc_density):
 
 # need to define this function and use it with ak.transform() because scipy
 # routines are not NumPy universal functions
-def _ak_l200_test_stat_time_term(layouts, ts_bkg_prob, **kwargs):
+def _ak_l200_test_stat_time_term(layouts, ts_bkg_prob, **_kwargs):
     """Awkward transform to compute the per-pulse terms of the test statistics.
 
     The two arguments are the pulse times `t0` relative to the HPGe trigger and

@@ -270,9 +270,12 @@ def build_evt_cols(
         datainfo = utils.make_files_config(datainfo)
 
     evt_tables = []
-    if datainfo.evt.file is not None and wo_mode == "of":
-        if Path(datainfo.evt.file).exists():
-            Path(datainfo.evt.file).unlink()
+    if (
+        datainfo.evt.file is not None
+        and wo_mode == "of"
+        and Path(datainfo.evt.file).exists()
+    ):
+        Path(datainfo.evt.file).unlink()
 
     for tcm_lh5 in lh5.LH5Iterator(
         datainfo.tcm.file,

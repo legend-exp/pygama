@@ -5,7 +5,6 @@ This module implements routines to evaluate expressions to columnar data.
 from __future__ import annotations
 
 import logging
-import os
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -136,7 +135,12 @@ def build_hit(
 
     wo_current = wo_mode
     for tbl, cfg in lh5_tables_config.items():
-        lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
+        lh5_it = LH5Iterator(
+            infile,
+            tbl,
+            buffer_len=buffer_len,
+            n_entries=None if n_max == np.inf else n_max,
+        )
         write_offset = 0
 
         log.info("Processing table '%s' in file %s", tbl, infile)

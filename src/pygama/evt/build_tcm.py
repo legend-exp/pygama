@@ -139,9 +139,8 @@ def build_tcm(
     if buffer_len is None:
         ntables = 0
         for filename, patterns in input_tables:
-            if isinstance(patterns, str):
-                patterns = [patterns]
-            for pattern in patterns:
+            pat_list = [patterns] if isinstance(patterns, str) else patterns
+            for pattern in pat_list:
                 ntables += len(lh5.ls(filename, lh5_group=pattern))
 
         n_fields = (
@@ -156,12 +155,11 @@ def build_tcm(
 
     # loop over files
     for filename, patterns in input_tables:
-        if isinstance(patterns, str):
-            patterns = [patterns]
+        pat_list = [patterns] if isinstance(patterns, str) else patterns
 
         # make a list of tables in the file
         tables_here = []
-        for pattern in patterns:
+        for pattern in pat_list:
             for table in lh5.ls(filename, lh5_group=pattern):
                 tables_here.append(table)
                 all_tables.append(table)
