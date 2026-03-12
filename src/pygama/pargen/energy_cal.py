@@ -32,30 +32,34 @@ log = logging.getLogger(__name__)
 
 class HPGeCalibration:
     """
-    Calibrate HPGe data to a set of known peaks. Class stores the calibration parameters
-    as well as the peaks locations and energies used. Each function called updates a results
-    dictionary with any additional information which is stored in the class.
+    Calibrate HPGe data to a set of known peaks.
+
+    Stores the calibration polynomial, peak locations, and intermediate fit
+    results.  Each method appends to a :attr:`results` dictionary so that
+    the full calibration history is preserved.
 
     Parameters
     ----------
-    e_uncal : array
-        uncalibrated energy data
-    glines : array
-        list of peak energies to be fit to. Each must be in the data
-    guess_kev : float
-        a rough initial guess at the conversion factor from e_uncal to kev. Must
-        be positive
-    deg : non-negative int
-        degree of the polynomial for the E_cal function E_kev = poly(e_uncal).
-        deg = 0 corresponds to a simple scaling E_kev = scale * e_uncal.
-        Otherwise follows the convention in np.polynomial.polynomial of
-        lowest order to highest order
-    uncal_is_int : bool
-        if True, attempts will be made to avoid picket-fencing when binning
-        e_uncal
-    fixed : dict
-        dictionary of fixed parameters for the calibration function
-
+    energy_param
+        Name of the uncalibrated energy parameter (used in logging).
+    glines
+        List of known peak energies in keV to fit to.
+    guess_kev
+        Rough initial conversion factor from ADC to keV (must be positive).
+    deg
+        Degree of the calibration polynomial
+        ``E_kev = poly(e_uncal)``.  ``deg = 0`` is a simple scaling;
+        ``deg = -1`` fixes the constant term.  Follows the
+        :mod:`numpy.polynomial.polynomial` convention (lowest to highest
+        order).
+    uncal_is_int
+        If ``True``, avoids picket-fence binning artefacts when *e_uncal*
+        is integer-valued.
+    fixed
+        Dictionary of fixed polynomial coefficient indices and their values.
+    debug_mode
+        If ``True``, exceptions are re-raised instead of being caught and
+        logged.
     """
 
     def __init__(
@@ -99,12 +103,13 @@ class HPGeCalibration:
 
     def gen_pars_dict(self):
         """
-        Generate a dictionary containing the expression and parameters used for energy calibration.
+        Generate the calibration expression dictionary for use in a hit-dict.
 
-        Returns:
-            dict: A dictionary with keys 'expression' and 'parameters'.
-                  'expression' is a string representing the energy calibration expression.
-                  'parameters' is a dictionary containing the parameter values used in the expression.
+        Returns
+        -------
+        pars_dict
+            Dictionary with keys ``"expression"`` (the polynomial string) and
+            ``"parameters"`` (mapping coefficient names to their values).
         """
         expression = ""
         parameters = {}
@@ -120,6 +125,17 @@ class HPGeCalibration:
         return {"expression": expression, "parameters": parameters}
 
     def update_results_dict(self, results_dict):
+        """
+        Store *results_dict* in :attr:`results` under the caller's function name.
+
+        If a key with that name already exists, a numeric suffix is appended
+        to avoid overwriting previous results.
+
+        Parameters
+        ----------
+        results_dict
+            Dictionary of results to store.
+        """
         name = inspect.stack()[1][3]
         if name in self.results:
             it = 0
@@ -1107,7 +1123,12 @@ class HPGeCalibration:
 
     def get_fwhms(self):
         """
-        Updates last results dictionary with fwhms in kev
+        Compute and store calibrated FWHMs for all fitted peaks.
+
+        Reads uncalibrated FWHM values from the most recent peak-parameter
+        results, converts them to keV using the derivative of the calibration
+        polynomial, and writes ``fwhm_in_kev`` and ``fwhm_err_in_kev`` back
+        into each peak's parameter dictionary.
         """
 
         peak_parameters = self.results[list(self.results)[-1]].get(
@@ -1166,6 +1187,33 @@ class HPGeCalibration:
 
     @staticmethod
     def fit_energy_res_curve(fwhm_func, fwhm_peaks, fwhms, dfwhms):
+        """
+        Fit an energy-resolution model to a set of measured FWHMs.
+
+        Performs a weighted least-squares fit of *fwhm_func* to *fwhms* at
+        *fwhm_peaks* and evaluates the chi-squared p-value.  Returns a
+        NaN-filled result dictionary when the fit fails.
+
+        Parameters
+        ----------
+        fwhm_func
+            Energy resolution model class with ``func``, ``string_func``,
+            ``guess``, and ``bounds`` static methods (e.g.
+            :class:`FWHMLinear`).
+        fwhm_peaks
+            Peak energies in keV at which FWHMs were measured.
+        fwhms
+            Measured FWHM values in keV.
+        dfwhms
+            Uncertainties on *fwhms*.
+
+        Returns
+        -------
+        results
+            Dictionary with keys ``function``, ``module``, ``expression``,
+            ``parameters``, ``uncertainties``, ``cov``, ``csqr``, and
+            ``p_val``.
+        """
         try:
             if len(fwhm_peaks) == 0:
                 raise RuntimeError
@@ -1223,6 +1271,34 @@ class HPGeCalibration:
     def interpolate_energy_res(
         fwhm_func, fwhm_peaks, fwhm_results, interp_energy_kev=None, debug_mode=False
     ):
+        """
+        Interpolate the fitted energy-resolution curve to target energies.
+
+        For each entry in *interp_energy_kev*, evaluates the fitted model at
+        the requested energy and estimates the uncertainty via bootstrap
+        resampling of the covariance matrix.  Results are added to
+        *fwhm_results* in-place and the same dict is returned.
+
+        Parameters
+        ----------
+        fwhm_func
+            Energy resolution model class (e.g. :class:`FWHMLinear`).
+        fwhm_peaks
+            Peak energies used in the original fit (used for range checking).
+        fwhm_results
+            Result dictionary from :meth:`fit_energy_res_curve`; modified
+            in-place.
+        interp_energy_kev
+            Dict mapping labels to energies in keV at which to interpolate
+            (e.g. ``{"Qbb": 2039.0}``).  ``None`` skips interpolation.
+        debug_mode
+            If ``True``, re-raises exceptions instead of silently returning NaN.
+
+        Returns
+        -------
+        fwhm_results
+            The input dictionary with added interpolation entries.
+        """
         if interp_energy_kev is not None:
             for key, energy in interp_energy_kev.items():
                 try:
@@ -1257,6 +1333,24 @@ class HPGeCalibration:
         return fwhm_results
 
     def get_energy_res_curve(self, fwhm_func, interp_energy_kev=None):
+        """
+        Fit the energy-resolution curve and optionally interpolate to target energies.
+
+        Collects calibrated FWHMs from the most recent peak-fit results
+        (excluding Doppler-broadened peaks at ~511, 1592.53, and 2103.5 keV),
+        calls :meth:`fit_energy_res_curve`, and optionally calls
+        :meth:`interpolate_energy_res`.  The result is stored under
+        ``fwhm_func.__name__`` in the most recent results entry.
+
+        Parameters
+        ----------
+        fwhm_func
+            Energy resolution model class (e.g. :class:`FWHMLinear` or
+            :class:`FWHMQuadratic`).
+        interp_energy_kev
+            Dict mapping labels to energies in keV, forwarded to
+            :meth:`interpolate_energy_res`.  ``None`` skips interpolation.
+        """
         peak_parameters = self.results[list(self.results)[-1]].get(
             "peak_parameters", None
         )
@@ -1323,6 +1417,32 @@ class HPGeCalibration:
         peak_param="mode",
         n_events=None,
     ):
+        """
+        Run the complete HPGe energy calibration pipeline.
+
+        Sequentially calls :meth:`hpge_find_energy_peaks`,
+        :meth:`hpge_get_energy_peaks`, :meth:`hpge_fit_energy_peaks`, and
+        :meth:`get_energy_res_curve` (for both :class:`FWHMLinear` and
+        :class:`FWHMQuadratic`).  If peaks are dropped during fitting, a
+        second attempt is made with adjusted fit windows.
+
+        Parameters
+        ----------
+        e_uncal
+            1-D array of uncalibrated energy values.
+        peak_pars
+            List of ``(peak_kev, (kev_lo, kev_hi), func)`` tuples specifying
+            the fit window and model for each peak.
+        allowed_p_val
+            Minimum chi-squared p-value for a peak fit to be accepted.
+        tail_weight
+            Weight for the tail-suppression prior in the fit cost function.
+        peak_param
+            Parameter used to extract the peak position (``"mode"`` or
+            ``"mu"``).
+        n_events
+            Maximum number of events to use; ``None`` uses all.
+        """
         log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
         log.debug(f"Guess is {self.pars[1]:.3f}")
         self.hpge_find_energy_peaks(e_uncal)
@@ -1394,6 +1514,21 @@ class HPGeCalibration:
         )
 
     def fit_calibrated_peaks(self, e_uncal, peak_pars):
+        """
+        Fit peaks using an existing calibration without updating the polynomial.
+
+        Calls :meth:`hpge_get_energy_peaks` and
+        :meth:`hpge_fit_energy_peaks` with ``update_cal_pars=False``, then
+        fits the energy resolution curves for both :class:`FWHMLinear` and
+        :class:`FWHMQuadratic`.
+
+        Parameters
+        ----------
+        e_uncal
+            1-D array of uncalibrated energy values.
+        peak_pars
+            List of ``(peak_kev, (kev_lo, kev_hi), func)`` tuples.
+        """
         log.debug(f"Fitting {self.energy_param}")
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
         self.hpge_fit_energy_peaks(e_uncal, peak_pars=peak_pars, update_cal_pars=False)
@@ -1416,6 +1551,31 @@ class HPGeCalibration:
         peak_param="mode",
         n_events=None,
     ):
+        """
+        Calibrate using a single prominent peak (degree-0 calibration).
+
+        Fits only the specified *peak* with ``update_cal_pars=True``, then
+        re-fits all peaks with ``update_cal_pars=False`` to populate the
+        full results, and fits both energy-resolution curves.  Requires
+        ``deg == 0`` (pure scaling calibration).
+
+        Parameters
+        ----------
+        e_uncal
+            1-D array of uncalibrated energy values.
+        peak
+            Known energy of the prominent peak in keV.
+        peak_pars
+            List of ``(peak_kev, (kev_lo, kev_hi), func)`` tuples.
+        allowed_p_val
+            Minimum chi-squared p-value for an accepted fit.
+        tail_weight
+            Weight for the tail-suppression prior.
+        peak_param
+            Parameter used to extract the peak position.
+        n_events
+            Maximum number of events to use; ``None`` uses all.
+        """
         log.debug(f"Find peaks and compute calibration curve for {self.energy_param}")
         log.debug(f"Guess is {self.pars[1]:.3f}")
         if self.deg != 0:
@@ -1454,6 +1614,29 @@ class HPGeCalibration:
         )
 
     def plot_cal_fit(self, data, figsize=(12, 8), fontsize=12, erange=(200, 2700)):
+        """
+        Plot the calibration curve and residuals.
+
+        Produces a two-panel figure: the upper panel shows the ADC peak
+        locations vs. their known keV energies with the fitted polynomial
+        overlaid; the lower panel shows the residuals in keV.
+
+        Parameters
+        ----------
+        data
+            Unused; kept for API consistency with other plot methods.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Font size for axis labels.
+        erange
+            ``(low, high)`` energy range in keV for the x-axis.
+
+        Returns
+        -------
+        fig
+            :class:`matplotlib.figure.Figure` object.
+        """
         fig, (ax1, ax2) = plt.subplots(
             2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figsize=figsize
         )
@@ -1482,6 +1665,28 @@ class HPGeCalibration:
     def plot_cal_fit_with_errors(
         self, data, figsize=(10, 6), fontsize=12, erange=(200, 2700)
     ):
+        """
+        Plot the calibration curve with peak-fit uncertainties.
+
+        Like :meth:`plot_cal_fit` but shows error bars on the ADC peak
+        locations derived from the peak-fit parameter uncertainties.
+
+        Parameters
+        ----------
+        data
+            Unused; kept for API consistency with other plot methods.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Font size for axis labels.
+        erange
+            ``(low, high)`` energy range in keV for the x-axis.
+
+        Returns
+        -------
+        fig
+            :class:`matplotlib.figure.Figure` object.
+        """
         fig, (ax1, ax2) = plt.subplots(
             2, 1, sharex=True, gridspec_kw={"height_ratios": [3, 1]}, figsize=figsize
         )
@@ -1550,6 +1755,32 @@ class HPGeCalibration:
     def plot_fits(
         self, energies, figsize=(12, 8), fontsize=12, ncols=3, nrows=3, binning_kev=5
     ):
+        """
+        Plot the peak-shape fits for all fitted calibration peaks.
+
+        Produces a grid of subplots, one per fitted peak, showing the
+        histogrammed data and the best-fit model.
+
+        Parameters
+        ----------
+        energies
+            1-D array of calibrated energy values.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Font size for axis labels.
+        ncols
+            Number of subplot columns.
+        nrows
+            Number of subplot rows.
+        binning_kev
+            Histogram bin width in keV.
+
+        Returns
+        -------
+        fig
+            :class:`matplotlib.figure.Figure` object.
+        """
         plt.rcParams["font.size"] = fontsize
 
         pk_parameters = self.results[list(self.results)[-1]].get(
@@ -1623,6 +1854,29 @@ class HPGeCalibration:
         return fig
 
     def plot_eres_fit(self, data, erange=(200, 2700), figsize=(12, 8), fontsize=12):
+        """
+        Plot the energy-resolution curve fits.
+
+        Shows measured FWHMs with error bars alongside the fitted
+        :class:`FWHMLinear` and :class:`FWHMQuadratic` curves, plus the
+        interpolated resolution at Qββ.
+
+        Parameters
+        ----------
+        data
+            Unused; kept for API consistency with other plot methods.
+        erange
+            ``(low, high)`` energy range in keV for the x-axis.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Font size for axis labels.
+
+        Returns
+        -------
+        fig
+            :class:`matplotlib.figure.Figure` object.
+        """
         plt.rcParams["font.size"] = fontsize
 
         pk_parameters = self.results[list(self.results)[-1]].get(
@@ -1734,38 +1988,50 @@ class HPGeCalibration:
 
 
 class FWHMLinear:
+    """Energy-resolution model FWHM(E) = sqrt(a + b·E)."""
+
     @staticmethod
     def func(x, a, b):
+        """Evaluate ``sqrt(a + b*x)``."""
         return np.sqrt(a + b * x)
 
     @staticmethod
     def string_func(input_param):
+        """Return the expression string for the hit-dict format."""
         return f"(a+b*{input_param})**(0.5)"
 
     @staticmethod
     def guess(xs, ys, y_errs):
+        """Return initial parameter guess ``[a, b]``."""
         return [np.nanmin(ys), 10**-3]
 
     @staticmethod
     def bounds(ys):
+        """Return parameter bounds ``[(a_lo, a_hi), (b_lo, b_hi)]``."""
         return [(0, None), (0, None)]
 
 
 class FWHMQuadratic:
+    """Energy-resolution model FWHM(E) = sqrt(a + b·E + c·E²)."""
+
     @staticmethod
     def func(x, a, b, c):
+        """Evaluate ``sqrt(a + b*x + c*x**2)``."""
         return np.sqrt(a + b * x + c * x**2)
 
     @staticmethod
     def string_func(input_param):
+        """Return the expression string for the hit-dict format."""
         return f"(a+b*{input_param}+c*{input_param}**2)**(0.5)"
 
     @staticmethod
     def guess(xs, ys, y_errs):
+        """Return initial parameter guess ``[a, b, c]``."""
         return [np.nanmin(ys), 2 * 10**-3, 10**-8]
 
     @staticmethod
     def bounds(ys):
+        """Return parameter bounds ``[(a_lo, a_hi), (b_lo, b_hi), (c_lo, c_hi)]``."""
         return [(0, np.nanmin(ys) ** 2), (10**-3, None), (0, None)]
 
 
@@ -2126,7 +2392,21 @@ def get_hpge_energy_bounds(func, parguess):
 
 class TailPrior:
     """
-    Generic least-squares cost function with error.
+    Iminuit cost-function mixin that adds a logarithmic tail-fraction prior.
+
+    When *tail_weight* > 0, the prior penalises small ``htail`` values,
+    discouraging the fitter from driving the tail fraction to zero.
+
+    Parameters
+    ----------
+    data
+        Data array (unused in the prior term itself; kept for interface
+        compatibility with iminuit cost functions).
+    model
+        Peak model callable.
+    tail_weight
+        Strength of the prior; larger values impose a stronger penalty on
+        small ``htail``.
     """
 
     verbose = 0
@@ -2138,9 +2418,11 @@ class TailPrior:
         self.tail_weight = tail_weight
 
     def _call(self, *pars):
+        """Delegate to ``__call__`` (iminuit internal interface)."""
         return self.__call__(*pars[0])
 
     def _value(self, *pars):
+        """Delegate to ``__call__`` (iminuit internal interface)."""
         return self.__call__(*pars[0])
 
     def __call__(
@@ -2155,6 +2437,13 @@ class TailPrior:
         n_bkg,
         hstep,
     ):
+        """
+        Evaluate the tail-fraction prior.
+
+        Returns ``tail_weight * log(htail + 0.1)``, which is added to the
+        main fit cost to penalise configurations with very small tail
+        fractions.
+        """
         return self.tail_weight * np.log(htail + 0.1)  # len(self.data)/
 
 

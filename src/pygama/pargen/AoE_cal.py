@@ -222,22 +222,30 @@ def aoe_peak_fixed(func, **kwargs):
 
 
 class Pol1:
+    """Linear model for the A/E mean as a function of energy: mean(E) = a·E + b."""
+
     @staticmethod
     def func(x, a, b):
+        """Evaluate ``a*x + b``."""
         return x * a + b
 
     @staticmethod
     def string_func(input_param):
+        """Return the expression string for the hit-dict format."""
         return f"{input_param}*a+b"
 
     @staticmethod
     def guess(bands, means, mean_errs):
+        """Return initial parameter guess ``[a, b]``."""
         return [-1e-06, 5e-01]
 
 
 class SigmaFit:
+    """Energy-dependent A/E sigma model: sigma(E) = sqrt(a + (b/E)^c)."""
+
     @staticmethod
     def func(x, a, b, c):
+        """Evaluate ``sqrt(a + (b/x)^c)``, returning NaN for non-positive arguments."""
         return np.where(
             (x > 0) & ((a + (b / (x + 10**-99)) ** c) > 0),
             np.sqrt(a + (b / (x + 10**-99)) ** c),
@@ -246,20 +254,26 @@ class SigmaFit:
 
     @staticmethod
     def string_func(input_param):
+        """Return the expression string for the hit-dict format."""
         return f"(a+(b/({input_param}+10**-99))**c)**(0.5)"
 
     @staticmethod
     def guess(bands, sigmas, sigma_errs):
+        """Return initial parameter guess ``[a, b, c]``."""
         return [np.nanpercentile(sigmas, 50) ** 2, 2, 2]
 
 
 class SigmoidFit:
+    """Sigmoid model for A/E cut survival: sf(E) = (a + b·E) · erfc(c·E + d)."""
+
     @staticmethod
     def func(x, a, b, c, d):
+        """Evaluate ``(a + b*x) * erfc(c*x + d)``."""
         return (a + b * x) * nb_erfc(c * x + d)
 
     @staticmethod
     def guess(xs, ys, y_errs):
+        """Return initial parameter guess ``[a, b, c, d]``."""
         return [np.nanmax(ys) / 2, 0, 1, 1.5]
 
 
@@ -735,9 +749,17 @@ class CalAoE:
 
     def update_cal_dicts(self, update_dict):
         """
-        Util function for updating the calibration dictionaries
-        checks if the dictionary is in the format of a single run or multiple runs
-        and then updates the dictionary accordingly
+        Merge new entries into the A/E calibration dictionary.
+
+        If ``cal_dicts`` is keyed by run timestamps, each timestamp's
+        sub-dict is updated individually, using *update_dict* directly as a
+        fallback when a timestamp is absent.  Otherwise *update_dict* is
+        merged directly.
+
+        Parameters
+        ----------
+        update_dict
+            Dictionary of new calibration entries to merge.
         """
         if len(self.cal_dicts) > 0 and re.match(
             r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]
