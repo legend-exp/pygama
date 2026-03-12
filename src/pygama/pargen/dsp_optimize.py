@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import sys
 from collections import namedtuple
-from typing import Any, Callable, Mapping, Optional, Tuple, Union
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,7 +32,7 @@ def run_one_dsp(
     fom_function: Callable | None = None,
     verbosity: int = 0,
     fom_kwargs=None,
-) -> Union[float, Table]:
+) -> float | Table:
     """Run one iteration of DSP on ``tb_data`, based on the DSP specified in ``dsp_config``.
 
     Optionally returns a value for optimization
@@ -67,10 +70,8 @@ def run_one_dsp(
     if fom_function is not None:
         if fom_kwargs is not None:
             return fom_function(tb_out, verbosity, fom_kwargs)
-        else:
-            return fom_function(tb_out, verbosity)
-    else:
-        return tb_out
+        return fom_function(tb_out, verbosity)
+    return tb_out
 
 
 ParGridDimension = namedtuple("ParGridDimension", "name parameter value_strs")
@@ -243,7 +244,7 @@ def run_grid_point(
     """
     if not isinstance(grids, list):
         grids = [grids]
-    for index, grid in zip(iii, grids):
+    for index, grid in zip(iii, grids, strict=False):
         db_dict = grid.set_dsp_pars(db_dict, index)
 
     log.debug(db_dict)
@@ -258,11 +259,10 @@ def run_grid_point(
                     res[i] = fom_function[i](tb_out, verbosity, fom_kwargs[i])
                 else:
                     res[i] = fom_function[0](tb_out, verbosity, fom_kwargs[i])
+            elif len(fom_function) > 1:
+                res[i] = fom_function[i](tb_out, verbosity)
             else:
-                if len(fom_function) > 1:
-                    res[i] = fom_function[i](tb_out, verbosity)
-                else:
-                    res[i] = fom_function[0](tb_out, verbosity)
+                res[i] = fom_function[0](tb_out, verbosity)
         log.debug("value:", res)
         out = {"indexes": [tuple(ii) for ii in iii], "results": res}
 
@@ -281,7 +281,7 @@ def get_grid_points(grid):
     while True:
         out.append([tuple(ii) for ii in iii])
 
-        for i, gri in enumerate(zip(iii, grid)):
+        for i, gri in enumerate(zip(iii, grid, strict=False)):
             if not gri[1].iterate_indices(gri[0]):
                 log.info(f"{i} grid end")
                 iii[i] = gri[1].get_zero_indices()
@@ -396,12 +396,11 @@ class BayesianOptimizer:
         self,
         acq_func: str,
         batch_size: int,
-        kernel: Optional[Kernel] = None,
-        sampling_rate: Optional[Union[str, pint.Quantity]] = None,
+        kernel: Kernel | None = None,
+        sampling_rate: str | pint.Quantity | None = None,
         fom_value: str = "y_val",
         fom_error: str = "y_val_err",
     ) -> None:
-
         np.random.seed(55)
 
         self.lambda_param = 0.01
@@ -459,7 +458,7 @@ class BayesianOptimizer:
         min_val: float,
         max_val: float,
         round_to_samples: bool = False,
-        unit: Optional[Union[str, pint.Quantity]] = None,
+        unit: str | pint.Quantity | None = None,
     ) -> None:
         """
         Add a new dimension (parameter) to the optimizer's search space.
@@ -568,7 +567,7 @@ class BayesianOptimizer:
             if response.fun < min_ei:
                 min_ei = response.fun
                 x_optimal = []
-                for y, dim in zip(response.x, self.dims):
+                for y, dim in zip(response.x, self.dims, strict=False):
                     if dim.round is True and dim.unit is not None:
                         # round so samples is integer
 
@@ -593,7 +592,7 @@ class BayesianOptimizer:
             )
             x_optimal += perturb
             new_x_optimal = []
-            for y, dim in zip(x_optimal[0], self.dims):
+            for y, dim in zip(x_optimal[0], self.dims, strict=False):
                 if dim.round is True and dim.unit is not None:
                     # round so samples is integer
                     new_x_optimal.append(
@@ -622,7 +621,7 @@ class BayesianOptimizer:
         self.y_init = np.append(self.y_init, np.array(y), axis=0)
         self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
 
-    def get_first_point(self) -> Tuple[Any, None]:
+    def get_first_point(self) -> tuple[Any, None]:
         """
         Get the first optimization point based on initial data.
 
@@ -728,12 +727,11 @@ class BayesianOptimizer:
 
         if np.isnan(y_val) | np.isnan(y_err):
             pass
-        else:
-            if y_val < self.y_min:
-                self.y_min = y_val
-                self.optimal_x = self.current_x
-                self.optimal_ei = self.current_ei
-                self.optimal_results = results
+        elif y_val < self.y_min:
+            self.y_min = y_val
+            self.optimal_x = self.current_x
+            self.optimal_ei = self.current_ei
+            self.optimal_results = results
 
         if self.current_iter == 1:
             self.prev_x = self.current_x
@@ -751,7 +749,6 @@ class BayesianOptimizer:
             and new_entry.notnull().any().any()
             and len(new_entry) >= 1
         ):
-
             if self.best_samples_.empty:
                 self.best_samples_ = new_entry.copy()
             else:
@@ -772,7 +769,7 @@ class BayesianOptimizer:
                     value_str = value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
-            if name not in out_dict.keys():
+            if name not in out_dict:
                 out_dict[name] = {parameter: value_str}
             else:
                 out_dict[name][parameter] = value_str
@@ -803,7 +800,7 @@ class BayesianOptimizer:
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        elif len(self.dims) == 1:
+        if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
 
             ys, ys_err = self.gauss_pr.predict(points.reshape(-1, 1), return_std=True)
@@ -908,7 +905,7 @@ class BayesianOptimizer:
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        elif len(self.dims) == 1:
+        if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
             for i, point in enumerate(points):
@@ -1010,7 +1007,7 @@ def run_bayesian_optimisation(
     db_dict: Mapping | None = None,
     nan_val: float | list = 10,
     n_iter: int = 10,
-) -> Tuple[Mapping, list]:
+) -> tuple[Mapping, list]:
     """Run Bayesian optimization loop to optimize DSP parameters.
 
     Parameters
@@ -1066,7 +1063,7 @@ def run_bayesian_optimisation(
         for optimiser in optimisers:
             db_dict = optimiser.update_db_dict(db_dict)
 
-        log.info(f"Iteration number: {j+1}")
+        log.info(f"Iteration number: {j + 1}")
         log.info(f"Processing with {db_dict}")
 
         tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict)
@@ -1079,13 +1076,12 @@ def run_bayesian_optimisation(
                     res[i] = fom_function[i](tb_out, fom_kwargs[i])
                 else:
                     res[i] = fom_function[0](tb_out, fom_kwargs[i])
+            elif len(fom_function) > 1:
+                res[i] = fom_function[i](tb_out)
             else:
-                if len(fom_function) > 1:
-                    res[i] = fom_function[i](tb_out)
-                else:
-                    res[i] = fom_function[0](tb_out)
+                res[i] = fom_function[0](tb_out)
 
-        log.info(f"Results of iteration {j+1} are {res}")
+        log.info(f"Results of iteration {j + 1} are {res}")
 
         for i, optimiser in enumerate(optimisers):
             if np.isnan(res[i][optimiser.fom_value]):
@@ -1100,7 +1096,6 @@ def run_bayesian_optimisation(
     out_results_list = []
 
     for optimiser in optimisers:
-
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results

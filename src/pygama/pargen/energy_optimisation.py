@@ -5,6 +5,8 @@ separately using the optimiser, then the resulting grids are interpolated
 to provide the best energy resolution at Qbb
 """
 
+from __future__ import annotations
+
 import logging
 
 import matplotlib.pyplot as plt
@@ -291,8 +293,7 @@ def fom_fwhm_with_alpha_fit(
                 fwhms = np.append(fwhms, fwhm_o_max)
                 final_alphas = np.append(final_alphas, alpha)
                 fwhm_errs = np.append(fwhm_errs, fwhm_o_max_err)
-                if fwhms[-1] < best_fwhm:
-                    best_fwhm = fwhms[-1]
+                best_fwhm = min(best_fwhm, fwhms[-1])
             log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
 
             ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
@@ -489,6 +490,39 @@ def fom_fwhm_no_alpha_sweep(
 
 
 def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
+    """
+    Figure-of-merit wrapper: FWHM with alpha (charge-trapping correction) sweep
+    for a single calibration peak.
+
+    Thin adapter around :func:`fom_fwhm_with_alpha_fit` that unpacks the
+    standardised ``kwarg_dict`` interface expected by the optimisation
+    framework.
+
+    Parameters
+    ----------
+    data
+        DataFrame containing the energy and charge-trapping correction
+        parameters for all events.
+    kwarg_dict
+        Dictionary with keys:
+
+        * ``idx_list`` – list of event-index arrays, one per peak.  Only the
+          first entry (``idx_list[0]``) is used.
+        * ``ctc_param`` – name of the charge-trapping correction parameter.
+        * ``peak_dicts`` – list of per-peak fitting dictionaries.  Only the
+          first entry is used.
+        * ``frac_max`` *(optional, default 0.2)* – fraction of the peak
+          maximum used to define the fit range.
+    display
+        Verbosity / plotting level passed through to the underlying fit.
+
+    Returns
+    -------
+    dict
+        Result dictionary from :func:`fom_fwhm_with_alpha_fit` containing
+        at minimum ``fwhm``, ``fwhm_err``, ``alpha``, ``n_sig``, and
+        ``n_sig_err``.
+    """
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
@@ -507,6 +541,47 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
 def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     data, kwarg_dict, display=0
 ):
+    """
+    Figure-of-merit: energy resolution interpolated to a target energy using
+    a multi-peak sweep with a shared alpha from the highest-energy peak.
+
+    The charge-trapping correction parameter *alpha* is determined from the
+    last (highest-energy) peak via :func:`fom_fwhm_with_alpha_fit`; this
+    alpha is then applied to all remaining peaks via
+    :func:`fom_fwhm_no_alpha_sweep`.  The resulting FWHM vs. energy curve is
+    fit with *fwhm_func* and interpolated to each energy in *interp_energy*.
+
+    Parameters
+    ----------
+    data
+        DataFrame containing energy and correction parameters for all events.
+    kwarg_dict
+        Dictionary with keys:
+
+        * ``peaks_kev`` – list of peak energies in keV, ordered from low to
+          high.  The last entry is used for the alpha sweep.
+        * ``idx_list`` – list of event-index arrays, one per peak.
+        * ``ctc_param`` – name of the charge-trapping correction parameter.
+        * ``peak_dicts`` – list of per-peak fitting dictionaries.
+        * ``interp_energy`` *(optional, default ``{"Qbb": 2039}``)* – dict
+          mapping energy label to keV value for interpolation.
+        * ``fwhm_func`` *(optional, default* ``pgc.FWHMLinear`` *)* – FWHM
+          curve model used for the energy-resolution fit.
+        * ``frac_max`` *(optional, default 0.2)* – fraction of peak maximum
+          used to define fit range.
+    display
+        Verbosity / plotting level passed through to the underlying fits.
+
+    Returns
+    -------
+    dict
+        Result dictionary containing interpolated FWHM value(s), e.g.
+        ``{"Qbb_fwhm": ..., "Qbb_fwhm_err": ..., "alpha": ...,
+        "peaks": ..., "fwhms": ..., "fwhm_errs": ...,
+        "n_sig": ..., "n_sig_err": ...}``.
+        Returns ``(nan, nan, nan)`` if fewer than two valid FWHM values are
+        available.
+    """
     peaks = kwarg_dict["peaks_kev"]
     idx_list = kwarg_dict["idx_list"]
     ctc_param = kwarg_dict["ctc_param"]
@@ -558,20 +633,19 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     nan_mask = np.isnan(fwhms) | (fwhms < 0)
     if len(fwhms[~nan_mask]) < 2:
         return np.nan, np.nan, np.nan
-    else:
-        results = pgc.HPGeCalibration.fit_energy_res_curve(
-            fwhm_func, peaks[~nan_mask], fwhms[~nan_mask], fwhm_errs[~nan_mask]
-        )
-        results = pgc.HPGeCalibration.interpolate_energy_res(
-            fwhm_func, peaks[~nan_mask], results, interp_energy
-        )
-        interp_res = results[f"{list(interp_energy)[0]}_fwhm_in_kev"]
-        interp_res_err = results[f"{list(interp_energy)[0]}_fwhm_err_in_kev"]
+    results = pgc.HPGeCalibration.fit_energy_res_curve(
+        fwhm_func, peaks[~nan_mask], fwhms[~nan_mask], fwhm_errs[~nan_mask]
+    )
+    results = pgc.HPGeCalibration.interpolate_energy_res(
+        fwhm_func, peaks[~nan_mask], results, interp_energy
+    )
+    interp_res = results[f"{list(interp_energy)[0]}_fwhm_in_kev"]
+    interp_res_err = results[f"{list(interp_energy)[0]}_fwhm_err_in_kev"]
 
-        if nan_mask[-1] is True or nan_mask[-2] is True:
-            interp_res_err = np.nan
-        if interp_res_err / interp_res > 0.1:
-            interp_res_err = np.nan
+    if nan_mask[-1] is True or nan_mask[-2] is True:
+        interp_res_err = np.nan
+    if interp_res_err / interp_res > 0.1:
+        interp_res_err = np.nan
 
     log.info(f"{list(interp_energy)[0]} fwhm is {interp_res} keV +- {interp_res_err}")
 

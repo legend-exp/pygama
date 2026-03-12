@@ -3,6 +3,8 @@ This module contains the functions for performing the filter optimisation.
 This happens with a grid search performed on ENC peak.
 """
 
+from __future__ import annotations
+
 import logging
 import time
 
@@ -89,7 +91,7 @@ def noise_optimization(
 
         t1 = time.time()
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
-        log.info(f"Time to process dsp data {time.time()-t1:.2f} s")
+        log.info(f"Time to process dsp data {time.time() - t1:.2f} s")
 
         for ene_par in ene_pars:
             dict_str = opt_dict_par[ene_par]["dict_str"]
@@ -220,14 +222,40 @@ def noise_optimization(
             par_dict_res["optimization"] = fig
             plot_dict["nopt"][dict_str] = par_dict_res
 
-    log.info(f"Time to complete the optimization {time.time()-t0:.2f} s")
+    log.info(f"Time to complete the optimization {time.time() - t0:.2f} s")
     if display > 0:
         return res_dict, plot_dict
-    else:
-        return res_dict
+    return res_dict
 
 
 def calculate_spread(energies, percentile_low, percentile_high, n_samples):
+    """
+    Estimate the inter-percentile spread of an energy distribution via bootstrapping.
+
+    Repeatedly resamples the input array with replacement and computes the
+    difference between *percentile_high* and *percentile_low* for each
+    bootstrap replicate.  The mean and standard error of the bootstrap
+    distribution are returned as the figure-of-merit and its uncertainty.
+
+    Parameters
+    ----------
+    energies
+        1-D array of energy values.
+    percentile_low
+        Lower percentile (0–100) used to define the spread.
+    percentile_high
+        Upper percentile (0–100) used to define the spread.
+    n_samples
+        Number of bootstrap resamples to draw.
+
+    Returns
+    -------
+    dict
+        Dictionary with keys:
+
+        * ``fom`` – mean inter-percentile spread across bootstrap samples.
+        * ``fom_err`` – standard error of the mean spread.
+    """
     spreads = np.zeros(n_samples)
     for i in range(n_samples):
         resampled = np.random.choice(energies, size=len(energies), replace=True)
@@ -246,6 +274,41 @@ def calculate_spread(energies, percentile_low, percentile_high, n_samples):
 
 
 def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
+    """
+    Fit a Gaussian-on-uniform model to an ENC (noise) peak and return the FWHM.
+
+    An initial guess from :func:`simple_gaussian_guess` is used to define a
+    sigma-clipped fit range.  The unbinned fit is accepted if the covariance
+    is well-defined and the goodness-of-fit p-value exceeds *allowed_p_val*;
+    otherwise the guess values are returned with zero uncertainties.
+
+    Parameters
+    ----------
+    energies
+        1-D array of energy (or ENC) values.
+    dx
+        Histogram bin width used for initial guessing and goodness-of-fit
+        evaluation.
+    sigma_thr
+        Number of sigma around the estimated mean used to clip the fit range.
+    allowed_p_val
+        Minimum chi-squared p-value for the fit to be considered successful.
+
+    Returns
+    -------
+    dict
+        Result dictionary with keys:
+
+        * ``pars`` – fit parameter array.
+        * ``errors`` – fit parameter uncertainties.
+        * ``covariance`` – parameter covariance matrix.
+        * ``mu`` – peak centre.
+        * ``mu_err`` – uncertainty on the peak centre.
+        * ``fom`` – FWHM of the peak.
+        * ``fom_err`` – uncertainty on the FWHM.
+        * ``chisq`` – reduced chi-squared of the fit.
+        * ``p_val`` – goodness-of-fit p-value.
+    """
     fit_range = [np.percentile(energies, 0.2), np.percentile(energies, 99.8)]
 
     hist, bins, var = get_hist(energies, range=fit_range, dx=dx)
@@ -279,12 +342,12 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     ):
         log.debug("fit failed, cov estimation failed")
         fit_failed = True
-    elif (np.abs(np.array(errs)[2:] / np.array(pars)[2:]) < 1e-7).any() or np.isnan(
-        np.array(errs)[2:]
-    ).any():
-        log.debug("fit failed, parameter error too low")
-        fit_failed = True
-    elif p_val < allowed_p_val or np.isnan(p_val):
+    elif (
+        (np.abs(np.array(errs)[2:] / np.array(pars)[2:]) < 1e-7).any()
+        or np.isnan(np.array(errs)[2:]).any()
+        or p_val < allowed_p_val
+        or np.isnan(p_val)
+    ):
         log.debug("fit failed, parameter error too low")
         fit_failed = True
     else:
@@ -312,6 +375,35 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
 
 
 def simple_gaussian_guess(hist, bins, func, toll=0.2):
+    """
+    Generate an initial parameter guess and bounds for a Gaussian-on-uniform fit.
+
+    Estimates the peak centre from the histogram maximum and the width from
+    the FWHM of the peak.  The signal count is estimated by integrating the
+    histogram over a ±2σ window around the peak.
+
+    Parameters
+    ----------
+    hist
+        1-D array of histogram counts.
+    bins
+        1-D array of bin edges (length ``len(hist) + 1``).
+    func
+        Probability distribution object whose parameter names are used to
+        construct the output dictionaries (must expose ``mu``, ``sigma``, and
+        ``n_sig`` parameters).
+    toll
+        Fractional tolerance used to set symmetric bounds around each guess
+        value.
+
+    Returns
+    -------
+    guess : dict
+        Initial parameter values: ``{"mu": ..., "sigma": ..., "n_sig": ...}``.
+    bounds : dict
+        Allowed parameter ranges: ``{"mu": (lo, hi), "sigma": (lo, hi),
+        "n_sig": (lo, hi)}``.
+    """
     max_idx = np.argmax(hist)
     mu = bins[max_idx]
     max_amp = np.max(hist)

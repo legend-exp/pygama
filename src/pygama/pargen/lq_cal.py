@@ -1,3 +1,19 @@
+"""
+Calibration routines for the Late Charge (LQ) parameter in HPGe detectors.
+
+LQ is computed from the ratio of the late-charge integral to the total charge
+and is sensitive to multi-site events.  This module provides functions to
+
+* determine the fit range and histogram the LQ distribution,
+* fit the distribution with a Gaussian model,
+* perform a drift-time correction for the time-dependent LQ shift,
+* calculate the LQ cut value from the DEP (double-escape peak) survival fraction,
+* compute survival fractions as a function of LQ cut position,
+* produce diagnostic plots.
+
+The main entry point is the :class:`LQCal` class.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -80,19 +96,18 @@ def get_lq_hist(
 
         return final_hist, bins, var
 
-    else:
-        # Return a histogram in a 13 keV range surrounding the specified peak
+    # Return a histogram in a 13 keV range surrounding the specified peak
 
-        df_peak = df.query(
-            f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
-        )
+    df_peak = df.query(
+        f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
+    )
 
-        fit_range = get_fit_range(df_peak[lq_param].to_numpy())
-        dep_hist, bins, var = pgh.get_hist(
-            df_peak[lq_param].to_numpy(), bins=100, range=fit_range
-        )
+    fit_range = get_fit_range(df_peak[lq_param].to_numpy())
+    dep_hist, bins, var = pgh.get_hist(
+        df_peak[lq_param].to_numpy(), bins=100, range=fit_range
+    )
 
-        return dep_hist, bins, var
+    return dep_hist, bins, var
 
 
 def binned_lq_fit(
@@ -302,9 +317,7 @@ class LQCal:
                             ]
                         )
                     except BaseException as e:
-                        if e == KeyboardInterrupt:
-                            raise (e)
-                        elif self.debug_mode:
+                        if e == KeyboardInterrupt or self.debug_mode:
                             raise (e)
 
                         self.timecorr_df = pd.concat(
@@ -375,9 +388,7 @@ class LQCal:
                         ]
                     )
                 except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
+                    if e == KeyboardInterrupt or self.debug_mode:
                         raise (e)
                     self.timecorr_df = pd.concat(
                         [
@@ -406,9 +417,7 @@ class LQCal:
                 )
                 log.info("LQ time correction finished")
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ time correction failed")
             self.update_cal_dicts(
@@ -467,9 +476,7 @@ class LQCal:
             )
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
@@ -494,7 +501,6 @@ class LQCal:
 
         log.info("Starting LQ Cut calculation")
         try:
-
             pars, errs, hist, bins = binned_lq_fit(
                 df, lq_param, cal_energy_param, peak=1592.5
             )
@@ -508,9 +514,7 @@ class LQCal:
             df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
@@ -562,7 +566,7 @@ class LQCal:
                     emin = 2 * fwhm
                     emax = 2 * fwhm
                     peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
                     cut_df, sf, sf_err = compton_sf_sweep(
@@ -606,9 +610,7 @@ class LQCal:
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
-                if e == KeyboardInterrupt:
-                    raise (e)
-                elif self.debug_mode:
+                if e == KeyboardInterrupt or self.debug_mode:
                     raise (e)
                 self.low_side_sf = pd.concat(
                     [
@@ -812,7 +814,7 @@ def plot_survival_fraction_curves(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
-                    label=f'{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]["sf"]:2.1f} +/- {lq_class.low_side_sf.loc[peak]["sf_err"]:2.1f} %',
+                    label=f"{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]['sf']:2.1f} +/- {lq_class.low_side_sf.loc[peak]['sf_err']:2.1f} %",
                 )
             except Exception:
                 pass

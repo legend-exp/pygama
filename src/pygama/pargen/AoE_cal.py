@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -211,9 +211,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
 
 
 def aoe_peak_fixed(func, **kwargs):
-    if func == aoe_peak:
-        fixed = ["x_lo", "x_hi"]
-    elif func == aoe_peak_with_high_tail:
+    if func == aoe_peak or func == aoe_peak_with_high_tail:
         fixed = ["x_lo", "x_hi"]
     elif func == exgauss:
         fixed = ["x_lo", "x_hi", "mu", "sigma"]
@@ -323,8 +321,7 @@ def unbinned_aoe_fit(
 
     # Range to fit over, below this tail behaviour more exponential, few events above
     fmin = msig.values["mu"] - 15 * msig.values["sigma"]
-    if fmin < np.nanmin(aoe):
-        fmin = np.nanmin(aoe)
+    fmin = max(fmin, np.nanmin(aoe))
     fmax_bkg = msig.values["mu"] - 5 * msig.values["sigma"]
     fmax = msig.values["mu"] + 5 * msig.values["sigma"]
     n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - msig.values["area"]
@@ -367,8 +364,7 @@ def unbinned_aoe_fit(
             )
         )[0]
     )
-    if nsig_guess < 0:
-        nsig_guess = 0
+    nsig_guess = max(nsig_guess, 0)
 
     x0 = aoe_peak_guess(
         pdf,
@@ -507,14 +503,16 @@ def unbinned_aoe_fit(
         res = (pdf.pdf(bin_centers, *fit[0]) * dx[0]) - counts
         plt.plot(
             bin_centers,
-            [re / count if count != 0 else re for re, count in zip(res, counts)],
+            [
+                re / count if count != 0 else re
+                for re, count in zip(res, counts, strict=False)
+            ],
             label="Normalised Residuals",
         )
         plt.legend(loc="upper left")
         plt.show()
         return fit[0], fit[1], fit[2], fit
-    else:
-        return fit[0], fit[1], fit[2], fit
+    return fit[0], fit[1], fit[2], fit
 
 
 def fit_time_means(tstamps, means, sigmas):
@@ -554,21 +552,20 @@ def fit_time_means(tstamps, means, sigmas):
         ):
             if i + 1 == len(means):
                 out_dict[tstamp] = np.nan
+            elif (np.abs(means[i + 1] - means[i]) < 0.4 * sigmas[i + 1]) and not (
+                np.isnan(means[i])
+                or np.isnan(means[i + 1])
+                or np.isnan(sigmas[i])
+                or np.isnan(sigmas[i + 1])
+            ):
+                for ts in current_tstamps:
+                    out_dict[ts] = rolling_mean
+                rolling_mean = means[i]
+                current_means = [means[i]]
+                current_tstamps = [tstamp]
+                current_sigmas = [sigmas[i]]
             else:
-                if (np.abs(means[i + 1] - means[i]) < 0.4 * sigmas[i + 1]) and not (
-                    np.isnan(means[i])
-                    or np.isnan(means[i + 1])
-                    or np.isnan(sigmas[i])
-                    or np.isnan(sigmas[i + 1])
-                ):
-                    for ts in current_tstamps:
-                        out_dict[ts] = rolling_mean
-                    rolling_mean = means[i]
-                    current_means = [means[i]]
-                    current_tstamps = [tstamp]
-                    current_sigmas = [sigmas[i]]
-                else:
-                    out_dict[tstamp] = np.nan
+                out_dict[tstamp] = np.nan
         else:
             current_tstamps.append(tstamp)
             current_means.append(means[i])
@@ -827,9 +824,7 @@ class CalAoE:
                             ]
                         )
                     except BaseException as e:
-                        if e == KeyboardInterrupt:
-                            raise (e)
-                        elif self.debug_mode:
+                        if e == KeyboardInterrupt or self.debug_mode:
                             raise (e)
                         self.timecorr_df = pd.concat(
                             [
@@ -873,6 +868,7 @@ class CalAoE:
                             for time, mean in zip(
                                 np.array(self.timecorr_df.index),
                                 np.array(self.timecorr_df["mean"]),
+                                strict=False,
                             )
                         }
                         final_time_dict = {
@@ -938,6 +934,7 @@ class CalAoE:
                                 for time, mean in zip(
                                     np.array(self.timecorr_df.index),
                                     np.array(self.timecorr_df["mean"]),
+                                    strict=False,
                                 )
                             }
                         else:
@@ -999,9 +996,7 @@ class CalAoE:
                         ]
                     )
                 except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
+                    if e == KeyboardInterrupt or self.debug_mode:
                         raise (e)
 
                     self.timecorr_df = pd.concat(
@@ -1033,9 +1028,7 @@ class CalAoE:
                 )
                 log.info("Finished A/E time correction")
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("A/E time correction failed")
             df[output_name] = df[aoe_param] / np.nan
@@ -1176,9 +1169,7 @@ class CalAoE:
                 log.info(f"dtcorr successful alpha:{self.alpha}")
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("Drift time correction failed")
             self.alpha = 0
@@ -1235,9 +1226,11 @@ class CalAoE:
         for band in compt_bands:
             allow = True
             for peak in peaks:
-                if (peak - 5) > band and (peak - 5) < (band + self.compt_bands_width):
-                    allow = False
-                elif (peak + 5 > band) and (peak + 5) < (band + self.compt_bands_width):
+                if (
+                    (peak - 5) > band and (peak - 5) < (band + self.compt_bands_width)
+                ) or (
+                    (peak + 5 > band) and (peak + 5) < (band + self.compt_bands_width)
+                ):
                     allow = False
             allowed = np.append(allowed, allow)
         compt_bands = compt_bands[allowed]
@@ -1262,7 +1255,7 @@ class CalAoE:
                 try:
                     pars, errs, cov, _ = unbinned_aoe_fit(
                         select_df.query(
-                            f"{self.cal_energy_param}>{band}&{self.cal_energy_param}< {self.compt_bands_width+band}"
+                            f"{self.cal_energy_param}>{band}&{self.cal_energy_param}< {self.compt_bands_width + band}"
                         )[aoe_param],
                         pdf=self.pdf,
                         display=display,
@@ -1298,9 +1291,7 @@ class CalAoE:
                     )
 
                 except BaseException as e:
-                    if e == KeyboardInterrupt:
-                        raise (e)
-                    elif self.debug_mode:
+                    if e == KeyboardInterrupt or self.debug_mode:
                         raise (e)
                     self.energy_corr_fits = pd.concat(
                         [
@@ -1408,9 +1399,7 @@ class CalAoE:
                     display=display,
                 )
             except BaseException as e:
-                if e == KeyboardInterrupt:
-                    raise (e)
-                elif self.debug_mode:
+                if e == KeyboardInterrupt or self.debug_mode:
                     raise (e)
 
                 dep_pars, dep_err, _ = return_nans(self.pdf)
@@ -1426,9 +1415,7 @@ class CalAoE:
             log.info(f"sigma pars are {sig_pars.to_dict()}")
 
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("A/E energy correction failed")
             mu_pars, mu_errs, mu_cov = return_nans(self.mean_func.func)
@@ -1549,7 +1536,7 @@ class CalAoE:
             )
 
             valid_fits = self.cut_fits.query(
-                f'sf_err<{(1.5 * np.nanpercentile(self.cut_fits["sf_err"], 85))}&sf_err==sf_err'
+                f"sf_err<{(1.5 * np.nanpercentile(self.cut_fits['sf_err'], 85))}&sf_err==sf_err"
             )
 
             c = cost.LeastSquares(
@@ -1584,9 +1571,7 @@ class CalAoE:
                     data[self.dt_cut_param]
                 )
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif self.debug_mode:
+            if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("A/E cut determination failed")
             self.low_cut_val = np.nan
@@ -1648,7 +1633,7 @@ class CalAoE:
                     emin = 2 * fwhm
                     emax = 2 * fwhm
                     peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
                     cut_df, sf, sf_err = compton_sf_sweep(
@@ -1675,7 +1660,7 @@ class CalAoE:
                     emin, emax = fit_widths[i]
                     fit_range = (peak - emin, peak + emax)
                     peak_df = select_df.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
                     cut_df, sf, sf_err = get_sf_sweep(
                         peak_df[self.cal_energy_param].to_numpy(),
@@ -1696,7 +1681,7 @@ class CalAoE:
                     )
 
                     cut_df = cut_df.query(
-                        f'sf_err<5*{np.nanpercentile(cut_df["sf_err"], 50)}& sf_err==sf_err & sf<=100'
+                        f"sf_err<5*{np.nanpercentile(cut_df['sf_err'], 50)}& sf_err==sf_err & sf<=100"
                     )
 
                     sfs = pd.concat(
@@ -1708,9 +1693,7 @@ class CalAoE:
                     peak_dfs[peak] = cut_df
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
             except BaseException as e:
-                if e == KeyboardInterrupt:
-                    raise (e)
-                elif self.debug_mode:
+                if e == KeyboardInterrupt or self.debug_mode:
                     raise (e)
                 sfs = pd.concat(
                     [
@@ -1760,7 +1743,7 @@ class CalAoE:
                     emin = 2 * fwhm
                     emax = 2 * fwhm
                     peak_df = data.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
                     sf_dict = compton_sf(
@@ -1786,7 +1769,7 @@ class CalAoE:
                     emin, emax = fit_widths[i]
                     fit_range = (peak - emin, peak + emax)
                     peak_df = data.query(
-                        f"({self.cal_energy_param}>{peak-emin})&({self.cal_energy_param}<{peak+emax})"
+                        f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
                     sf, sf_err, _, _ = get_survival_fraction(
                         peak_df[self.cal_energy_param].to_numpy(),
@@ -1812,9 +1795,7 @@ class CalAoE:
                 log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
 
             except BaseException as e:
-                if e == KeyboardInterrupt:
-                    raise (e)
-                elif self.debug_mode:
+                if e == KeyboardInterrupt or self.debug_mode:
                     raise (e)
                 sfs = pd.concat(
                     [
@@ -2077,7 +2058,7 @@ def drifttime_corr_plot(
         xs = np.linspace(aoe_pars["x_lo"], aoe_pars["x_hi"], 100)
         counts, aoe_bins, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp1"]}&({aoe_param}<{aoe_pars["x_hi"]})&({aoe_param}>{aoe_pars["x_lo"]})'
+                f"{aoe_class.dt_res_dict['aoe_grp1']}&({aoe_param}<{aoe_pars['x_hi']})&({aoe_param}>{aoe_pars['x_lo']})"
             )[aoe_param],
             bins=400,
             histtype="step",
@@ -2102,7 +2083,7 @@ def drifttime_corr_plot(
         xs = np.linspace(aoe_pars2["x_lo"], aoe_pars2["x_hi"], 100)
         counts, aoe_bins2, bars = plt.hist(
             final_df.query(
-                f'{aoe_class.dt_res_dict["aoe_grp2"]}&({aoe_param}<{aoe_pars2["x_hi"]})&({aoe_param}>{aoe_pars2["x_lo"]})'
+                f"{aoe_class.dt_res_dict['aoe_grp2']}&({aoe_param}<{aoe_pars2['x_hi']})&({aoe_param}>{aoe_pars2['x_lo']})"
             )[aoe_param],
             bins=400,
             histtype="step",
@@ -2137,7 +2118,7 @@ def drifttime_corr_plot(
         sigmas = aoe_class.dt_res_dict["dt_fit"]["sigmas"]
         amps = aoe_class.dt_res_dict["dt_fit"]["amps"]
 
-        for mu, sigma, amp in zip(mus, sigmas, amps):
+        for mu, sigma, amp in zip(mus, sigmas, amps, strict=False):
             plt.plot(
                 pgh.get_bin_centers(bins),
                 nb_gauss_amp(pgh.get_bin_centers(bins), mu, sigma, amp),
@@ -2358,7 +2339,7 @@ def plot_sigma_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
         )
         sig_pars = aoe_class.energy_corr_res_dict["SigmaFits"]["pars"]
         if aoe_class.sigma_func == SigmaFit:
-            label = f'sqrt model: \nsqrt({sig_pars["a"]:1.4f}+({sig_pars["b"]:1.1f}/E)^{sig_pars["c"]:1.1f})'
+            label = f"sqrt model: \nsqrt({sig_pars['a']:1.4f}+({sig_pars['b']:1.1f}/E)^{sig_pars['c']:1.1f})"
         else:
             raise ValueError("unknown sigma function")
         ax1.plot(
@@ -2460,13 +2441,13 @@ def plot_cut_fit(
 def get_peak_label(peak: float) -> str:
     if peak == 2039:
         return "CC @"
-    elif peak == 1592.5:
+    if peak == 1592.5:
         return "Tl DEP @"
-    elif peak == 1620.5:
+    if peak == 1620.5:
         return "Bi FEP @"
-    elif peak == 2103.53:
+    if peak == 2103.53:
         return "Tl SEP @"
-    elif peak == 2614.5:
+    if peak == 2614.5:
         return "Tl FEP @"
 
 
@@ -2492,7 +2473,7 @@ def plot_survival_fraction_curves(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
-                    label=f'{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sfs.loc[peak]["sf"]:2.1f} +/- {aoe_class.low_side_sfs.loc[peak]["sf_err"]:2.1f} %',
+                    label=f"{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sfs.loc[peak]['sf']:2.1f} +/- {aoe_class.low_side_sfs.loc[peak]['sf_err']:2.1f} %",
                 )
             except Exception:
                 pass

@@ -1,3 +1,8 @@
+"""
+Utility functions for parameter fitting, unit conversion, and LH5 data loading
+used across the pargen calibration and optimisation modules.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -12,6 +17,25 @@ log = logging.getLogger(__name__)
 
 
 def convert_to_minuit(pars, func):
+    """
+    Create an :class:`iminuit.Minuit` instance from a parameter set and a PDF.
+
+    Parameters
+    ----------
+    pars
+        Initial parameter values.  Either a dict mapping parameter names to
+        values, or a sequence of values that will be passed positionally.
+    func
+        Callable whose signature defines the parameters.  If the object
+        exposes a ``pdf_ext`` attribute it is used as the cost function (so
+        that extended PDFs are handled correctly); otherwise the callable
+        itself is used.
+
+    Returns
+    -------
+    iminuit.Minuit
+        Configured Minuit object ready for minimisation.
+    """
     try:
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
     except AttributeError:
@@ -24,14 +48,34 @@ def convert_to_minuit(pars, func):
 
 
 def return_nans(input):
+    """
+    Return a NaN-filled result tuple with the same structure as a successful fit.
+
+    Useful for propagating fit failures without raising exceptions.
+
+    Parameters
+    ----------
+    input
+        Either a plain callable (whose positional arguments after the first
+        define the parameter list) or an object with a ``required_args()``
+        method (e.g. a pygama distribution).
+
+    Returns
+    -------
+    values : iminuit.Values
+        Parameter values, all set to NaN.
+    errors : iminuit.Errors
+        Parameter uncertainties, all set to NaN.
+    covariance : numpy.ndarray
+        Square covariance matrix filled with NaN.
+    """
     if isinstance(input, FunctionType):
         args = input.__code__.co_varnames[: input.__code__.co_argcount][1:]
         m = convert_to_minuit(np.full(len(args), np.nan), input)
         return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
-    else:
-        args = input.required_args()
-        m = convert_to_minuit(np.full(len(args), np.nan), input)
-        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
+    args = input.required_args()
+    m = convert_to_minuit(np.full(len(args), np.nan), input)
+    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
 
 
 def load_data(
@@ -119,7 +163,7 @@ def load_data(
         df_fields = params & (fields | set(cal_dict))
         if df_fields != params:
             log.debug(
-                f"load_data(): params not found in data files or cal_dict: {params-df_fields}"
+                f"load_data(): params not found in data files or cal_dict: {params - df_fields}"
             )
         df = pd.DataFrame(columns=list(df_fields))
 
@@ -150,5 +194,4 @@ def load_data(
     log.debug("data loaded")
     if return_selection_mask:
         return df, masks
-    else:
-        return df
+    return df

@@ -9,11 +9,11 @@ import re
 from collections.abc import Collection, Mapping
 
 import awkward as ak
-import lgdo.lh5 as lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from lgdo import lh5
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm
@@ -84,6 +84,26 @@ def get_keys(in_data, cut_dict):
 
 
 def get_mode_stdev(par_array):
+    """
+    Estimate the mode and standard deviation of a parameter distribution.
+
+    Uses a histogram-based approach: the distribution is first clipped to the
+    1st–99th percentile range, the modal bin is located, and a Gaussian is fit
+    in the neighbourhood of that bin to refine the estimates.  Multiple
+    fallback strategies are applied when the primary fit fails.
+
+    Parameters
+    ----------
+    par_array
+        1-D array of parameter values.
+
+    Returns
+    -------
+    mean : float
+        Estimated mode (peak position) of the distribution.
+    std : float
+        Estimated standard deviation corresponding to the FWHM of the peak.
+    """
     idxs = (par_array > np.nanpercentile(par_array, 1)) & (
         par_array < np.nanpercentile(par_array, 99)
     )
@@ -182,6 +202,30 @@ def get_mode_stdev(par_array):
 
 
 def fit_distributions(x_lo, x_hi, norm_par_array, display=0):
+    """
+    Fit an exponentially modified Gaussian (exGauss) and a pure Gaussian to
+    a parameter distribution and return the better-fitting result.
+
+    The fit is performed unbinned over the range ``[x_lo, x_hi]``.  A
+    goodness-of-fit comparison is used to choose between the two models; if
+    neither converges the function falls back to histogram-based estimates.
+
+    Parameters
+    ----------
+    x_lo
+        Lower bound of the fitting range.
+    x_hi
+        Upper bound of the fitting range.
+    norm_par_array
+        1-D array of (typically normalised) parameter values.
+    display
+        Verbosity / plotting level.  Values > 0 trigger diagnostic plots.
+
+    Returns
+    -------
+    pars : dict
+        Best-fit parameter dictionary for the winning model.
+    """
     peak_par_array = norm_par_array[(norm_par_array > x_lo) & (norm_par_array < x_hi)]
 
     hist, bins, var = pgh.get_hist(peak_par_array, dx=0.1, range=(x_lo, x_hi))
@@ -535,12 +579,10 @@ def generate_cuts(
                 up_val = np.nanpercentile(all_par_array, 95)
                 if upper is not None:
                     plt.axvline(upper)
-                    if up_val < upper:
-                        up_val = upper
+                    up_val = max(up_val, upper)
                 if lower is not None:
                     plt.axvline(lower)
-                    if low_val > lower:
-                        low_val = lower
+                    low_val = min(low_val, lower)
 
                 plt.hist(
                     all_par_array,
@@ -558,8 +600,7 @@ def generate_cuts(
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
-    else:
-        return output_dict
+    return output_dict
 
 
 def get_cut_indexes(data, cut_parameters):
@@ -779,20 +820,19 @@ def generate_cut_classifiers(
                         else:
                             cut_right = None
 
-                else:
-                    if isinstance(percentile, (int, float)):
-                        cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
-                        cut_right = np.nanpercentile(norm_par_array, percentile)
+                elif isinstance(percentile, (int, float)):
+                    cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
+                    cut_right = np.nanpercentile(norm_par_array, percentile)
 
-                    elif isinstance(percentile, dict):
-                        if "low_side" in percentile:
-                            cut_left = np.nanpercentile(norm_par_array, percentile)
-                        else:
-                            cut_left = None
-                        if "high_side" in percentile:
-                            cut_right = np.nanpercentile(norm_par_array, percentile)
-                        else:
-                            cut_right = None
+                elif isinstance(percentile, dict):
+                    if "low_side" in percentile:
+                        cut_left = np.nanpercentile(norm_par_array, percentile)
+                    else:
+                        cut_left = None
+                    if "high_side" in percentile:
+                        cut_right = np.nanpercentile(norm_par_array, percentile)
+                    else:
+                        cut_right = None
 
             if default is not None:
                 value = default["value"]
@@ -812,18 +852,14 @@ def generate_cut_classifiers(
 
                 if default_mode == "higher_limit":
                     if cut_left is not None:
-                        if cut_left < default_cut_left:
-                            cut_left = default_cut_left
+                        cut_left = max(cut_left, default_cut_left)
                     if cut_right is not None:
-                        if cut_right > default_cut_right:
-                            cut_right = default_cut_right
+                        cut_right = min(cut_right, default_cut_right)
                 elif default_mode == "lower_limit":
                     if cut_left is not None:
-                        if cut_left > default_cut_left:
-                            cut_left = default_cut_left
+                        cut_left = min(cut_left, default_cut_left)
                     if cut_right is not None:
-                        if cut_right < default_cut_right:
-                            cut_right = default_cut_right
+                        cut_right = max(cut_right, default_cut_right)
                 else:
                     raise ValueError("unknown mode")
 
@@ -881,8 +917,7 @@ def generate_cut_classifiers(
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
-    else:
-        return output_dict
+    return output_dict
 
 
 def find_pulser_properties(df, energy="daqenergy"):
@@ -968,27 +1003,54 @@ def find_pulser_properties(df, energy="daqenergy"):
             super_max = super_max[super_max > 20]
             if len(maxs) < 2:
                 continue
-            else:
-                max_locs = np.array([0.0])
-                max_locs = np.append(max_locs, bcs[np.array(maxs)])
-                if (
-                    len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0]) > 1
-                    or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
-                    or len(super_max) > 0
-                ):
-                    pulser_e = e
-                    period = stats.mode(tsl).mode[0]
-                    if period > 0.1:
-                        out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
+            max_locs = np.array([0.0])
+            max_locs = np.append(max_locs, bcs[np.array(maxs)])
+            if (
+                len(np.where(np.abs(np.diff(np.diff(max_locs))) <= 0.001)[0]) > 1
+                or (np.abs(np.diff(np.diff(max_locs))) <= 0.001).all()
+                or len(super_max) > 0
+            ):
+                pulser_e = e
+                period = stats.mode(tsl).mode[0]
+                if period > 0.1:
+                    out_pulsers.append((pulser_e, peak_e_err[i], period, energy))
 
-                else:
-                    continue
+            else:
+                continue
         except Exception:
             continue
     return out_pulsers
 
 
 def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
+    """
+    Identify pulser event indices from a TCM (Time Coincidence Map) file.
+
+    Reads the hardware TCM table and returns the indices of events in which
+    the specified channel appears and the total multiplicity exceeds the
+    given threshold — a signature typical of pulser events that fire multiple
+    channels simultaneously.
+
+    Parameters
+    ----------
+    tcm_file
+        Path to a single TCM LH5 file, or a list of such file paths.  When a
+        list is supplied the results are concatenated.
+    channel
+        Channel identifier.  Accepts an integer or a string with an optional
+        ``"ch"`` prefix (e.g. ``"ch34"`` or ``"34"``).
+    multiplicity_threshold
+        Minimum event multiplicity required for an event to be labelled as a
+        pulser.
+
+    Returns
+    -------
+    ids : numpy.ndarray
+        Array of integer indices of pulser events within the channel's event
+        list.
+    mask : numpy.ndarray of bool
+        Boolean mask of the same length as the channel event list.
+    """
     if isinstance(channel, str):
         if channel[:2] == "ch":
             chan = int(channel[2:])
@@ -1013,6 +1075,36 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
 
 
 def tag_pulsers(df, chan_info, window=0.01):
+    """
+    Tag pulser events in a DataFrame using energy and periodicity cuts.
+
+    For each channel descriptor in *chan_info*, events are selected by a
+    narrow energy window around the pulser peak energy.  A linear fit to the
+    pulse timestamps is then used to determine the precise period and phase of
+    the pulser train; events that fall within *window* seconds of an expected
+    pulse are labelled as pulsers via an ``isPulser`` column.
+
+    Parameters
+    ----------
+    df
+        DataFrame containing at minimum a ``timestamp`` column and the energy
+        column(s) referenced in *chan_info*.
+    chan_info
+        A single tuple ``(pulser_energy, peak_e_err, period, energy_name)``
+        or a list of such tuples, one per channel.  *pulser_energy* and
+        *peak_e_err* define the energy selection window; *period* is the
+        approximate repetition period in seconds; *energy_name* is the column
+        in *df* to use.
+    window
+        Half-width (seconds) of the time residual window around each expected
+        pulse used to define the period cut.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The input DataFrame with an added (or updated) ``isPulser`` column
+        set to 1 for pulser events and 0 for physics events.
+    """
     df["isPulser"] = 0
 
     if isinstance(chan_info, tuple):

@@ -64,7 +64,7 @@ def fix_all_but_nevents(func):
     else:
         log.error(f"get_hpge_E_fixed not implemented for {func}")
         return None, None
-    mask = ~np.in1d(func.required_args(), fixed)
+    mask = ~np.isin(func.required_args(), fixed)
     return fixed, mask
 
 
@@ -187,7 +187,6 @@ def update_guess(func, parguess, energies):
     Updates guess for the number of signal and background events
     """
     if func == gauss_on_step or func == hpge_peak:
-
         total_events = len(energies)
         parguess["n_sig"] = len(
             energies[
@@ -210,9 +209,8 @@ def update_guess(func, parguess, energies):
         parguess["n_bkg"] = total_events - parguess["n_sig"]
         return parguess
 
-    else:
-        log.error(f"update_guess not implemented for {func}")
-        return parguess
+    log.error(f"update_guess not implemented for {func}")
+    return parguess
 
 
 def get_survival_fraction(
@@ -290,13 +288,12 @@ def get_survival_fraction(
     nan_idxs = np.isnan(cut_param)
     if high_cut is not None:
         idxs = (cut_param > cut_val) & (cut_param < high_cut) & data_mask
+    elif mode == "greater":
+        idxs = (cut_param > cut_val) & data_mask
+    elif mode == "less":
+        idxs = (cut_param < cut_val) & data_mask
     else:
-        if mode == "greater":
-            idxs = (cut_param > cut_val) & data_mask
-        elif mode == "less":
-            idxs = (cut_param < cut_val) & data_mask
-        else:
-            raise ValueError("mode not recognised")
+        raise ValueError("mode not recognised")
 
     if pars is None:
         (pars, errs, cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
@@ -479,9 +476,7 @@ def get_sf_sweep(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
             )
         except BaseException as e:
-            if e == KeyboardInterrupt:
-                raise (e)
-            elif debug_mode:
+            if e == KeyboardInterrupt or debug_mode:
                 raise (e)
     out_df.set_index("cut_val", inplace=True)
     if final_cut_value is not None:
@@ -542,13 +537,12 @@ def compton_sf(
 
     if high_cut_val is not None:
         mask = (cut_param > low_cut_val) & (cut_param < high_cut_val) & data_mask
+    elif mode == "greater":
+        mask = (cut_param > low_cut_val) & data_mask
+    elif mode == "less":
+        mask = (cut_param < low_cut_val) & data_mask
     else:
-        if mode == "greater":
-            mask = (cut_param > low_cut_val) & data_mask
-        elif mode == "less":
-            mask = (cut_param < low_cut_val) & data_mask
-        else:
-            raise ValueError("mode not recognised")
+        raise ValueError("mode not recognised")
 
     sf = len(cut_param[mask]) / len(cut_param)
     err = 100 * np.sqrt((sf * (1 - sf)) / len(cut_param))
