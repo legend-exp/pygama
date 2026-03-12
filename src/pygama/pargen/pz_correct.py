@@ -330,14 +330,28 @@ class PZCorrect:
         self, tb_data: lgdo.Table, slope_param="tail_slope", display=0
     ):
         """
-        Finds the decay constant from the modal value of the tail slope after cuts
-        and saves it to the specified json. Updates self.output_dict with tau value
+        Determine the single pole-zero decay constant from the tail slope.
+
+        Runs the DSP chain on *tb_data*, extracts the *slope_param* column,
+        estimates the mode and standard deviation of the slope distribution,
+        and converts the modal value to a time constant τ = −1/mode.  The
+        result is stored in :attr:`output_dict` under the ``"pz"`` key.
 
         Parameters
         ----------
-        - slopes: numpy array of tail slopes
-        - wfs: WaveformTable object containing waveform data
+        tb_data
+            LH5 table containing the raw waveforms and any parameters
+            needed by :attr:`dsp_config`.
+        slope_param
+            Name of the tail-slope output column produced by the DSP chain.
+        display
+            If > 0, return a plot dictionary; otherwise return ``None``.
 
+        Returns
+        -------
+        out_plot_dict
+            Dictionary of diagnostic figures (empty if *display* > 0), or
+            ``None`` when *display* ≤ 0.
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config)
         slopes = tb_out[slope_param].nda

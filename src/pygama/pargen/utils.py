@@ -88,23 +88,42 @@ def load_data(
     return_selection_mask=False,
 ) -> pd.DataFrame | tuple(pd.DataFrame, np.array):
     """
-    Loads parameters from data files. Applies calibration to cal_energy_param
-    and uses this to apply a lower energy threshold.
+    Load parameters from LH5 files and apply calibration expressions.
 
+    Reads *params* from *files*, evaluates all expressions in *cal_dict*
+    to produce calibrated columns, and optionally applies a lower energy
+    threshold.  When *files* is a dict keyed by run timestamp, the
+    function recurses over each timestamp and concatenates the results.
+
+    Parameters
+    ----------
     files
-        file or list of files or dict pointing from timestamps to lists of files
+        A single file path, a list of file paths, or a dict mapping run
+        timestamps to lists of file paths.
     lh5_path
-        path to table in files
+        Path to the LH5 table within each file.
     cal_dict
-        dictionary with operations used to apply calibration constants
+        Calibration expressions in hit-dict format:
+        ``{outname: {"expression": ..., "parameters": {...}}}``.  When
+        *files* is a timestamp dict, this may also be keyed by timestamp.
     params
-        list of parameters to load from file
+        Set of output column names to include in the returned DataFrame.
     cal_energy_param
-        name of uncalibrated energy parameter
+        Name of the calibrated energy column used to apply the threshold.
     threshold
-        lower energy threshold for events to load
-    return_selection_map
-        if True, return selection mask for threshold along with data
+        Minimum energy value; events below this are dropped.  ``None``
+        keeps all events.
+    return_selection_mask
+        If ``True``, also return the boolean threshold mask.
+
+    Returns
+    -------
+    df
+        DataFrame containing the requested *params* (plus an optional
+        ``run_timestamp`` column when *files* is a dict).
+    masks
+        Boolean threshold mask of the same length as *df*.  Only returned
+        when *return_selection_mask* is ``True``.
     """
 
     params = set(params)

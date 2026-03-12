@@ -22,7 +22,33 @@ log = logging.getLogger(__name__)
 
 def simple_guess(energy, func, fit_range=None, bin_width=None):
     """
-    Simple guess for peak fitting
+    Generate a simple initial parameter guess for a peak fit.
+
+    Estimates the peak centroid, width, signal and background counts, and
+    (for HPGe-style models) tail parameters from the histogram of *energy*.
+    The bin width is chosen adaptively using an inter-quartile-range rule
+    when not provided explicitly.
+
+    Parameters
+    ----------
+    energy
+        1-D array of energy values.
+    func
+        Distribution function to guess for; currently supports
+        ``hpge_peak`` and ``gauss_on_step``.
+    fit_range
+        ``(low, high)`` energy window.  Defaults to the full range of
+        *energy*.
+    bin_width
+        Histogram bin width.  When ``None`` an optimal width is estimated
+        from the data.
+
+    Returns
+    -------
+    parguess
+        :class:`iminuit.Values` of initial parameter values, or the
+        NaN-filled fallback from :func:`~pygama.pargen.utils.return_nans`
+        if *func* is not supported.
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
@@ -103,8 +129,68 @@ def get_peak_fwhm_with_dt_corr(
     display=0,
 ):
     """
-    Applies the drift time correction and fits the peak returns the fwhm, fwhm/max and associated errors,
-    along with the number of signal events and the reduced chi square of the fit. Can return result in ADC or keV.
+    Apply a drift-time correction and fit a peak, returning FWHM and fit quality.
+
+    Computes ``ct_energy = energy + alpha * dt * energy``, then performs an
+    unbinned staged fit of *func* to the corrected spectrum inside a window
+    around the peak.  Bootstrap resampling is used to estimate the
+    uncertainty on the FWHM.  All return values are ``np.nan`` / ``None``
+    when the fit fails.
+
+    Parameters
+    ----------
+    energies
+        1-D array of raw (uncorrected) energy values.
+    alpha
+        Charge-trapping correction coefficient.
+    dt
+        1-D array of drift-time values, same length as *energies*.
+    func
+        Peak-shape distribution to fit.
+    peak
+        Known peak energy in keV (used for ADC-to-keV conversion).
+    kev_width
+        ``(low_side, high_side)`` half-widths in keV that define the fit
+        window relative to the peak centroid.
+    guess
+        Optional initial parameter guess; forwarded to
+        :func:`~pygama.pargen.energy_cal.unbinned_staged_energy_fit`.
+    kev
+        If ``True``, convert the returned FWHM from ADC to keV.
+    frac_max
+        Fractional height at which to evaluate the peak width
+        (default 0.5 gives the FWHM).
+    bin_width
+        Histogram bin width in ADC counts.
+    allow_tail_drop
+        Passed through to the staged fit; allows the tail fraction to
+        drop to zero.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
+
+    Returns
+    -------
+    fwhm
+        Full-width at *frac_max* of the maximum in keV (or ADC if
+        *kev* is ``False``).
+    fwhm_o_max
+        Ratio of FWHM to peak maximum (shape quality metric).
+    fwhm_err
+        Bootstrap uncertainty on *fwhm*.
+    fwhm_o_max_err
+        Bootstrap uncertainty on *fwhm_o_max*.
+    chisqr
+        ``(chi2, ndof)`` reduced chi-squared tuple from the staged fit.
+    n_sig
+        Fitted number of signal events.
+    n_sig_err
+        Uncertainty on *n_sig*.
+    mu
+        Fitted peak centroid in ADC.
+    mu_err
+        Uncertainty on *mu*.
+    energy_pars
+        Full best-fit parameter values from the staged fit.
     """
 
     correction = np.multiply(
@@ -234,8 +320,43 @@ def fom_fwhm_with_alpha_fit(
     tb_in, kwarg_dict, ctc_parameter, nsteps=11, idxs=None, frac_max=0.2, display=0
 ):
     """
-    FOM for sweeping over ctc values to find the best value, returns the best found fwhm with its error,
-    the corresponding alpha value and the number of events in the fitted peak, also the reduced chisquare of the
+    Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
+
+    Scans *nsteps* values of the charge-trapping coefficient alpha between
+    0 and 3.5×10⁻⁶, fitting the peak at each step via
+    :func:`get_peak_fwhm_with_dt_corr`.  A degree-4 polynomial is fit to
+    the valid FWHM/max-ratio values to locate the optimal alpha, and the
+    peak is re-fit at that alpha to obtain the final FWHM in keV.  An early
+    termination heuristic stops the sweep when the FWHM curve is clearly
+    rising.
+
+    Parameters
+    ----------
+    tb_in
+        LH5 table containing the energy and drift-time columns.
+    kwarg_dict
+        Per-peak fitting options with at minimum the keys ``parameter``
+        (energy column name), ``func`` (peak shape), ``peak`` (keV),
+        and ``kev_width`` (fit window half-widths).  Optional key
+        ``bin_width`` sets the histogram bin width (default 1 ADC).
+    ctc_parameter
+        Name of the charge-trapping correction parameter column in *tb_in*.
+    nsteps
+        Number of alpha values to scan.
+    idxs
+        Optional boolean or integer index array to select a subset of
+        events.
+    frac_max
+        Fractional height used to define the final FWHM.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
+
+    Returns
+    -------
+    out_dict
+        Dictionary with keys ``fwhm``, ``fwhm_err``, ``alpha``,
+        ``alpha_err``, ``chisquare``, ``n_sig``, and ``n_sig_err``.
+        All values are ``np.nan`` (and ``alpha`` is 0) on failure.
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
@@ -415,7 +536,45 @@ def fom_fwhm_no_alpha_sweep(
     display=0,
 ):
     """
-    FOM with no ctc sweep, used for optimising ftp.
+    Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
+
+    Applies a single drift-time correction with the given *alpha* and fits
+    the peak, returning a comprehensive set of fit quality metrics.  Used
+    when the optimal alpha is already known (e.g. from a prior
+    :func:`fom_fwhm_with_alpha_fit` call) or when no charge-trapping
+    correction is desired.
+
+    Parameters
+    ----------
+    tb_in
+        LH5 table containing the energy and optional drift-time columns.
+    kwarg_dict
+        Per-peak fitting options with at minimum the keys ``parameter``
+        (energy column name), ``func``, ``peak``, and ``kev_width``.
+        Optional keys: ``alpha`` (overrides the *alpha* argument),
+        ``ctc_param`` (drift-time column name).
+    ctc_param
+        Name of the charge-trapping correction column; overridden by
+        ``kwarg_dict["ctc_param"]`` if present.
+    alpha
+        Charge-trapping correction coefficient; overridden by
+        ``kwarg_dict["alpha"]`` if present.
+    idxs
+        Optional index array to select a subset of events.
+    frac_max
+        Fractional height used to define the FWHM.
+    kev
+        If ``True``, return the FWHM in keV rather than ADC units.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
+
+    Returns
+    -------
+    out_dict
+        Dictionary with keys ``fwhm``, ``fwhm_o_max``, ``fwhm_err``,
+        ``fwhm_o_max_err``, ``chisquare``, ``n_sig``, ``n_sig_err``,
+        ``mu``, ``mu_err``, and ``fit_pars``.  All values are ``np.nan``
+        if the input energies contain NaNs.
     """
     parameter = kwarg_dict["parameter"]
     func = kwarg_dict["func"]
