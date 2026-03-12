@@ -83,7 +83,7 @@ def get_keys(in_data, cut_dict):
     return np.unique(out_params).tolist()
 
 
-def get_mode_stdev(par_array):
+def get_mode_stdev(par_array) -> tuple:
     """
     Estimate the mode and standard deviation of a parameter distribution.
 
@@ -99,9 +99,9 @@ def get_mode_stdev(par_array):
 
     Returns
     -------
-    mean : float
+    mean
         Estimated mode (peak position) of the distribution.
-    std : float
+    std
         Estimated standard deviation corresponding to the FWHM of the peak.
     """
     idxs = (par_array > np.nanpercentile(par_array, 1)) & (
@@ -201,14 +201,14 @@ def get_mode_stdev(par_array):
     return mean, std
 
 
-def fit_distributions(x_lo, x_hi, norm_par_array, display=0):
+def fit_distributions(x_lo, x_hi, norm_par_array, display=0) -> tuple:
     """
-    Fit an exponentially modified Gaussian (exGauss) and a pure Gaussian to
-    a parameter distribution and return the better-fitting result.
+    Fit several distribution models to a parameter distribution and return the
+    best-fitting one.
 
-    The fit is performed unbinned over the range ``[x_lo, x_hi]``.  A
-    goodness-of-fit comparison is used to choose between the two models; if
-    neither converges the function falls back to histogram-based estimates.
+    Candidates (Gaussian, exGauss, skewed Gaussian, Gaussian-on-exGauss, double
+    exGauss) are fitted unbinned over the range ``[x_lo, x_hi]``.  The winner
+    is chosen by p-value (or lowest chi-squared when all p-values are zero).
 
     Parameters
     ----------
@@ -223,8 +223,10 @@ def fit_distributions(x_lo, x_hi, norm_par_array, display=0):
 
     Returns
     -------
-    pars : dict
-        Best-fit parameter dictionary for the winning model.
+    func
+        Best-fitting distribution callable.
+    pars
+        Parameter array for the winning model.
     """
     peak_par_array = norm_par_array[(norm_par_array > x_lo) & (norm_par_array < x_hi)]
 
@@ -1022,7 +1024,7 @@ def find_pulser_properties(df, energy="daqenergy"):
     return out_pulsers
 
 
-def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
+def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold) -> tuple:
     """
     Identify pulser event indices from a TCM (Time Coincidence Map) file.
 
@@ -1045,10 +1047,10 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
 
     Returns
     -------
-    ids : numpy.ndarray
+    ids
         Array of integer indices of pulser events within the channel's event
         list.
-    mask : numpy.ndarray of bool
+    mask
         Boolean mask of the same length as the channel event list.
     """
     if isinstance(channel, str):
@@ -1074,7 +1076,7 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold):
     return ids, mask
 
 
-def tag_pulsers(df, chan_info, window=0.01):
+def tag_pulsers(df, chan_info, window=0.01) -> pd.DataFrame:
     """
     Tag pulser events in a DataFrame using energy and periodicity cuts.
 
@@ -1101,7 +1103,7 @@ def tag_pulsers(df, chan_info, window=0.01):
 
     Returns
     -------
-    pandas.DataFrame
+    df
         The input DataFrame with an added (or updated) ``isPulser`` column
         set to 1 for pulser events and 0 for physics events.
     """

@@ -489,7 +489,7 @@ def fom_fwhm_no_alpha_sweep(
     }
 
 
-def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
+def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0) -> dict:
     """
     Figure-of-merit wrapper: FWHM with alpha (charge-trapping correction) sweep
     for a single calibration peak.
@@ -518,7 +518,7 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
 
     Returns
     -------
-    dict
+    out_dict
         Result dictionary from :func:`fom_fwhm_with_alpha_fit` containing
         at minimum ``fwhm``, ``fwhm_err``, ``alpha``, ``n_sig``, and
         ``n_sig_err``.
@@ -540,7 +540,7 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0):
 
 def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     data, kwarg_dict, display=0
-):
+) -> dict | tuple:
     """
     Figure-of-merit: energy resolution interpolated to a target energy using
     a multi-peak sweep with a shared alpha from the highest-energy peak.
@@ -574,7 +574,7 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
 
     Returns
     -------
-    dict
+    results
         Result dictionary containing interpolated FWHM value(s), e.g.
         ``{"Qbb_fwhm": ..., "Qbb_fwhm_err": ..., "alpha": ...,
         "peaks": ..., "fwhms": ..., "fwhm_errs": ...,

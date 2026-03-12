@@ -399,9 +399,7 @@ def dplms_ge_dict(
     return out_dict
 
 
-def is_valid_centroid(
-    centroid: np.array, lim: int, size: int, full_size: int
-) -> list[bool]:
+def is_valid_centroid(centroid: np.array, lim: int, size: int, full_size: int) -> tuple:
     """
     Select waveforms whose centroid lies within a valid alignment window.
 
@@ -419,11 +417,11 @@ def is_valid_centroid(
 
     Returns
     -------
-    idxs : numpy.ndarray of bool
+    idxs
         Boolean mask that is True for valid events.
-    llim : float
+    llim
         Lower centroid boundary used (samples).
-    hlim : float
+    hlim
         Upper centroid boundary used (samples).
     """
     llim = size / 2 - lim
@@ -434,7 +432,7 @@ def is_valid_centroid(
 
 def is_not_pile_up(
     peak_pos: np.array, peak_pos_neg: np.array, thr: int, lim: int, size: int
-) -> list[bool]:
+) -> tuple:
     """
     Reject pile-up events based on the presence of secondary peaks.
 
@@ -459,11 +457,11 @@ def is_not_pile_up(
 
     Returns
     -------
-    idxs : list of bool
+    idxs
         Per-event mask; True means the event is pile-up free.
-    llow : float
+    llow
         Lower boundary of the accepted peak band (samples).
-    lupp : float
+    lupp
         Upper boundary of the accepted peak band (samples).
     """
     bin_edges = np.linspace(size / 2 - lim, size / 2 + lim, 2 * lim)
@@ -491,7 +489,7 @@ def is_not_pile_up(
     return idxs, llow, lupp
 
 
-def is_valid_risetime(risetime: np.array, llim: int, perc: float):
+def is_valid_risetime(risetime: np.array, llim: int, perc: float) -> tuple:
     """
     Select waveforms within an acceptable risetime range.
 
@@ -506,11 +504,11 @@ def is_valid_risetime(risetime: np.array, llim: int, perc: float):
 
     Returns
     -------
-    idxs : numpy.ndarray of bool
+    idxs
         Boolean mask; True for events within the accepted risetime range.
-    llim : int
+    llim
         Lower risetime boundary used (samples).
-    hlim : float
+    hlim
         Upper risetime boundary used (samples, computed from *perc*).
     """
     hlim = np.percentile(risetime[~np.isnan(risetime)], perc)
@@ -518,7 +516,7 @@ def is_valid_risetime(risetime: np.array, llim: int, perc: float):
     return idxs, llim, hlim
 
 
-def signal_selection(dsp_cal, dplms_dict, coeff_values):
+def signal_selection(dsp_cal, dplms_dict, coeff_values) -> dict:
     """
     Apply centroid, pile-up, and risetime cuts to select clean calibration signals.
 
@@ -537,7 +535,7 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
 
     Returns
     -------
-    dict
+    sel_dict
         Selection dictionary with keys:
 
         * ``idxs`` – combined boolean mask of passing events
@@ -587,7 +585,7 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
     return sel_dict
 
 
-def noise_matrix(bls: np.array, length: int) -> np.array:
+def noise_matrix(bls: np.array, length: int) -> np.ndarray:
     """
     Compute the noise covariance matrix from baseline waveforms.
 
@@ -605,7 +603,7 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
 
     Returns
     -------
-    numpy.ndarray
+    nmat
         Noise covariance matrix of shape ``(length, length)``.
     """
     nev, size = bls.shape
@@ -643,7 +641,7 @@ def noise_matrix_corr(
 
     Returns
     -------
-    numpy.ndarray
+    nmat
         Symmetrised block noise covariance matrix of shape
         ``(n_channels * length, n_channels * length)``.
     """
@@ -687,7 +685,7 @@ def noise_matrix_corr(
 
 def signal_matrices(
     wfs: np.array, length: int, decay_const: float, ff: int = 2
-) -> np.array:
+) -> tuple:
     """
     Compute the signal-shape matrices needed for DPLMS filter synthesis.
 
@@ -712,13 +710,13 @@ def signal_matrices(
 
     Returns
     -------
-    ref : numpy.ndarray
+    ref
         Mean reference pulse of length *n_samples*.
-    rmat : numpy.ndarray
+    rmat
         Reference signal matrix, shape ``(length, length)``.
-    pmat : numpy.ndarray
+    pmat
         Pile-up penalty matrix, shape ``(length, length)``.
-    fmat : numpy.ndarray
+    fmat
         Flat-top derivative matrix, shape ``(length, length)``.
     """
     nev, size = wfs.shape
@@ -762,7 +760,7 @@ def filter_synthesis(
     length: int,
     size: int,
     flip: bool = True,
-) -> np.array:
+) -> tuple:
     """
     Synthesise a DPLMS optimal filter for a single channel.
 
@@ -796,11 +794,11 @@ def filter_synthesis(
 
     Returns
     -------
-    x : numpy.ndarray
+    x
         Filter coefficients of length *length*.
-    y : numpy.ndarray
+    y
         Response of the filter convolved with the reference pulse.
-    refy : numpy.ndarray
+    refy
         Reference pulse window aligned to *y* for comparison.
     """
     # Reference slice
@@ -836,7 +834,7 @@ def filter_synthesis_corr(
     length: int,
     size: int,
     flip: bool = True,
-) -> np.array:
+) -> tuple:
     """
     Synthesise a DPLMS optimal filter exploiting cross-channel noise correlations.
 
@@ -872,11 +870,11 @@ def filter_synthesis_corr(
 
     Returns
     -------
-    x : numpy.ndarray
+    x
         Primary-channel filter coefficients of length *length*.
-    y : numpy.ndarray
+    y
         Response of the filter convolved with the (extended) reference pulse.
-    refy : numpy.ndarray
+    refy
         Reference pulse window aligned to *y* for comparison.
     """
     # Extract number of correlated geds

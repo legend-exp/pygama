@@ -538,7 +538,7 @@ class PZCorrect:
         fontsize=8,
         n_waveforms=100,
         downsample=1,
-    ):
+    ) -> dict:
         """
         Plot a random selection of waveforms after applying the PZ correction.
 
@@ -574,7 +574,7 @@ class PZCorrect:
 
         Returns
         -------
-        dict
+        plot_dict
             Dictionary ``{"waveforms": fig}`` containing the matplotlib figure.
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
@@ -613,7 +613,7 @@ class PZCorrect:
         display=0,
         figsize=(8, 6),
         fontsize=8,
-    ):
+    ) -> dict:
         """
         Plot a histogram of waveform tail slopes before or after PZ correction.
 
@@ -640,8 +640,9 @@ class PZCorrect:
 
         Returns
         -------
-        dict
-            Dictionary ``{"slopes": fig}`` containing the matplotlib figure.
+        out_plot_dict
+            Dictionary ``{"slopes": fig}`` or ``{"corrected_slope": fig}``
+            containing the matplotlib figure.
         """
         tb_out = opt.run_one_dsp(
             tb_data,

@@ -16,7 +16,7 @@ from lgdo import lh5
 log = logging.getLogger(__name__)
 
 
-def convert_to_minuit(pars, func):
+def convert_to_minuit(pars, func) -> Minuit:
     """
     Create an :class:`iminuit.Minuit` instance from a parameter set and a PDF.
 
@@ -33,8 +33,7 @@ def convert_to_minuit(pars, func):
 
     Returns
     -------
-    iminuit.Minuit
-        Configured Minuit object ready for minimisation.
+    Configured Minuit object ready for minimisation.
     """
     try:
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
@@ -47,7 +46,7 @@ def convert_to_minuit(pars, func):
     return m
 
 
-def return_nans(input):
+def return_nans(input) -> tuple:
     """
     Return a NaN-filled result tuple with the same structure as a successful fit.
 
@@ -62,11 +61,11 @@ def return_nans(input):
 
     Returns
     -------
-    values : iminuit.Values
+    values
         Parameter values, all set to NaN.
-    errors : iminuit.Errors
+    errors
         Parameter uncertainties, all set to NaN.
-    covariance : numpy.ndarray
+    covariance
         Square covariance matrix filled with NaN.
     """
     if isinstance(input, FunctionType):

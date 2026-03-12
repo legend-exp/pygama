@@ -228,7 +228,7 @@ def noise_optimization(
     return res_dict
 
 
-def calculate_spread(energies, percentile_low, percentile_high, n_samples):
+def calculate_spread(energies, percentile_low, percentile_high, n_samples) -> dict:
     """
     Estimate the inter-percentile spread of an energy distribution via bootstrapping.
 
@@ -250,7 +250,7 @@ def calculate_spread(energies, percentile_low, percentile_high, n_samples):
 
     Returns
     -------
-    dict
+    results
         Dictionary with keys:
 
         * ``fom`` – mean inter-percentile spread across bootstrap samples.
@@ -273,7 +273,7 @@ def calculate_spread(energies, percentile_low, percentile_high, n_samples):
     return results
 
 
-def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
+def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20) -> dict:
     """
     Fit a Gaussian-on-uniform model to an ENC (noise) peak and return the FWHM.
 
@@ -296,7 +296,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
 
     Returns
     -------
-    dict
+    results
         Result dictionary with keys:
 
         * ``pars`` – fit parameter array.
@@ -374,7 +374,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20):
     return results
 
 
-def simple_gaussian_guess(hist, bins, func, toll=0.2):
+def simple_gaussian_guess(hist, bins, func, toll=0.2) -> tuple:
     """
     Generate an initial parameter guess and bounds for a Gaussian-on-uniform fit.
 
@@ -398,9 +398,9 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2):
 
     Returns
     -------
-    guess : dict
+    guess
         Initial parameter values: ``{"mu": ..., "sigma": ..., "n_sig": ...}``.
-    bounds : dict
+    bounds
         Allowed parameter ranges: ``{"mu": (lo, hi), "sigma": (lo, hi),
         "n_sig": (lo, hi)}``.
     """
