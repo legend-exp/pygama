@@ -13,10 +13,10 @@ from . import xtalk
 
 
 def apply_recovery_cut(
-    datainfo: utils.DataInfo,
-    tcm: utils.TCMData,
-    table_names: Sequence[str],
-    channel_mapping: dict,
+    datainfo: utils.DataInfo,  # noqa: ARG001
+    tcm: utils.TCMData,  # noqa: ARG001
+    table_names: Sequence[str],  # noqa: ARG001
+    channel_mapping: dict,  # noqa: ARG001
     *,
     timestamps: types.Array,
     flag: types.Array,
@@ -43,13 +43,13 @@ def apply_xtalk_correction(
     datainfo: utils.DataInfo,
     tcm: utils.TCMData,
     table_names: Sequence[str],
-    channel_mapping: dict,
+    channel_mapping: dict,  # noqa: ARG001
     *,
     return_mode: str,
     uncal_energy_expr: str,
     cal_energy_expr: str,
     multiplicity_expr: str,
-    xtalk_threshold: float = None,
+    xtalk_threshold: float | None = None,
     xtalk_matrix_filename: str = "",
     xtalk_rawid_obj: str = "xtc/rawid_index",
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
@@ -117,10 +117,10 @@ def apply_xtalk_correction(
 
     if return_mode == "energy":
         return types.VectorOfVectors(energy_corr[multiplicity_mask])
-    elif return_mode == "tcm_index":
+    if return_mode == "tcm_index":
         return types.VectorOfVectors(tcm_index_array[multiplicity_mask])
-    else:
-        raise ValueError(f"Unknown mode: {return_mode}")
+    msg = f"Unknown mode: {return_mode}"
+    raise ValueError(msg)
 
 
 def apply_xtalk_correction_and_calibrate(
@@ -135,7 +135,7 @@ def apply_xtalk_correction_and_calibrate(
     cal_par_files: str | Sequence[str],
     multiplicity_expr: str,
     xtalk_matrix_filename: str,
-    xtalk_threshold: float = None,
+    xtalk_threshold: float | None = None,
     xtalk_rawid_obj: str = "xtc/rawid_index",
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
@@ -225,7 +225,7 @@ def apply_xtalk_correction_and_calibrate(
 
     if return_mode == "energy":
         return types.VectorOfVectors(calibrated_corr[multiplicity_mask])
-    elif return_mode == "tcm_index":
+    if return_mode == "tcm_index":
         return types.VectorOfVectors(tcm_index_array[multiplicity_mask])
-    else:
-        raise ValueError(f"Unknown mode: {return_mode}")
+    msg = f"Unknown mode: {return_mode}"
+    raise ValueError(msg)

@@ -139,9 +139,8 @@ def build_tcm(
     if buffer_len is None:
         ntables = 0
         for filename, patterns in input_tables:
-            if isinstance(patterns, str):
-                patterns = [patterns]
-            for pattern in patterns:
+            patterns_list = [patterns] if isinstance(patterns, str) else patterns
+            for pattern in patterns_list:
                 ntables += len(lh5.ls(filename, lh5_group=pattern))
 
         n_fields = (
@@ -156,12 +155,11 @@ def build_tcm(
 
     # loop over files
     for filename, patterns in input_tables:
-        if isinstance(patterns, str):
-            patterns = [patterns]
+        patterns_list = [patterns] if isinstance(patterns, str) else patterns
 
         # make a list of tables in the file
         tables_here = []
-        for pattern in patterns:
+        for pattern in patterns_list:
             for table in lh5.ls(filename, lh5_group=pattern):
                 tables_here.append(table)
                 all_tables.append(table)
@@ -174,9 +172,8 @@ def build_tcm(
                 if isinstance(hash_func, str):
                     table_key = int(re.search(hash_func, table).group())
                 else:
-                    raise NotImplementedError(
-                        f"hash_func of type {type(hash_func).__name__}"
-                    )
+                    msg = f"hash_func of type {type(hash_func).__name__}"
+                    raise NotImplementedError(msg)
             else:
                 table_key = table_idx
 
@@ -198,7 +195,7 @@ def build_tcm(
 
     coin_windows = [
         ptcm.coin_groups(n, w, r)
-        for n, w, r in zip(coin_cols, coin_windows, window_refs)
+        for n, w, r in zip(coin_cols, coin_windows, window_refs, strict=False)
     ]
 
     tcm_gen = ptcm.generate_tcm_cols(
@@ -206,9 +203,8 @@ def build_tcm(
     )
     tcm = []
     # clear existing output files
-    if out_file is not None and wo_mode == "of":
-        if Path(out_file).exists():
-            Path(out_file).unlink()
+    if out_file is not None and wo_mode == "of" and Path(out_file).exists():
+        Path(out_file).unlink()
 
     wrote_first = False
     while True:
@@ -231,5 +227,5 @@ def build_tcm(
             break
 
     if out_file is None:
-        out_tbl = _concat_tables(tcm)
-        return out_tbl
+        return _concat_tables(tcm)
+    return None

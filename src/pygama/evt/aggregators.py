@@ -25,7 +25,7 @@ def evaluate_to_first_or_last(
     pars_dict=None,
     default_value=np.nan,
     is_first: bool = True,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.Array:
     """Aggregates across channels by returning the expression of the channel
     with value of `sorter`.
@@ -109,7 +109,8 @@ def evaluate_to_first_or_last(
             )
 
             if sort_field.ndim > 1:
-                raise ValueError(f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array")
+                msg = f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array"
+                raise ValueError(msg)
 
             ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
 
@@ -146,7 +147,7 @@ def evaluate_to_scalar(
     n_rows,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.Array:
     """Aggregates by summation across channels.
 
@@ -246,7 +247,7 @@ def evaluate_at_channel(
     ch_comp,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.Array:
     """Aggregates by evaluating the expression at a given channel.
 
@@ -318,7 +319,7 @@ def evaluate_at_channel_vov(
     channels_skip,
     pars_dict=None,
     default_value=np.nan,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.VectorOfVectors:
     """Same as :func:`evaluate_at_channel` but evaluates expression at non
     flat channels :class:`.VectorOfVectors`.
@@ -402,7 +403,7 @@ def evaluate_to_aoesa(
     pars_dict=None,
     default_value=np.nan,
     missing_value=np.nan,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.ArrayOfEqualSizedArrays:
     """Aggregates by returning an :class:`.ArrayOfEqualSizedArrays` of evaluated
     expressions of channels that fulfill a query expression.
@@ -502,7 +503,7 @@ def evaluate_to_vector(
     pars_dict=None,
     default_value=np.nan,
     sorter=None,
-    channel_mapping=None,
+    channel_mapping=None,  # noqa: ARG001
 ) -> types.VectorOfVectors:
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
@@ -565,15 +566,14 @@ def evaluate_to_vector(
             missing_value=np.nan,
         )
 
-        if "ascend_by" == md:
+        if md == "ascend_by":
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
 
-        elif "descend_by" == md:
+        elif md == "descend_by":
             out = out[np.arange(len(out))[:, None], np.argsort(-s_val)]
         else:
-            raise ValueError(
-                "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
-            )
+            msg = "sorter values can only have 'ascend_by' or 'descend_by' prefixes"
+            raise ValueError(msg)
 
     return types.VectorOfVectors(
         ak.values_astype(ak.drop_none(ak.nan_to_none(ak.Array(out))), dtype)
