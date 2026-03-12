@@ -30,8 +30,7 @@ def run_one_dsp(
     verbosity: int = 0,
     fom_kwargs=None,
 ) -> Union[float, Table]:
-    """
-    Run one iteration of DSP on ``tb_data`
+    """Run one iteration of DSP on ``tb_data`, based on the DSP specified in ``dsp_config``.
 
     Optionally returns a value for optimization
 
@@ -420,6 +419,8 @@ class BayesianOptimizer:
         else:
             if sampling_rate is not None:
                 raise TypeError("Unknown type for sampling rate")
+
+            self.sampling_rate = None
 
         self.gauss_pr = GaussianProcessRegressor(kernel=kernel)
         self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
@@ -1045,6 +1046,9 @@ def run_bayesian_optimisation(
     ----
     The optimisers need to be initialised with the parameters set, and initial values added.
     """
+
+    if db_dict is None:
+        db_dict = {}
 
     if not isinstance(optimisers, list):
         optimisers = [optimisers]
