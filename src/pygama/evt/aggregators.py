@@ -60,7 +60,7 @@ def evaluate_to_first_or_last(
     if not isinstance(datainfo, utils.DataInfo):
         datainfo = utils.make_files_config(datainfo)
 
-    df = None
+    sort_df = None
 
     for ch in channels:
         table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
@@ -82,10 +82,10 @@ def evaluate_to_first_or_last(
                 pars_dict=pars_dict,
             )
 
-            if df is None:
+            if sort_df is None:
                 # define dimension of output array
                 out = utils.make_numpy_full(n_rows, default_value, res.dtype)
-                df = pd.DataFrame({"sort_field": np.zeros(len(out)), "res": out})
+                sort_df = pd.DataFrame({"sort_field": np.zeros(len(out)), "res": out})
 
             # get mask from query
             limarr = utils.get_mask_from_query(
@@ -121,18 +121,22 @@ def evaluate_to_first_or_last(
 
             if is_first:
                 if ch == channels[0]:
-                    df["sort_field"] = np.inf
+                    sort_df["sort_field"] = np.inf
                 ids = (
-                    ch_df.sort_field.to_numpy() < df.sort_field[evt_ids_ch].to_numpy()
+                    ch_df.sort_field.to_numpy()
+                    < sort_df.sort_field[evt_ids_ch].to_numpy()
                 ) & (limarr)
             else:
                 ids = (
-                    ch_df.sort_field.to_numpy() > df.sort_field[evt_ids_ch].to_numpy()
+                    ch_df.sort_field.to_numpy()
+                    > sort_df.sort_field[evt_ids_ch].to_numpy()
                 ) & (limarr)
 
-            df.loc[evt_ids_ch[ids], list(df.columns)] = ch_df.loc[ids, list(df.columns)]
+            sort_df.loc[evt_ids_ch[ids], list(sort_df.columns)] = ch_df.loc[
+                ids, list(sort_df.columns)
+            ]
 
-    return types.Array(nda=df.res.to_numpy())
+    return types.Array(nda=sort_df.res.to_numpy())
 
 
 def evaluate_to_scalar(

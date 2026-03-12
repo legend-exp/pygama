@@ -149,7 +149,7 @@ def generate_tcm_cols(
 
     if coin_windows in (None, 0):
         coin_windows = []
-    elif not isinstance(coin_windows, (list, tuple, np.ndarray)):
+    elif not isinstance(coin_windows, list | tuple | np.ndarray):
         coin_windows = [coin_windows]
 
     tcm = None

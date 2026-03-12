@@ -510,7 +510,7 @@ def evaluate_expression(
 
     if table is not None:
         pars_dict = {
-            k: v for k, v in table.items() if isinstance(v, (Array, VectorOfVectors))
+            k: v for k, v in table.items() if isinstance(v, Array | VectorOfVectors)
         }
 
     # ...or defined through the configuration

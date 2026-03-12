@@ -346,7 +346,7 @@ def make_pulse_data_mask(
 
     # apply time windowing
     if t_loc_ns is not None and dt_range_ns is not None:
-        if not isinstance(dt_range_ns, (tuple, list)):
+        if not isinstance(dt_range_ns, tuple | list):
             msg = "dt_range_ns must be a tuple"
             raise ValueError(msg)
 
