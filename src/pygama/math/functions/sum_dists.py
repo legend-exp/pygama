@@ -4,9 +4,11 @@ A class that creates the sum of distributions, with methods for scipy computed :
 .. code-block:: python
 
     mu1, mu2, sigma, frac = range(4)
-    moyal_add = SumDists([(moyal, [mu1, sigma]), (moyal, [mu2, sigma])], [frac], "fracs") # create two moyals that share a sigma and differ by a fraction,
-    x = np.arange(-10,10)
-    pars = np.array([1, 2, 2, 0.1]) # corresponds to mu1 = 1, mu2 = 2, sigma = 2, frac=0.1
+    moyal_add = SumDists(
+        [(moyal, [mu1, sigma]), (moyal, [mu2, sigma])], [frac], "fracs"
+    )  # create two moyals that share a sigma and differ by a fraction,
+    x = np.arange(-10, 10)
+    pars = np.array([1, 2, 2, 0.1])  # corresponds to mu1 = 1, mu2 = 2, sigma = 2, frac=0.1
     moyal_add.pdf(x, *pars)
     moyal_add.draw_pdf(x, *pars)
     moyal_add.required_args()

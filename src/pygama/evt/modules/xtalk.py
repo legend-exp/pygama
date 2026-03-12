@@ -243,7 +243,6 @@ def get_xtalk_correction(
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
 ):
-
     # read lh5 files to numpy
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
     ordered_rawids = [rawid for rawid in xtalk_matrix_rawids if rawid in rawids]

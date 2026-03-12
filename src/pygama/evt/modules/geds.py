@@ -22,7 +22,6 @@ def apply_recovery_cut(
     flag: types.Array,
     time_window: float,
 ) -> types.Array:
-
     discharge_timestamps = timestamps.nda[flag.nda == 1]
     is_recovering = np.full(len(timestamps.nda), False)
     for tstamp in discharge_timestamps:
