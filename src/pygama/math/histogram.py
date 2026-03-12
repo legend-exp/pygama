@@ -541,9 +541,9 @@ def get_fwfm(
             (m, b), cov = np.polyfit(
                 bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov="unscaled"
             )
-        except np.linalg.LinAlgError:
+        except np.linalg.LinAlgError as err:
             msg = "LinAlgError in x_lo"
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from err
         x_lo = (val_f - b) / m
         # uncertainty
         dxl2 = (
@@ -566,9 +566,9 @@ def get_fwfm(
             (m, b), cov = np.polyfit(
                 bin_centers[i_0:i_n], hist[i_0:i_n], 1, w=wts, cov="unscaled"
             )
-        except np.linalg.LinAlgError:
+        except np.linalg.LinAlgError as err:
             msg = "LinAlgError in x_hi"
-            raise RuntimeError(msg)
+            raise RuntimeError(msg) from err
         x_hi = (val_f - b) / m
         if x_hi < x_lo:
             msg = "Fit slopes produced negative fwfm"
@@ -795,7 +795,7 @@ def get_i_local_extrema(data, delta):
         log.error("get_i_local_extrema: Input argument delta must be a scalar")
         return np.array(imaxes), np.array(imins)
     if delta <= 0:
-        log.error(f"get_i_local_extrema: delta ({delta}) must be positive")
+        log.error("get_i_local_extrema: delta (%s) must be positive", delta)
         return np.array(imaxes), np.array(imins)
 
     # now loop over data

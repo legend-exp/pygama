@@ -3,6 +3,7 @@ pygama utility functions.
 """
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Callable
 
@@ -38,8 +39,6 @@ def get_par_names(func: Callable) -> tuple[str, ...]:
     func
         A function whose parameters we want to return
     """
-    import inspect
-
     par = inspect.getfullargspec(func)
     return par[0][1:]
 
@@ -59,16 +58,16 @@ def get_formatted_stats(mean: float, sigma: float, ndigs: int = 2) -> str:
         The number of significant digits we want to display
     """
     if sigma == 0:
-        fmt = "%d" % ndigs
+        fmt = f"{ndigs:d}"
         fmt = "%#." + fmt + "g"
         return fmt % mean, fmt % sigma
     sig_pos = int(np.floor(np.log10(abs(sigma))))
-    sig_fmt = "%d" % ndigs
+    sig_fmt = f"{ndigs:d}"
     sig_fmt = "%#." + sig_fmt + "g"
     mean_pos = int(np.floor(np.log10(abs(mean))))
     mdigs = mean_pos - sig_pos + ndigs
     mdigs = max(mdigs, ndigs - 1)
-    mean_fmt = "%d" % mdigs
+    mean_fmt = f"{mdigs:d}"
     mean_fmt = "%#." + mean_fmt + "g"
     return mean_fmt % mean, sig_fmt % sigma
 
@@ -100,7 +99,7 @@ def print_fit_results(
         Writes the curve_fit results to the log
     """
     if title is not None:
-        log.info(f"{title}:")
+        log.info("%s:", title)
     par_names = []
     if func is None:
         for i in range(len(pars)):
@@ -109,6 +108,6 @@ def print_fit_results(
         par_names = get_par_names(func)
     for i in range(len(pars)):
         mean, sigma = get_formatted_stats(pars[i], np.sqrt(cov[i][i]))
-        log.info(f"{par_names[i]} = {mean} +/- {sigma}")
+        log.info("%s = %s +/- %s", par_names[i], mean, sigma)
     if pad:
         log.info("")

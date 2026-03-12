@@ -128,7 +128,6 @@ src = ["src"]
 force-exclude = true
 exclude = [
   "src/pygama/flow",
-  "src/pygama/math",
   "src/pygama/pargen",
   "docs",
   "tests",

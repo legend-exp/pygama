@@ -144,13 +144,14 @@ def get_parameter_names(dists: np.array, par_idxs: np.array, par_size: int) -> n
         prereq_names = np.array(dists[i].required_args())[mask]
         req_names = []
         # Check for duplicate names
-        for name in prereq_names:
-            if name in param_names:
-                if name[-1].isdigit():
-                    name = name[:-1] + f"{int(name[-1])+1}"
+        for orig_name in prereq_names:
+            new_name = orig_name
+            if orig_name in param_names:
+                if orig_name[-1].isdigit():
+                    new_name = orig_name[:-1] + f"{int(orig_name[-1])+1}"
                 else:
-                    name = name + "1"
-            req_names.append(name)
+                    new_name = orig_name + "1"
+            req_names.append(new_name)
 
         param_names[new_idxs] = req_names
         overall_par_idxs.extend(par_idxs[i])

@@ -260,7 +260,7 @@ def nb_step_scaled_cdf(
 
 class StepGen(PygamaContinuous):
 
-    def _argcheck(self, x_lo, x_hi, mu, sigma, hstep):
+    def _argcheck(self, x_lo, x_hi, _mu, _sigma, _hstep):
         return x_hi > x_lo
 
     def __init__(self, *args, **kwargs):

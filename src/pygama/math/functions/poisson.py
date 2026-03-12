@@ -74,8 +74,8 @@ def nb_poisson_cdf(x: np.ndarray, mu: int, lamb: float) -> np.ndarray:
     for i in nb.prange(x.shape[0]):
         y[i] = x[i] - mu
         z = 0
-        for j in nb.prange(1, np.floor(y[i]) + 2):
-            j -= 1
+        for jj in nb.prange(1, np.floor(y[i]) + 2):
+            j = jj - 1
             z += lamb**j / factorial(j)
         y[i] = z * np.exp(-lamb)
     return y

@@ -120,7 +120,7 @@ class PygamaContinuous(rv_continuous):
     version of rv_continuous_frozen that has direct access to pygama numbafied functions
     """
 
-    def _pdf_norm(self, x, x_lo, x_hi, *args, **kwds):
+    def _pdf_norm(self, x, x_lo, x_hi, *args, **_kwds):
         r"""
         Normalize a pdf on a subset of its support, typically over a fit-range.
 
@@ -153,7 +153,7 @@ class PygamaContinuous(rv_continuous):
             return np.full_like(x, np.inf)
         return self.get_pdf(x, *args) / norm
 
-    def _cdf_norm(self, x, x_lo, x_hi, *args, **kwds):
+    def _cdf_norm(self, x, x_lo, x_hi, *args, **_kwds):
         r"""
         Derive a cdf from a pdf that is normalized on a subset of its support, typically over a fit-range.
 

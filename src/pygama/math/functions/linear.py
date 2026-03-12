@@ -148,7 +148,7 @@ class LinearGen(PygamaContinuous):
         self.x_hi = None
         super().__init__(*args, **kwargs)
 
-    def _argcheck(self, x_lo, x_hi, m, b):
+    def _argcheck(self, _x_lo, _x_hi, _m, _b):
         return True
 
     def _pdf(self, x: np.ndarray, x_lo: float, x_hi: float, m, b) -> np.ndarray:

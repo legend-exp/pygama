@@ -321,7 +321,7 @@ def gauss_mode_width_max(
     if pars[1] < 0:
         pars[1] = -pars[1]
     if inflate_errors:
-        chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars)
+        chi2, dof = goodness_of_fit(hist, bins, var, nb_gauss_amp, pars, method=gof_method)
         if chi2 > dof:
             cov *= chi2 / dof
     return np.asarray([pars["mu"], pars["sigma"], pars["a"]]), np.asarray(cov)
