@@ -33,22 +33,27 @@ def noise_optimization(
     display: int = 0,
 ) -> dict:
     """
-    This function calculates the optimal filter par.
+    Calculate the optimal noise-filter parameter.
+
     Parameters
     ----------
-    tb_data : str
-        raw table to run the macro on
-    dsp_proc_chain: str
-        Path to minimal dsp config file
-    par_dsp: str
-        Dictionary with default dsp parameters
-    opt_dict: str
-        Dictionary with parameters for optimization
-    lh5_path:  str
-        Name of channel to process, should be name of lh5 group in raw files
+    tb_data
+        Raw LH5 table to run the DSP macro on.
+    dsp_proc_chain
+        Minimal DSP config dictionary.
+    par_dsp
+        Dictionary with default DSP parameters.
+    opt_dict
+        Dictionary with parameters for the optimisation.
+    lh5_path
+        Name of the channel to process (LH5 group name in raw files).
+    display
+        Plot verbosity level.
+
     Returns
     -------
-    res_dict : dict
+    res_dict
+        Dictionary of optimisation results.
     """
 
     t0 = time.time()

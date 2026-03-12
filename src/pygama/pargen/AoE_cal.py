@@ -73,6 +73,34 @@ aoe_peak_with_high_tail.get_fwhm = hpge_get_fwhm.__get__(aoe_peak_with_high_tail
 
 
 def aoe_peak_guess(func, hist, bins, var, **kwargs):
+    """
+    Build initial parameter guesses for an A/E peak fit.
+
+    Estimates the peak centroid and width from the histogram using
+    :func:`pgf.gauss_mode_width_max`, falling back to a simple Gaussian guess
+    when that fails.  The returned values are packaged via
+    :func:`~pygama.pargen.utils.convert_to_minuit` so they can be passed
+    directly to :class:`~iminuit.Minuit`.
+
+    Parameters
+    ----------
+    func
+        PDF to guess parameters for; one of ``aoe_peak``,
+        ``aoe_peak_with_high_tail``, ``exgauss``, or ``gaussian``.
+    hist
+        Histogram counts.
+    bins
+        Histogram bin edges.
+    var
+        Histogram bin variances.
+    **kwargs
+        Override specific guess values by name (e.g. ``mu=0.95``).
+
+    Returns
+    -------
+    values
+        :class:`~iminuit.util.ValueView` of initial parameter guesses for ``func``.
+    """
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
     mu = bin_centers[np.argmax(hist)]
@@ -159,6 +187,26 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
 
 
 def aoe_peak_bounds(func, guess, **kwargs):
+    """
+    Build parameter bounds for an A/E peak fit.
+
+    Parameters
+    ----------
+    func
+        PDF to bound; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
+        ``exgauss``, or ``gaussian``.
+    guess
+        Current parameter guess dict (used to derive relative bounds for
+        ``mu`` and ``sigma``).
+    **kwargs
+        Override specific bounds by name (e.g. ``tau=(0, 0.5)``).
+
+    Returns
+    -------
+    bounds_dict
+        Dict mapping each parameter name to a ``(lower, upper)`` tuple
+        suitable for passing to :attr:`~iminuit.Minuit.limits`.
+    """
     if func == aoe_peak:
         bounds_dict = {
             "x_lo": (None, None),
@@ -211,6 +259,26 @@ def aoe_peak_bounds(func, guess, **kwargs):
 
 
 def aoe_peak_fixed(func, **kwargs):
+    """
+    Return the fixed parameters and free-parameter mask for an A/E peak fit.
+
+    Parameters
+    ----------
+    func
+        PDF to query; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
+        ``exgauss``, or ``gaussian``.
+    **kwargs
+        Unused; reserved for future overrides.
+
+    Returns
+    -------
+    fixed
+        List of parameter names to hold fixed (typically the fit-range
+        boundaries ``x_lo`` and ``x_hi``).
+    mask
+        Boolean array aligned with ``func.required_args()``; ``True`` for
+        free parameters, ``False`` for fixed ones.
+    """
     if func == aoe_peak or func == aoe_peak_with_high_tail:
         fixed = ["x_lo", "x_hi"]
     elif func == exgauss:
@@ -288,17 +356,23 @@ def unbinned_aoe_fit(
 
     Parameters
     ----------
-    aoe: np.array
-        A/E values
-    pdf: PDF
-        PDF to fit to
-    display: int
-        Level of display
+    aoe
+        A/E values.
+    pdf
+        PDF to fit to.
+    display
+        Verbosity level; 0 = silent, >1 = diagnostic plots.
 
     Returns
     -------
-    tuple(np.array, np.array, np.ndarray, tuple)
-        Tuple of fit values, errors, covariance matrix and full fit info
+    values
+        Fitted parameter values.
+    errors
+        Fitted parameter errors.
+    covariance
+        Covariance matrix.
+    fit
+        Full fit info tuple ``(values, errors, covariance, gof, pdf, mask, valid, m)``.
     """
     if not isinstance(aoe, np.ndarray):
         aoe = np.array(aoe)
@@ -535,15 +609,17 @@ def fit_time_means(tstamps, means, sigmas):
 
     Parameters
     ----------
-    tstamps: np.array
-        Timestamps of the data
-    means: np.array
-        Means of the A/E distribution
-    sigmas: np.array
-        Sigmas of the A/E distribution
+    tstamps
+        Timestamps of the data.
+    means
+        Means of the A/E distribution.
+    sigmas
+        Sigmas of the A/E distribution.
 
-    Returns: dict
-        Dictionary of the time dependence of the means
+    Returns
+    -------
+    out_dict
+        Dictionary mapping each timestamp to its corrected mean value.
     """
     out_dict = {}
     current_tstamps = []
@@ -598,15 +674,15 @@ def average_consecutive(tstamps, means):
 
     Parameters
     ----------
-    tstamps: np.array
-        Timestamps of the data
-    means: np.array
-        Means of the A/E distribution
-    sigmas: np.array
-        Sigmas of the A/E distribution
+    tstamps
+        Timestamps of the data.
+    means
+        Means of the A/E distribution.
 
-    Returns: dict
-        Dictionary of the time dependence of the means
+    Returns
+    -------
+    out_dict
+        Dictionary mapping each timestamp to the average of its mean and the next.
     """
     out_dict = {}
     for i, tstamp in enumerate(tstamps):
@@ -623,17 +699,21 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
 
     Parameters
     ----------
-    tstamps: np.array
-        Timestamps of the data
-    means: np.array
-        Means of the A/E distribution
-    sigmas: np.array
-        Sigmas of the A/E distribution
-    times: np.array
-        Times of the mean samples in unix time format
+    tstamps
+        Timestamps of the data.
+    means
+        Means of the A/E distribution.
+    times
+        Unix timestamps of each mean sample.
+    aoe_param
+        Name of the A/E parameter in the dataframe.
+    output_name
+        Key to use for the correction expression in the output dict.
 
-    Returns: dict
-        Dictionary of the time dependence of the means
+    Returns
+    -------
+    out_dict
+        Dictionary mapping each timestamp to a per-output-name correction expression.
     """
     out_dict = {}
     for i, tstamp in enumerate(tstamps):
@@ -688,40 +768,41 @@ class CalAoE:
         Parameters
         ----------
 
-        cal_dicts: dict
-            Dictionary of calibration parameters can either be empty/None, for a single run or for multiple runs
-            keyed by timestamp in the format YYYYMMDDTHHMMSSZ
-        cal_energy_param: str
-            Calibrated energy parameter to use for A/E calibrations and for determining peak events
-        eres_func: callable
-            Function to determine the energy resolution should take in a single variable the calibrated energy
-        pdf: PDF
-            PDF to fit to the A/E distribution
-        selection_string: str
-            Selection string for the data that will be passed as a query to the data dataframe
-        dt_corr: bool
-            Whether to correct the drift time
-        dep_correct: bool
-            Whether to correct the double escape peak into the single site band before cut determination
-        dt_cut: dict
+        cal_dicts
+            Dictionary of calibration parameters; can be empty/None for a single run, or keyed by
+            timestamp in the format ``YYYYMMDDTHHMMSSZ`` for multiple runs.
+        cal_energy_param
+            Calibrated energy parameter to use for A/E calibrations and for determining peak events.
+        eres_func
+            Function to determine the energy resolution; should accept a single calibrated energy value.
+        pdf
+            PDF to fit to the A/E distribution.
+        selection_string
+            Selection string passed as a query to the data DataFrame.
+        dt_corr
+            Whether to apply drift-time correction.
+        dep_correct
+            Whether to correct the double escape peak into the single-site band before cut determination.
+        dt_cut
             Dictionary of the drift time cut parameters in the form::
 
                 {"out_param": "dt_cut", "hard": False}
 
-            where the out_param is the name of the parameter to cut on in the dataframe (should have been precalculated)
-            and "hard" is whether to remove these events completely for survival fraction calculations
-            or whether they they should only be removed in the cut determination/ A/E calibration steps
-            but the survival fractions should be calculated with them included
-        high_cut_val: float
-            Value to cut the A/E distribution at on the high side
-        mean_func: Callable
-            Function to fit the energy dependence of the A/E mean, should be in the form of a class as above for Pol1
-        sigma_func: Callable
-            Function to fit the energy dependence of the A/E sigma, should be in the form of a class as above for Sigma_Fit
-        compt_bands_width: float
-            Width of the compton bands to use for the energy correction
-        debug_mode: bool
-            If True will raise errors if the A/E calibration fails otherwise just return NaN values
+            where ``out_param`` is the name of the parameter to cut on in the dataframe (should have
+            been precalculated) and ``"hard"`` controls whether these events are removed completely
+            for survival fraction calculations, or only for cut determination / A/E calibration steps.
+        dt_param
+            Name of the drift-time parameter in the dataframe.
+        high_cut_val
+            Value to cut the A/E distribution at on the high side.
+        mean_func
+            Class implementing the energy-dependence model for the A/E mean (e.g. :class:`Pol1`).
+        sigma_func
+            Class implementing the energy-dependence model for the A/E sigma (e.g. :class:`SigmaFit`).
+        compt_bands_width
+            Width of the Compton bands in keV used for the energy correction.
+        debug_mode
+            If ``True``, re-raise exceptions from the A/E calibration steps instead of returning NaN.
 
         """
         self.cal_dicts = cal_dicts if cal_dicts is not None else {}
@@ -789,12 +870,12 @@ class CalAoE:
         Parameters
         ----------
 
-        df: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the A/E parameter to use
-        mode: str
-            Mode to use for the time correction, can be "full", "partial" or "none":
+        df
+            DataFrame containing the data.
+        aoe_param
+            Name of the A/E parameter to use.
+        mode
+            Mode to use for the time correction, can be ``"full"``, ``"partial"``, or ``"none"``:
 
             none: just use the mean of the a/e centroids to shift all the data
             partial: iterate through the centroids if vary by less than 0.4 sigma
@@ -803,11 +884,11 @@ class CalAoE:
             full : each run will be corrected individually
             average_consecutive: average the consecutive centroids
             interpolate_consecutive: interpolate between the consecutive centroids
-        output_name: str
-            Name of the output parameter for the time corrected A/E in the dataframe and to
-            be added to the calibration dictionary
-        display: int
-            plot level
+        output_name
+            Name of the output parameter for the time-corrected A/E in the dataframe and to
+            be added to the calibration dictionary.
+        display
+            Plot verbosity level.
 
         """
         log.info("Starting A/E time correction")
@@ -1079,15 +1160,15 @@ class CalAoE:
         Parameters
         ----------
 
-        data: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the A/E parameter to use as starting point
-        output_name: str
-            Name of the output parameter for the drift time corrected A/E in the dataframe and to
-            be added to the calibration dictionary
-        display: int
-            plot level
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the A/E parameter to use as starting point.
+        out_param
+            Name of the output parameter for the drift-time-corrected A/E in the dataframe and to
+            be added to the calibration dictionary.
+        display
+            Plot verbosity level.
 
         """
         log.info("Starting A/E drift time correction")
@@ -1222,18 +1303,18 @@ class CalAoE:
         Parameters
         ----------
 
-        data: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the A/E parameter to use as starting point
-        corrected_param: str
-            Name of the output parameter for the energy mean corrected A/E to
-            be added in the dataframe and  to the calibration dictionary
-        classifier_param: str
-            Name of the output parameter for the full mean and sigma energy corrected A/E classifier
-            to be added in the dataframe and to the calibration dictionary
-        display: int
-            plot level
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the A/E parameter to use as starting point.
+        corrected_param
+            Name of the output parameter for the energy-mean-corrected A/E to be added in the
+            dataframe and to the calibration dictionary.
+        classifier_param
+            Name of the output parameter for the full mean- and sigma-corrected A/E classifier
+            to be added in the dataframe and to the calibration dictionary.
+        display
+            Plot verbosity level.
 
         """
 
@@ -1510,21 +1591,21 @@ class CalAoE:
         Parameters
         ----------
 
-        data: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the A/E parameter to use as starting point
-        peak : float
-            Energy of the peak to use for the cut determination e.g. 1592.5
-        ranges: tuple
-            Tuple of the range in keV below and above the peak to use for the cut determination e.g. (20,40)
-        dep_acc: float
-            Desired DEP survival fraction for final cut
-        output_cut_param: str
-            Name of the output parameter for the events passing A/E in the dataframe and to
-            be added to the calibration dictionary
-        display: int
-            plot level
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the A/E parameter to use as starting point.
+        peak
+            Energy in keV of the peak to use for cut determination, e.g. ``1592.5``.
+        ranges
+            Tuple of ``(below, above)`` in keV defining the fit range around ``peak``, e.g. ``(20, 40)``.
+        dep_acc
+            Desired DEP survival fraction for the final cut.
+        output_cut_param
+            Name of the output boolean parameter for events passing the A/E cut in the dataframe
+            and to be added to the calibration dictionary.
+        display
+            Plot verbosity level.
 
         """
 
@@ -1625,21 +1706,20 @@ class CalAoE:
         Parameters
         ----------
 
-        data: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the parameter in the dataframe for the final A/E classifier
-        peaks: list
-            List of peaks to calculate the survival fractions for
-        fit_widths: list
-            List of tuples of the energy range to fit the peak in
-        n_samples: int
-            Number of samples to take in the sweep
-        cut_range: tuple
-            Range of the cut to sweep through
-        mode: str
-            mode to use for the cut determination, can be "greater" or "less" i.e. do we want to
-            keep events with A/E greater or less than the cut value
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the parameter in the dataframe for the final A/E classifier.
+        peaks
+            List of peak energies in keV to calculate survival fractions for.
+        fit_widths
+            List of ``(below, above)`` tuples in keV defining the fit range around each peak.
+        n_samples
+            Number of cut values to sample in the sweep.
+        cut_range
+            Range of A/E cut values to sweep through.
+        mode
+            Whether to keep events with A/E ``"greater"`` or ``"less"`` than the cut value.
 
         """
         sfs = pd.DataFrame()
@@ -1744,17 +1824,16 @@ class CalAoE:
         Parameters
         ----------
 
-        data: pd.DataFrame
-            Dataframe containing the data
-        aoe_param: str
-            Name of the parameter in the dataframe for the final A/E classifier
-        peaks: list
-            List of peaks to calculate the survival fractions for
-        fit_widths: list
-            List of tuples of the energy range to fit the peak in
-        mode: str
-            mode to use for the cut determination, can be "greater" or "less" i.e. do we want to
-            keep events with A/E greater or less than the cut value
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the parameter in the dataframe for the final A/E classifier.
+        peaks
+            List of peak energies in keV to calculate survival fractions for.
+        fit_widths
+            List of ``(below, above)`` tuples in keV defining the fit range around each peak.
+        mode
+            Whether to keep events with A/E ``"greater"`` or ``"less"`` than the cut value.
 
         """
         sfs = pd.DataFrame()
@@ -1848,24 +1927,24 @@ class CalAoE:
         Parameters
         ----------
 
-        df: pd.DataFrame
-            Dataframe containing the data
-        initial_aoe_param: str
-            Name of the A/E parameter in dataframe to use as starting point
-        peaks_of_interest: list
-            List of peaks to calculate the survival fractions for
-        fit_widths: list
-            List of tuples of the energy range to fit the peak in for survival fraction determination
-        cut_peak_idx: int
-            Index of the peak in peaks of interest to use for the cut determination
-        dep_acc: float
-            Desired survival fraction in the peak for final cut value
-        sf_nsamples: int
-            Number of samples to take in the survival fraction sweep
-        sf_cut_range: tuple
-            Range to use for the survival fraction sweep
-        timecorr_mode: str
-            Mode to use for the time correction, see time_correction function for details
+        df
+            DataFrame containing the data.
+        initial_aoe_param
+            Name of the A/E parameter in the dataframe to use as starting point.
+        peaks_of_interest
+            List of peak energies in keV to calculate survival fractions for.
+        fit_widths
+            List of ``(below, above)`` tuples in keV for the fit range around each peak.
+        cut_peak_idx
+            Index into ``peaks_of_interest`` of the peak used for cut determination.
+        dep_acc
+            Desired survival fraction in the DEP for the final cut value.
+        sf_nsamples
+            Number of samples to take in the survival fraction sweep.
+        sf_cut_range
+            Range of A/E cut values to use for the survival fraction sweep.
+        timecorr_mode
+            Mode to use for the time correction; see :meth:`time_correction` for details.
 
         """
         if peaks_of_interest is None:

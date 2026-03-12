@@ -283,25 +283,24 @@ class HPGeCalibration:
 
         Parameters
         ----------
-        e_uncal : array
+        e_uncal
             Uncalibrated energy values.
-        peaks_kev : array, optional
-            Energies of peaks to search for (in keV). If not provided, the peaks_kev
-            attribute of the object will be used.
-        n_sigma : float, optional
+        peaks_kev
+            Energies of peaks to search for (in keV). Defaults to ``self.peaks_kev``.
+        n_sigma
             Threshold for detecting a peak in sigma (i.e. sqrt(var)). Default is 3.
-        etol_kev : float, optional
+        etol_kev
             Absolute tolerance in energy for matching peaks. Default is 5.
-        var_zero : float, optional
-            Number used to replace zeros of var to avoid divide-by-zero in hist/sqrt(var).
-            Default is 1. Usually when var = 0, it's because hist = 0, and any value here is fine.
-        bin_width_kev : float, optional
+        var_zero
+            Replacement value for zeros in ``var`` to avoid divide-by-zero in ``hist/sqrt(var)``.
+            Default is 1.
+        bin_width_kev
             Width of the energy bins for re-binning the histogram. Default is 0.2 keV.
-        update_cal_pars : bool, optional
-            Flag indicating whether to update the calibration parameters. Default is True.
-        erange : tuple, optional
-            Range of energy values to consider for peak search. If not provided, the range
-            will be determined automatically based on the peaks_kev values.
+        update_cal_pars
+            Whether to update the calibration parameters. Default is ``True``.
+        erange
+            Range of energy values to consider for the peak search. Determined automatically
+            from ``peaks_kev`` if not provided.
 
         Returns
         -------
@@ -762,31 +761,31 @@ class HPGeCalibration:
 
         Parameters
         ----------
-        e_uncal : array
+        e_uncal
             Unbinned energy data to be fit.
-        peaks_kev : array, optional
-            Array of energy values for the peaks to fit. If not provided, it uses the peaks_kev attribute of the class.
-        peak_pars : list of tuples, optional
-            List containing tuples of the form (peak, range, func) where peak is the energy of the peak to fit,
-            range is the range in keV to fit, and func is the function to fit.
-        bin_width_kev : int, optional
-            Default binwidth to use for the fit window histogramming. Default is 1 keV.
-        peak_param : str, optional
-            Parameter to use for peak fitting. Default is "mode".
-        method : str, optional
-            Method to use for fitting. Default is "unbinned". Can specify to use binned fit method instead.
-        n_events : int, optional
-            Number of events to use for unbinned fit.
-        allowed_p_val : float, optional
-            Lower limit on p-value of fit.
-        tail_weight : int, optional
-            Weight to apply to the tail of the fit.
-        update_cal_pars : bool, optional
-            Whether to update the calibration parameters. Default is True.
+        peaks_kev
+            Peak energies in keV to fit. Defaults to ``self.peaks_kev``.
+        peak_pars
+            List of ``(peak, range, func)`` tuples specifying the energy, fit range (keV),
+            and fit function for each peak.
+        bin_width_kev
+            Default bin width for fit-window histogramming. Default is 1 keV.
+        peak_param
+            Peak-location parameter to use in fitting. Default is ``"mode"``.
+        method
+            Fitting method: ``"unbinned"`` (default) or ``"binned"``.
+        n_events
+            Number of events to use for the unbinned fit.
+        allowed_p_val
+            Lower limit on the fit p-value.
+        tail_weight
+            Weight applied to the tail of the fit.
+        update_cal_pars
+            Whether to update the calibration parameters. Default is ``True``.
 
         Returns
         -------
-        results_dict : dict
+        results_dict
             Dictionary containing the fit results for each peak.
 
         Raises
@@ -2050,25 +2049,29 @@ def hpge_fit_energy_peak_tops(
 
     Parameters
     ----------
-    hist, bins, var : array, array, array
-        Histogram of uncalibrated energies, see pgh.get_hist()
-    peak_locs : array
-        locations of peaks in hist. Must be accurate two within +/- 2*n_to_fit
-    n_to_fit : int
-        number of hist bins near the peak top to include in the gaussian fit
-    cost_func : bool (optional)
-        Flag passed to gauss_mode_width_max()
-    inflate_errors : bool (optional)
-        Flag passed to gauss_mode_width_max()
-    gof_method : str (optional)
-        method flag passed to gauss_mode_width_max()
+    hist
+        Histogram of uncalibrated energies, see :func:`pgh.get_hist`.
+    bins
+        Bin edges corresponding to ``hist``.
+    var
+        Variances of each histogram bin.
+    peak_locs
+        Locations of peaks in ``hist``; must be accurate to within ± ``2*n_to_fit`` bins.
+    n_to_fit
+        Number of histogram bins near the peak top to include in the Gaussian fit.
+    cost_func
+        Cost function flag passed to :func:`gauss_mode_width_max`.
+    inflate_errors
+        Error inflation flag passed to :func:`gauss_mode_width_max`.
+    gof_method
+        Goodness-of-fit method flag passed to :func:`gauss_mode_width_max`.
 
     Returns
     -------
-    pars_list : list of array
-        a list of best-fit parameters (mode, sigma, max) for each peak-top fit
-    cov_list : list of 2D arrays
-        a list of covariance matrices for each pars
+    pars_list
+        List of best-fit parameter arrays ``(mode, sigma, max)`` for each peak-top fit.
+    cov_list
+        List of covariance matrices corresponding to each entry in ``pars_list``.
     """
     pars_list = []
     cov_list = []
@@ -2102,21 +2105,21 @@ def get_hpge_energy_peak_par_guess(
 
     Parameters
     ----------
-    energy : array
-        An array of energy values in the range around the peak for guessing.
-    func : function
-        The function to be fit to the peak in the histogram.
-    fit_range : tuple, optional
-        A tuple specifying the range around the peak to perform the fit. If not provided, the entire range of energy values will be used.
-    bin_width : float, optional
-        The width of the bins in the histogram. Default is 1.
-    mode_guess : float, optional
-        A guess for the mode (mu) parameter of the function. If not provided, it will be estimated from the data.
+    energy
+        Array of energy values in the range around the peak.
+    func
+        The fit function to guess parameters for.
+    fit_range
+        Range ``(lo, hi)`` around the peak; defaults to the full extent of ``energy``.
+    bin_width
+        Width of the histogram bins. Default is 1.
+    mode_guess
+        Initial guess for the mode (mu) parameter; estimated from the data if not provided.
 
     Returns
     -------
-    ValueView
-        A ValueView object from iminuit containing the parameter guesses for the function fit.
+    guesses
+        :class:`~iminuit.util.ValueView` of initial parameter guesses for ``func``.
 
     Notes
     -----
@@ -2313,15 +2316,15 @@ def get_hpge_energy_fixed(func):
 
     Parameters
     ----------
-    func : function
-        The function for which the fixed indexes and mask are to be determined.
+    func
+        The fit function for which the fixed indexes and mask are to be determined.
 
     Returns
     -------
-    fixed : list
-        A sequence list of fixed indexes for fitting.
-    mask : ndarray
-        A boolean mask indicating which parameters are fixed (False) and which are not fixed (True).
+    fixed
+        List of parameter names to hold fixed during fitting.
+    mask
+        Boolean array; ``True`` for free parameters, ``False`` for fixed ones.
     """
 
     if (
@@ -2832,24 +2835,27 @@ def hpge_fit_energy_scale(mus, mu_vars, energies_kev, deg=0, fixed=None):
 
     Parameters
     ----------
-    mus : array
-        uncalibrated energies
-    mu_vars : array
-        variances in the mus
-    energies_kev : array
-        energies to fit to, in kev
-    deg : int
-        degree for energy scale fit. deg=0 corresponds to a simple scaling
-        mu = scale * E. Otherwise deg follows the definition in np.polyfit
-    fixed : dict
-        dict where keys are index of polyfit pars to fix and vals are the value
-        to fix at, can be None to fix at guess value
+    mus
+        Uncalibrated energies.
+    mu_vars
+        Variances in ``mus``.
+    energies_kev
+        Reference energies to fit to, in keV.
+    deg
+        Degree for the energy scale fit. ``deg=0`` fits a simple scaling
+        ``mu = scale * E``; otherwise follows the :func:`np.polyfit` convention.
+    fixed
+        Dict whose keys are polynomial-parameter indices to fix and values are the fixed
+        values (``None`` fixes at the current guess value).
+
     Returns
     -------
-    pars : array
-        parameters of the best fit. Follows the convention in np.polyfit
-    cov : 2D array
-        covariance matrix for the best fit parameters.
+    pars
+        Best-fit parameters following the :func:`np.polyfit` convention.
+    errs
+        Parameter errors (square root of diagonal covariance entries).
+    cov
+        Covariance matrix for the best-fit parameters.
     """
     if deg == 0:
         scale, scale_cov = fit_simple_scaling(energies_kev, mus, var=mu_vars)
@@ -2892,28 +2898,27 @@ def hpge_fit_energy_cal_func(
 
     Parameters
     ----------
-    mus : array
-        uncalibrated energies
-    mu_vars : array
-        variances in the mus
-    energies_kev : array
-        energies to fit to, in kev
-    energy_scale_pars : array
-        Parameters from the escale fit (kev to ADC) used for calculating
-        uncertainties
-    deg : int
-        degree for energy scale fit. deg=0 corresponds to a simple scaling
-        mu = scale * E. Otherwise deg follows the definition in np.polyfit
-    fixed : dict
-        dict where keys are index of polyfit pars to fix and vals are the value
-        to fix at, can be None to fix at guess value
+    mus
+        Uncalibrated energies.
+    mu_vars
+        Variances in ``mus``.
+    energies_kev
+        Reference energies to fit to, in keV.
+    energy_scale_pars
+        Parameters from the energy-scale fit (keV → ADC) used for computing uncertainties.
+    deg
+        Degree for the calibration polynomial. ``deg=0`` fits a simple scaling;
+        otherwise follows the :func:`np.polyfit` convention.
+    fixed
+        Dict whose keys are polynomial-parameter indices to fix and values are the fixed
+        values (``None`` fixes at the current guess value).
 
     Returns
     -------
-    pars : array
-        parameters of the best fit. Follows the convention in np.polyfit
-    cov : 2D array
-        covariance matrix for the best fit parameters.
+    pars
+        Best-fit parameters following the :func:`np.polyfit` convention.
+    cov
+        Covariance matrix for the best-fit parameters.
     """
 
     if deg == 0 and len(mus) == 1:
@@ -2977,31 +2982,27 @@ def poly_match(xx, yy, deg=-1, rtol=1e-5, atol=1e-8, fixed=None):
 
     Parameters
     ----------
-    xx : array-like
-        domain data array. Must be sorted from least to largest. Must satisfy
-        len(xx) >= len(yy)
-    yy : array-like
-        range data array: the values to which pol(xx) will be compared. Must be
-        sorted from least to largest. Must satisfy len(yy) > max(2, deg+2)
-    deg : int
-        degree of the polynomial to be used. If deg = 0, will fit for a simple
-        scaling: scale * xx = yy. If deg = -1, fits to a simple shift in the
-        data: xx + shift = yy. Otherwise, deg is equivalent to the deg argument
-        of np.polyfit()
-    rtol : float
-        the relative tolerance to be sent to np.isclose()
-    atol : float
-        the absolute tolerance to be sent to np.isclose(). Has the same units
-        as yy.
+    xx
+        Domain data array. Must be sorted ascending; must satisfy ``len(xx) >= len(yy)``.
+    yy
+        Range data array: values to which ``poly(xx)`` will be compared. Must be sorted
+        ascending; must satisfy ``len(yy) > max(2, deg+2)``.
+    deg
+        Degree of the polynomial. ``deg=0`` fits a simple scaling ``scale * xx = yy``;
+        ``deg=-1`` fits a simple shift ``xx + shift = yy``; otherwise equivalent to
+        the ``deg`` argument of :func:`np.polyfit`.
+    rtol
+        Relative tolerance passed to :func:`np.isclose`.
+    atol
+        Absolute tolerance passed to :func:`np.isclose` (same units as ``yy``).
 
     Returns
     -------
-    pars: None or array of floats
-        The parameters of the best fit of poly(xx) = yy.  Follows the convention
-        used for the return value "p" of polyfit. Returns None when the inputs
-        are bad.
-    i_matches : list of int
-        list of indices in xx for the matched values in the best match
+    pars
+        Best-fit parameters of ``poly(xx) = yy`` in :func:`np.polyfit` convention, or
+        ``None`` when inputs are invalid.
+    i_matches
+        List of indices in ``xx`` for the matched values in the best match.
     """
 
     # input handling
