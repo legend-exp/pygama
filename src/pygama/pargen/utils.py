@@ -33,7 +33,8 @@ def convert_to_minuit(pars, func) -> Minuit:
 
     Returns
     -------
-    Configured Minuit object ready for minimisation.
+    m
+        Configured Minuit object ready for minimisation.
     """
     try:
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
