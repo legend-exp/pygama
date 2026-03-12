@@ -1,6 +1,7 @@
 import logging
 import sys
 from collections import namedtuple
+from typing import Any, Callable, Mapping, Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,21 +9,28 @@ import pandas as pd
 import pint
 from dspeed import build_dsp
 from dspeed.units import unit_registry as ureg
+from lgdo import Table
 from matplotlib.colors import LogNorm
+from matplotlib.figure import Figure
 from scipy.optimize import minimize
 from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import Kernel
 from sklearn.utils._testing import ignore_warnings
 
 log = logging.getLogger(__name__)
 
 
 def run_one_dsp(
-    tb_data, dsp_config, db_dict=None, fom_function=None, verbosity=0, fom_kwargs=None
-):
-    """
-    run one iteration of DSP on tb_data
+    tb_data: Table,
+    dsp_config: Mapping,
+    db_dict: Mapping | None = None,
+    fom_function: Callable | None = None,
+    verbosity: int = 0,
+    fom_kwargs=None,
+) -> Union[float, Table]:
+    """Run one iteration of DSP on ``tb_data`, based on the DSP specified in ``dsp_config``.
 
     Optionally returns a value for optimization
 
@@ -200,6 +208,7 @@ def run_grid(
     grid_values = np.ndarray(shape=grid.get_shape(), dtype="O")
     iii = grid.get_zero_indices()
     log.info("starting grid calculations...")
+
     while True:
         db_dict = grid.set_dsp_pars(db_dict, iii)
         if verbosity > 1:
@@ -289,24 +298,115 @@ OptimiserDimension = namedtuple(
 
 class BayesianOptimizer:
     """
-    Bayesian optimiser uses Gaussian Process Regressor from sklearn to fit kernel
+    Bayesian optimization using a Gaussian Process regression.
+
+    This optimizer fits a Gaussian Process (GP) to fit kernel
     to data, takes in a series of init samples for this fit and then calculates
     the next point using the acquisition function specified.
-    """
 
-    np.random.seed(55)
-    lambda_param = 0.01
-    eta_param = 0
+    The GP model is implemented using
+    ``sklearn.gaussian_process.GaussianProcessRegressor``.
+
+    Parameters
+    ----------
+    acq_func
+        Acquisition function used to select new sampling points.
+
+        Supported values are:
+            - ``"ei"`` : Expected Improvement
+            - ``"ucb"`` : Upper Confidence Bound
+            - ``"lcb"`` : Lower Confidence Bound
+    batch_size
+        Number of candidate points proposed at each optimization iteration.
+    kernel
+        Optional kernel used by the Gaussian Process regressor.
+        If ``None``, the default kernel from ``GaussianProcessRegressor`` is used.
+    sampling_rate
+        Optional sampling rate associated with evaluations. If given as a string it will be converted to a ``pint.Quantity``.
+    fom_value
+        Column name containing the figure-of-merit values in the input data,
+    fom_error
+        Column name containing the uncertainty associated with the figure-of-merit values.
+
+    Attributes
+    ----------
+    gauss_pr
+        Gaussian Process model used.
+    acq_function
+        Acquisition function method corresponding to the specified `acq_func`.
+    batch_size
+        Batch size used in the Gaussian Process optimization.
+    dims
+        List of dimensions (parameters) added to the optimizer's search space.
+    iters
+        Counter for the number of optimization iterations performed.
+    best_samples_
+        DataFrame storing the best evaluated samples and their acquisition values.
+    distances_
+        List of distances between sampled points, used for diagnostics.
+    x_init
+        Initial input points provided via `add_initial_values`.
+    y_init
+        Observed function values corresponding to `x_init`.
+    yerr_init
+        Uncertainty associated with `y_init`.
+    y_min
+        Minimum observed value in `y_init`. Set by `get_first_point`.
+    optimal_x
+        Input corresponding to `y_min`. Set by `get_first_point`.
+    optimal_ei
+        Placeholder for expected improvement at `optimal_x`. Set by `get_first_point`.
+    current_x
+        Current optimization point being evaluated. Updated by `update_db_dict()`.
+    current_ei
+        Acquisition function value for `current_x`. Updated by `update_db_dict()`.
+    current_iter
+        Optimization iteration counter. Incremented each time `update_db_dict()` is called.
+
+    Examples
+    --------
+    Simple 1D optimization:
+
+    .. code-block:: python
+
+        import numpy as np
+
+        # Create optimizer
+        optimizer = BayesianOptimizer(acq_func="ei", batch_size=1)
+        optimizer.add_dimension("x", parameter="x", min_val=-5, max_val=5)
+
+        # Add initial observations
+        optimizer.add_initial_values(
+            np.array([[0], [2], [-1]]),
+            np.array([10.0, 5.0, 7.0]),
+            np.array([0.1, 0.2, 0.1])
+        )
+
+        # Update DSP parameters database with the current optimization point
+        db_dict = optimizer.update_db_dict({})
+
+        # Simulate new evaluation and update optimizer
+        optimizer.update({"x": [1.0], "y_val": 3.5, "y_val_err": 0.1})
+
+        # Plot the result
+        fig = optimizer.plot()
+    """
 
     def __init__(
         self,
-        acq_func,
-        batch_size,
-        kernel=None,
-        sampling_rate=None,
-        fom_value="y_val",
-        fom_error="y_val_err",
-    ):
+        acq_func: str,
+        batch_size: int,
+        kernel: Optional[Kernel] = None,
+        sampling_rate: Optional[Union[str, pint.Quantity]] = None,
+        fom_value: str = "y_val",
+        fom_error: str = "y_val_err",
+    ) -> None:
+
+        np.random.seed(55)
+
+        self.lambda_param = 0.01
+        self.eta_param = 0
+
         self.dims = []
         self.current_iter = 0
 
@@ -321,9 +421,23 @@ class BayesianOptimizer:
             if sampling_rate is not None:
                 raise TypeError("Unknown type for sampling rate")
 
+            self.sampling_rate = None
+
         self.gauss_pr = GaussianProcessRegressor(kernel=kernel)
         self.best_samples_ = pd.DataFrame(columns=["x", "y", "ei"])
         self.distances_ = []
+
+        # other attrs
+        self.x_init = None
+        self.y_init = None
+        self.yerr_init = None
+        self.y_min = None
+
+        # optimisation results
+        self.current_x = None
+        self.prev_x = None
+        self.optimal_x = None
+        self.optimal_ei = None
 
         if acq_func == "ei":
             self.acq_function = self._get_expected_improvement
@@ -331,13 +445,47 @@ class BayesianOptimizer:
             self.acq_function = self._get_ucb
         elif acq_func == "lcb":
             self.acq_function = self._get_lcb
+        else:
+            msg = f"Unknown acquisition function: {acq_func}. Supported values are 'ei', 'ucb', and 'lcb'."
+            raise ValueError(msg)
 
         self.fom_value = fom_value
         self.fom_error = fom_error
 
     def add_dimension(
-        self, name, parameter, min_val, max_val, round_to_samples=False, unit=None
-    ):
+        self,
+        name: str,
+        parameter: float,
+        min_val: float,
+        max_val: float,
+        round_to_samples: bool = False,
+        unit: Optional[Union[str, pint.Quantity]] = None,
+    ) -> None:
+        """
+        Add a new dimension (parameter) to the optimizer's search space.
+
+        Each dimension defines a variable that the Bayesian optimizer will vary
+        to explore the objective function.
+
+        Parameters
+        ----------
+        name
+            Name of the dimension.
+        parameter
+            Initial value or reference for this parameter.
+        min_val
+            Minimum allowed value for this parameter.
+        max_val
+            Maximum allowed value for this parameter.
+        round_to_samples
+            If True, sampled values along this dimension will be rounded to
+            multiples of `sampling_rate`. Requires `sampling_rate` to be set
+            in the optimizer.
+        unit
+            Physical unit of the parameter (e.g., "K", "mL"). Converted to
+            a `pint.Quantity` internally if provided.
+        """
+
         if round_to_samples is True and self.sampling_rate is None:
             raise ValueError("Must provide sampling rate to round to samples")
         if unit is not None:
@@ -351,7 +499,27 @@ class BayesianOptimizer:
     def get_n_dimensions(self):
         return len(self.dims)
 
-    def add_initial_values(self, x_init, y_init, yerr_init):
+    def add_initial_values(self, x_init: Any, y_init: Any, yerr_init: Any) -> None:
+        """
+        Add initial observed data to the optimizer.
+
+        These initial samples are used to fit the Gaussian Process model
+        before starting the Bayesian optimization iterations.
+
+        Parameters
+        ----------
+        x_init
+            Initial input points. Shape should match the number of dimensions
+            added via `add_dimension`.
+        y_init
+            Observed function values corresponding to `x_init`.
+        yerr_init
+            Uncertainty (error) associated with `y_init`.
+
+        Notes
+        -----
+        The lengths of `x_init`, `y_init`, and `yerr_init` must all match.
+        """
         self.x_init = x_init
         self.y_init = y_init
         self.yerr_init = yerr_init
@@ -454,26 +622,73 @@ class BayesianOptimizer:
         self.y_init = np.append(self.y_init, np.array(y), axis=0)
         self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
 
-    def get_first_point(self):
+    def get_first_point(self) -> Tuple[Any, None]:
+        """
+        Get the first optimization point based on initial data.
+
+        Selects the input point corresponding to the minimum observed value
+        in the initial samples (`y_init`). This point can serve as the starting
+        point for the Bayesian optimization process.
+
+        Sets the following attributes on the optimizer:
+        - `y_min` : Minimum observed value in `y_init`.
+        - `optimal_x` : Input corresponding to `y_min`.
+        - `optimal_ei` : Initialized to None.
+
+        Returns
+        -------
+        optimal_x
+            Input point corresponding to the minimum observed `y_init`.
+        optimal_ei
+            Placeholder for the expected improvement at `optimal_x` (initialized to None).
+        """
         y_min_ind = np.nanargmin(self.y_init)
+
         self.y_min = self.y_init[y_min_ind]
         self.optimal_x = self.x_init[y_min_ind]
         self.optimal_ei = None
+
         return self.optimal_x, self.optimal_ei
 
     @ignore_warnings(category=ConvergenceWarning)
     def iterate_values(self):
+        """Iterate the optimization process by fitting the Gaussian Process to the
+        current data and selecting the next point based on the acquisition function.
+        """
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         x_next, ei = self._get_next_probable_point()
         return x_next, ei
 
-    def update_db_dict(self, db_dict):
+    def update_db_dict(self, db_dict: Mapping) -> Mapping:
+        """
+        Update a DSP parameters database with the current optimization point.
+
+        This method updates `db_dict` with the values of the current point being
+        evaluated by the optimizer. If it is the first iteration, it retrieves
+        the initial point; otherwise, it computes the next point using
+        `iterate_values()`. Each dimension's value is stored in the database,
+        with units appended if specified.
+
+        Parameters
+        ----------
+        db_dict
+            Dictionary representing the DSP parameters database. Keys are
+            dimension names, and values are dictionaries mapping parameter
+            identifiers to their corresponding values as strings (including units).
+
+        Returns
+        -------
+        Mapping
+            Updated DSP parameters database including the current optimization point.
+        """
         if self.current_iter == 0:
             x_new, ei = self.get_first_point()
+
         x_new, ei = self.iterate_values()
         self.current_x = x_new
         self.current_ei = ei
+
         for i, val in enumerate(x_new):
             name, parameter, min_val, max_val, rounding, unit = self.dims[i]
             if unit is not None:
@@ -489,7 +704,22 @@ class BayesianOptimizer:
         self.current_iter += 1
         return db_dict
 
-    def update(self, results):
+    def update(self, results: Mapping[str, Any]) -> None:
+        """
+        Update the optimizer with new evaluation results.
+
+        This method updates the internal state of the Bayesian optimizer with
+        the latest evaluation at `current_x`. It extends the prior data used
+        by the Gaussian Process, updates the current best observed point, and
+        tracks distances between consecutive sampled points.
+
+        Parameters
+        ----------
+        results
+            Dictionary-like object containing the latest evaluation. Must
+            include keys corresponding to `fom_value` and `fom_error`.
+        """
+
         y_val = results[self.fom_value]
         y_err = results[self.fom_error]
         self._extend_prior_with_posterior_data(
@@ -512,6 +742,7 @@ class BayesianOptimizer:
                 np.linalg.norm(np.array(self.prev_x) - np.array(self.current_x))
             )
             self.prev_x = self.current_x
+
         new_entry = pd.DataFrame(
             {"x": self.optimal_x, "y": self.y_min, "ei": self.optimal_ei}
         )
@@ -520,15 +751,18 @@ class BayesianOptimizer:
             and new_entry.notnull().any().any()
             and len(new_entry) >= 1
         ):
-            self.best_samples_ = pd.concat(
-                [
-                    self.best_samples_,
-                    new_entry,
-                ],
-                ignore_index=True,
-            )
+
+            if self.best_samples_.empty:
+                self.best_samples_ = new_entry.copy()
+            else:
+                self.best_samples_ = pd.concat(
+                    [self.best_samples_, new_entry],
+                    ignore_index=True,
+                )
 
     def get_best_vals(self):
+        """Extract the best observed values in a dictionary format suitable for updating the DSP parameters database."""
+
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
             name, parameter, min_val, max_val, rounding, unit = self.dims[i]
@@ -545,7 +779,25 @@ class BayesianOptimizer:
         return out_dict
 
     @ignore_warnings(category=ConvergenceWarning)
-    def plot(self, init_samples=None):
+    def plot(self, init_samples=None) -> Figure:
+        """Plot the Gaussian Process regression and acquisition function.
+
+        For 1D and 2D optimization problems, this method visualizes the fitted
+        Gaussian Process and the acquisition function across the search space.
+        Initial samples, failed samples, and the optimal point are highlighted.
+
+        Parameters
+        ----------
+        init_samples
+            Optional list of initial sample points to highlight on the plot.
+
+        Returns
+        -------
+        fig
+            Matplotlib Figure object containing the plot of the Gaussian Process
+            regression and acquisition function.
+        """
+
         nan_idxs = np.isnan(self.y_init)
         fail_idxs = np.isnan(self.yerr_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
@@ -553,12 +805,9 @@ class BayesianOptimizer:
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
         elif len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
-            ys = np.zeros_like(points)
-            ys_err = np.zeros_like(points)
-            for i, point in enumerate(points):
-                ys[i], ys_err[i] = self.gauss_pr.predict(
-                    np.array([point]).reshape(1, -1), return_std=True
-                )
+
+            ys, ys_err = self.gauss_pr.predict(points.reshape(-1, 1), return_std=True)
+
             fig = plt.figure()
 
             plt.scatter(np.array(self.x_init), np.array(self.y_init), label="Samples")
@@ -653,6 +902,8 @@ class BayesianOptimizer:
 
     @ignore_warnings(category=ConvergenceWarning)
     def plot_acq(self, init_samples=None):
+        """Plot the acquisition function across the search space."""
+
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
@@ -730,10 +981,13 @@ class BayesianOptimizer:
             ticks, labels = plt.xticks()
             labels = np.linspace(self.dims[1].min_val, self.dims[1].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[1], 5)
+
             plt.xticks(ticks=ticks, labels=labels, rotation=45)
             ticks, labels = plt.yticks()
+
             labels = np.linspace(self.dims[0].min_val, self.dims[0].max_val, 5)
             ticks = np.linspace(0, out_grid.shape[0], 5)
+
             plt.yticks(ticks=ticks, labels=labels, rotation=45)
             plt.xlabel(
                 f"{self.dims[1].name}-{self.dims[1].parameter}({self.dims[1].unit})"
@@ -748,15 +1002,59 @@ class BayesianOptimizer:
 
 
 def run_bayesian_optimisation(
-    tb_data,
-    dsp_config,
-    fom_function,
-    optimisers,
-    fom_kwargs=None,
-    db_dict=None,
-    nan_val=10,
-    n_iter=10,
-):
+    tb_data: Table,
+    dsp_config: str | Mapping,
+    fom_function: list | Callable,
+    optimisers: list | BayesianOptimizer,
+    fom_kwargs: Mapping | None = None,
+    db_dict: Mapping | None = None,
+    nan_val: float | list = 10,
+    n_iter: int = 10,
+) -> Tuple[Mapping, list]:
+    """Run Bayesian optimization loop to optimize DSP parameters.
+
+    Parameters
+    ----------
+    tb_data
+        An input table of the data for which the DSP is performed.
+    dsp_config
+        Configuration for the DSP processing chain, see `run_one_dsp()`
+    fom_function
+        Function(s) to calculate the figure-of-merit from the DSP output table.
+        If a list is given, each function will be applied to the output of each
+        optimiser in order. If a single function is given, it will be applied
+        to the output of all optimisers.
+        This function should return a dictionary containing a keys of name `fom_value` and `fom_error` in the optimisers, which will be used to inform the optimization process.
+    optimisers
+        A list of `BayesianOptimizer` instances to run in parallel. Each optimizer
+        will update the DSP parameters database and receive the results of each iteration to inform its next point selection.
+    fom_kwargs
+        Optional keyword arguments for the `fom_function`. If a list is given, each set
+        of kwargs will be applied to the corresponding function in `fom_function`. If a single set of kwargs is given, it will be applied to all functions.
+    db_dict
+        Optional initial DSP parameters database to be updated by the optimizers. If not provided, an
+        empty dictionary will be used.
+    nan_val
+        Value to assign to the figure-of-merit if it is NaN. Can be a single float applied to all optimizers or a list of floats corresponding to each optimizer.
+    n_iter
+        Number of optimization iterations to perform. Each iteration consists of each optimizer proposing a new point, running the DSP with those parameters, evaluating the figure-of-merit, and updating the optimizers with the results.
+
+    Returns
+    -------
+    out_param_dict
+        A dictionary containing the best parameter values found by each optimizer, formatted for updating the DSP parameters
+        database.
+    out_results_list
+        A list of dictionaries containing the optimal results corresponding to the best parameters found by each optimizer.
+
+    Note
+    ----
+    The optimisers need to be initialised with the parameters set, and initial values added.
+    """
+
+    if db_dict is None:
+        db_dict = {}
+
     if not isinstance(optimisers, list):
         optimisers = [optimisers]
     if not isinstance(fom_kwargs, list):
@@ -800,10 +1098,13 @@ def run_bayesian_optimisation(
 
     out_param_dict = {}
     out_results_list = []
+
     for optimiser in optimisers:
+
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results
+
         if np.isnan(results_dict[optimiser.fom_value]):
             log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
         out_results_list.append(results_dict)
