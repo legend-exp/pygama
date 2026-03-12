@@ -1,9 +1,10 @@
 """
 pygama convenience functions for fitting ubinned data
 """
+from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 import numpy as np
 from iminuit import Minuit, cost
@@ -15,11 +16,11 @@ def fit_unbinned(
     func: Callable,
     data: np.ndarray,
     guess: np.ndarray = None,
-    extended: bool = True,  # noqa: N803
+    extended: bool = True,
     cost_func: str = "LL",
     simplex: bool = False,
-    bounds: list[tuple[float, float], ...] = None,
-    fixed: list[bool, ...] = None,
+    bounds: list[tuple[float, float], ...] | None = None,
+    fixed: list[bool, ...] | None = None,
 ) -> tuple[np.ndarray, ...]:
     """Do a unbinned fit to data.
     Default is extended Log Likelihood fit, with option for other cost functions.
@@ -50,8 +51,9 @@ def fit_unbinned(
         the best-fit parameters and their errors / covariance
     """
     if guess is None:
+        msg = "auto-guessing not yet implemented, you must supply a guess."
         raise NotImplementedError(
-            "auto-guessing not yet implemented, you must supply a guess."
+            msg
         )
 
     if cost_func == "LL":

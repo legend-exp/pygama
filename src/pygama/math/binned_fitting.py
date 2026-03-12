@@ -1,9 +1,10 @@
 """
 pygama convenience functions for fitting binned data
 """
+from __future__ import annotations
 
 import logging
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import numpy as np
 from iminuit import Minuit, cost
@@ -23,8 +24,8 @@ def fit_binned(
     cost_func: str = "LL",
     extended: bool = True,
     simplex: bool = False,
-    bounds: tuple[tuple[float, float], ...] = None,
-    fixed: tuple[int, ...] = None,
+    bounds: tuple[tuple[float, float], ...] | None = None,
+    fixed: tuple[int, ...] | None = None,
 ) -> tuple[np.ndarray, ...]:
     """
     Do a binned fit to a histogram.
@@ -61,8 +62,9 @@ def fit_binned(
         Covariance matrix
     """
     if guess is None:
+        msg = "auto-guessing not yet implemented, you must supply a guess."
         raise NotImplementedError(
-            "auto-guessing not yet implemented, you must supply a guess."
+            msg
         )
 
     if cost_func == "LL":
@@ -84,10 +86,7 @@ def fit_binned(
         if var is None:
             var = hist  # assume Poisson stats if variances are not provided
 
-        if len(bins) == len(hist) + 1:
-            bin_centres = pgh.get_bin_centers(bins)
-        else:
-            bin_centres = bins
+        bin_centres = pgh.get_bin_centers(bins) if len(bins) == len(hist) + 1 else bins
 
         # skip "okay" bins with content 0 +/- 0
         # if bin content is non-zero but var = 0 let the user see the warning
@@ -100,10 +99,9 @@ def fit_binned(
         cost_func = cost.LeastSquares(xvals, hist, var, func)
 
     m = Minuit(cost_func, *guess)
-    if bounds is not None:
-        if isinstance(bounds, dict):
-            for key, val in bounds.items():
-                m.limits[key] = val
+    if bounds is not None and isinstance(bounds, dict):
+        for key, val in bounds.items():
+            m.limits[key] = val
     if fixed is not None:
         for fix in fixed:
             m.fixed[fix] = True
@@ -151,11 +149,14 @@ def goodness_of_fit(
     # arg checks
     if method == "var":
         if var is None:
-            raise RuntimeError("var must be non-None to use method 'var'")
+            msg = "var must be non-None to use method 'var'"
+            raise RuntimeError(msg)
         if np.any(var == 0):
-            raise ValueError("var cannot contain zeros")
+            msg = "var cannot contain zeros"
+            raise ValueError(msg)
     if method == "Neyman" and np.any(hist == 0):
-        raise ValueError("hist cannot contain zeros for Neyman method")
+        msg = "hist cannot contain zeros for Neyman method"
+        raise ValueError(msg)
 
     # compute expected values
     yy = func(pgh.get_bin_centers(bins), *pars)
@@ -173,22 +174,22 @@ def goodness_of_fit(
         dof = len(hist) - len(pars)
         return log_lr, dof
 
+    # compute chi2 numerator and denominator
+    numerator = (hist - yy) ** 2
+    if method == "var":
+        denominator = var
+    elif method == "Pearson":
+        denominator = yy
+    elif method == "Neyman":
+        denominator = hist
     else:
-        # compute chi2 numerator and denominator
-        numerator = (hist - yy) ** 2
-        if method == "var":
-            denominator = var
-        elif method == "Pearson":
-            denominator = yy
-        elif method == "Neyman":
-            denominator = hist
-        else:
-            raise NameError(f"goodness_of_fit: unknown method {method}")
+        msg = f"goodness_of_fit: unknown method {method}"
+        raise NameError(msg)
 
-        # compute chi2 and dof
-        chisq = np.sum(numerator / denominator)
-        dof = len(hist) - len(pars)
-        return chisq, dof
+    # compute chi2 and dof
+    chisq = np.sum(numerator / denominator)
+    dof = len(hist) - len(pars)
+    return chisq, dof
 
 
 def poisson_gof(
@@ -233,12 +234,12 @@ def poisson_gof(
 def gauss_mode_width_max(
     hist: np.ndarray,
     bins: np.ndarray,
-    var: Optional[np.ndarray] = None,
-    mode_guess: Optional[float] = None,
-    n_bins: Optional[int] = 5,
+    var: np.ndarray | None = None,
+    mode_guess: float | None = None,
+    n_bins: int | None = 5,
     cost_func: str = "Least Squares",
-    inflate_errors: Optional[bool] = False,
-    gof_method: Optional[str] = "var",
+    inflate_errors: bool | None = False,
+    gof_method: str | None = "var",
 ) -> tuple[np.ndarray, ...]:
     r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
@@ -309,7 +310,7 @@ def gauss_mode_width_max(
     width_guess = bin_centers[i_n] - bin_centers[i_0]
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
-    pars, errors, cov = fit_binned(
+    pars, _errors, cov = fit_binned(
         nb_gauss_amp,
         hist[i_0:i_n],
         bins[i_0 : i_n + 1],
@@ -353,7 +354,8 @@ def gauss_mode_max(
     """
     pars, cov = gauss_mode_width_max(hist, bins, **kwargs)
     if pars is None or cov is None:
-        raise RuntimeError("fit binned failed to work")
+        msg = "fit binned failed to work"
+        raise RuntimeError(msg)
     return pars[::2], cov[::2, ::2]  # skips "sigma" rows and columns
 
 
@@ -378,8 +380,8 @@ def gauss_mode(hist: np.ndarray, bins: np.ndarray, **kwargs) -> tuple[float, flo
 def taylor_mode_max(
     hist: np.ndarray,
     bins: np.ndarray,
-    var: Optional[np.ndarray] = None,
-    mode_guess: Optional[float] = None,
+    var: np.ndarray | None = None,
+    mode_guess: float | None = None,
     n_bins: int = 5,
 ) -> tuple[np.ndarray, ...]:
     """Get the max and mode of a peak based on Taylor exp near the max
@@ -419,10 +421,7 @@ def taylor_mode_max(
     >>> hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5,5))
     >>> pgf.taylor_mode_max(hist, bins, var, n_bins=5)
     """
-    if mode_guess is not None:
-        i_0 = pgh.find_bin(mode_guess, bins)
-    else:
-        i_0 = np.argmax(hist)
+    i_0 = pgh.find_bin(mode_guess, bins) if mode_guess is not None else np.argmax(hist)
     i_0 -= int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
     wts = None if var is None else 1 / np.sqrt(var[i_0:i_n])

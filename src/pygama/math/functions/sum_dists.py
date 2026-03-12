@@ -13,9 +13,9 @@ A class that creates the sum of distributions, with methods for scipy computed :
     moyal_add.draw_pdf(x, *pars)
     moyal_add.required_args()
 """
+from __future__ import annotations
 
 import inspect
-from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,7 +26,7 @@ from pygama.math.functions.pygama_continuous import PygamaContinuous
 
 def get_dists_and_par_idxs(
     dists_and_pars_array: np.array(tuple, tuple),
-) -> Tuple[np.array, np.array]:
+) -> tuple[np.array, np.array]:
     r"""
     Split the array of tuples passed to the :func:`SumDists` constructor into separate arrays with one containing only the
     distributions and the other containing the parameter index arrays. Also performs some sanity checks.
@@ -44,7 +44,8 @@ def get_dists_and_par_idxs(
     """
     # can only sum two dists at once, check:
     if len(dists_and_pars_array) != 2:
-        raise ValueError("Can only sum two distributions at once.")
+        msg = "Can only sum two distributions at once."
+        raise ValueError(msg)
 
     dists = []
     par_idxs = []
@@ -52,12 +53,12 @@ def get_dists_and_par_idxs(
     # Check that each tuple in the dists_and_pars_array is of length two
     for dist_and_pars in dists_and_pars_array:
         if len(dist_and_pars) != 2:
+            msg = "Each tuple needs a distribution and a parameter index array."
             raise ValueError(
-                "Each tuple needs a distribution and a parameter index array."
+                msg
             )
-        else:
-            dists.append(dist_and_pars[0])
-            par_idxs.append(np.array(dist_and_pars[1]))
+        dists.append(dist_and_pars[0])
+        par_idxs.append(np.array(dist_and_pars[1]))
 
     return dists, par_idxs
 
@@ -68,7 +69,7 @@ def get_areas_fracs(
     frac_flag: bool,
     area_flag: bool,
     one_area_flag: bool,
-) -> Tuple[np.array, np.array]:
+) -> tuple[np.array, np.array]:
     r"""
     Grab the value(s) of either the fraction or the areas passed in the params array from the :func:`SumDists` call.
     If :func:`SumDists` is in "fracs" mode, then this grabs `f` from the params array and returns fracs = [f, 1-f] and areas of unity.
@@ -255,17 +256,19 @@ class SumDists(rv_continuous):
             if (not isinstance(dists[i], PygamaContinuous)) and (
                 not isinstance(dists[i], SumDists)
             ):
-                raise ValueError(
+                msg = (
                     f"Distribution at index {i} has value {dists[i]},\
                 and is an array and not a PygamaContinuous distribution"
+                )
+                raise ValueError(
+                    msg
                 )
 
         # Get the parameter names for later introspection
         # First, find the length of the eventual single parameter array
         par_size = 0
         for par_idx in par_idxs:
-            if np.amax(par_idx) >= par_size:
-                par_size = np.amax(par_idx)
+            par_size = max(np.amax(par_idx), par_size)
         par_size = (
             np.amax([par_size, np.amax(area_frac_idxs)])
             if len(area_frac_idxs) != 0
@@ -276,8 +279,9 @@ class SumDists(rv_continuous):
         # Set the internal state depending on what flag was passed
         if flag == "fracs":
             if len(area_frac_idxs) != 1:
+                msg = "SumDists only accepts the parameter position of one fraction."
                 raise ValueError(
-                    "SumDists only accepts the parameter position of one fraction."
+                    msg
                 )
             self.frac_flag = True
             self.area_flag = False
@@ -285,7 +289,8 @@ class SumDists(rv_continuous):
             shapes[area_frac_idxs[0]] = "f"  # add frac name to the shapes
         elif flag == "areas":
             if len(area_frac_idxs) != 2:
-                raise ValueError("SumDists needs two parameter indices of areas.")
+                msg = "SumDists needs two parameter indices of areas."
+                raise ValueError(msg)
             self.frac_flag = False
             self.area_flag = True
             self.one_area_flag = False
@@ -294,7 +299,8 @@ class SumDists(rv_continuous):
             # needed so that we can create SumDists from SumDists without having an overall area to the second dist
             # Sets the area of the second dist to 1
             if len(area_frac_idxs) != 1:
-                raise ValueError("SumDists needs one parameter index of an area.")
+                msg = "SumDists needs one parameter index of an area."
+                raise ValueError(msg)
             self.frac_flag = False
             self.area_flag = False
             self.one_area_flag = True
@@ -367,12 +373,10 @@ class SumDists(rv_continuous):
                 x, *params[self.par_idxs[0]]
             ), areas[1] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
 
-        else:
-            # This is faster than list comprehension
-            probs = areas[0] * fracs[0] * pdfs[0].pdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
-            return probs
+        # This is faster than list comprehension
+        return areas[0] * fracs[0] * pdfs[0].pdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * pdfs[1].pdf(x, *params[self.par_idxs[1]])
 
     def _cdf(self, x, *params):
         """
@@ -394,12 +398,10 @@ class SumDists(rv_continuous):
                 x, *params[self.par_idxs[0]]
             ), areas[1] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
 
-        else:
-            # This is faster than list comprehension
-            probs = areas[0] * fracs[0] * cdfs[0].cdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
-            return probs
+        # This is faster than list comprehension
+        return areas[0] * fracs[0] * cdfs[0].cdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * cdfs[1].cdf(x, *params[self.par_idxs[1]])
 
     def get_pdf(self, x, *params):
         """
@@ -421,12 +423,10 @@ class SumDists(rv_continuous):
                 x, *params[self.par_idxs[0]]
             ), areas[1] * fracs[1] * pdfs[1].get_pdf(x, *params[self.par_idxs[1]])
 
-        else:
-            # This is faster than list comprehension
-            probs = areas[0] * fracs[0] * pdfs[0].get_pdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * pdfs[1].get_pdf(x, *params[self.par_idxs[1]])
-            return probs
+        # This is faster than list comprehension
+        return areas[0] * fracs[0] * pdfs[0].get_pdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * pdfs[1].get_pdf(x, *params[self.par_idxs[1]])
 
     def get_cdf(self, x, *params):
         """
@@ -448,12 +448,10 @@ class SumDists(rv_continuous):
                 x, *params[self.par_idxs[0]]
             ), areas[1] * fracs[1] * cdfs[1].get_cdf(x, *params[self.par_idxs[1]])
 
-        else:
-            # This is faster than list comprehension
-            probs = areas[0] * fracs[0] * cdfs[0].get_cdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * cdfs[1].get_cdf(x, *params[self.par_idxs[1]])
-            return probs
+        # This is faster than list comprehension
+        return areas[0] * fracs[0] * cdfs[0].get_cdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * cdfs[1].get_cdf(x, *params[self.par_idxs[1]])
 
     def pdf_norm(self, x, *params):
         """
@@ -477,8 +475,7 @@ class SumDists(rv_continuous):
 
         if norm == 0:
             return np.full_like(x, np.inf)
-        else:
-            return self.get_pdf(x, *params) / norm
+        return self.get_pdf(x, *params) / norm
 
     def cdf_norm(self, x, *params):
         """
@@ -502,8 +499,7 @@ class SumDists(rv_continuous):
 
         if norm == 0:
             return np.full_like(x, np.inf)
-        else:
-            return (self.get_cdf(x, *params)) / norm
+        return (self.get_cdf(x, *params)) / norm
 
     def pdf_ext(self, x, *params):
         """
@@ -554,12 +550,11 @@ class SumDists(rv_continuous):
                 areas[0] * fracs[0] * pdf_exts[0].get_pdf(x, *params[self.par_idxs[0]]),
                 areas[1] * fracs[1] * pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]]),
             )
-        else:
-            probs = areas[0] * fracs[0] * pdf_exts[0].get_pdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]])
+        probs = areas[0] * fracs[0] * pdf_exts[0].get_pdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]])
 
-            return sig, probs
+        return sig, probs
 
     def cdf_ext(self, x, *params):
         """
@@ -581,12 +576,10 @@ class SumDists(rv_continuous):
                 x, *params[self.par_idxs[0]]
             ), areas[1] * fracs[1] * cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
 
-        else:
-            # This is faster than list comprehension
-            probs = areas[0] * fracs[0] * cdf_exts[0].get_cdf(
-                x, *params[self.par_idxs[0]]
-            ) + areas[1] * fracs[1] * cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
-            return probs
+        # This is faster than list comprehension
+        return areas[0] * fracs[0] * cdf_exts[0].get_cdf(
+            x, *params[self.par_idxs[0]]
+        ) + areas[1] * fracs[1] * cdf_exts[1].get_cdf(x, *params[self.par_idxs[1]])
 
     def required_args(self) -> list:
         """
@@ -632,10 +625,9 @@ class SumDists(rv_continuous):
 
         if errors is not None:
             return mu, errors[mu_idx]
-        elif cov is not None:
+        if cov is not None:
             return mu, np.sqrt(cov[mu_idx][mu_idx])
-        else:
-            return mu
+        return mu
 
     def get_mode(
         self, pars: np.ndarray, cov: np.ndarray = None, errors: np.ndarray = None
@@ -665,10 +657,9 @@ class SumDists(rv_continuous):
 
         if errors is not None:
             return mu, errors[mu_idx]
-        elif cov is not None:
+        if cov is not None:
             return mu, np.sqrt(cov[mu_idx][mu_idx])
-        else:
-            return mu
+        return mu
 
     def get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
         r"""
@@ -695,10 +686,9 @@ class SumDists(rv_continuous):
 
         if cov is None:
             return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
-        else:
-            return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2)), np.sqrt(
-                cov[sigma_idx][sigma_idx]
-            ) * 2 * np.sqrt(2 * np.log(2))
+        return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2)), np.sqrt(
+            cov[sigma_idx][sigma_idx]
+        ) * 2 * np.sqrt(2 * np.log(2))
 
     def get_fwfm(self, pars: np.ndarray, cov: np.ndarray = None, frac_max=0.5) -> tuple:
         r"""
@@ -725,10 +715,9 @@ class SumDists(rv_continuous):
 
         if cov is None:
             return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max))
-        else:
-            return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max)), np.sqrt(
-                cov[sigma_idx][sigma_idx]
-            ) * 2 * np.sqrt(-2 * np.log(frac_max))
+        return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max)), np.sqrt(
+            cov[sigma_idx][sigma_idx]
+        ) * 2 * np.sqrt(-2 * np.log(frac_max))
 
     def get_total_events(
         self, pars: np.ndarray, cov: np.ndarray = None, errors: np.ndarray = None
@@ -760,12 +749,11 @@ class SumDists(rv_continuous):
             return pars[n_sig_idx] + pars[n_bkg_idx], np.sqrt(
                 errors[n_sig_idx] ** 2 + errors[n_bkg_idx] ** 2
             )
-        elif cov is not None:
+        if cov is not None:
             return pars[n_sig_idx] + pars[n_bkg_idx], np.sqrt(
                 cov[n_sig_idx][n_sig_idx] ** 2 + cov[n_bkg_idx][n_bkg_idx] ** 2
             )
-        else:
-            return pars[n_sig_idx] + pars[n_bkg_idx]
+        return pars[n_sig_idx] + pars[n_bkg_idx]
 
     def __getattribute__(self, attr):
         """

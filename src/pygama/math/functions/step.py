@@ -1,6 +1,7 @@
 """
 Step distributions for pygama
 """
+from __future__ import annotations
 
 from math import erf
 
@@ -85,9 +86,7 @@ def nb_unnorm_step_pdf(x: float, mu: float, sigma: float, hstep: float) -> float
     invs = np.sqrt(2) * sigma
     if invs == 0:
         return 1 + hstep
-    else:
-        step_f = 1 + hstep * erf((x - mu) / invs)
-        return step_f
+    return 1 + hstep * erf((x - mu) / invs)
 
 
 @nb.njit(**nb_kwargs)

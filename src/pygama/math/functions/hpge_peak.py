@@ -43,6 +43,7 @@ Notes
 -----
 The extended Gaussian distribution and the step distribution share the mu, sigma with the Gaussian
 """
+from __future__ import annotations
 
 import numpy as np
 
@@ -111,16 +112,13 @@ def hpge_get_fwhm(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
             return hpge_peak_fwhm(
                 pars[sigma_idx], pars[htail_idx], pars[tau_idx], dropped_cov
             )
-        else:
-            return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx])
+        return hpge_peak_fwhm(pars[sigma_idx], pars[htail_idx], pars[tau_idx])
 
-    else:
-        if cov is None:
-            return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
-        else:
-            return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2)), np.sqrt(
-                cov[sigma_idx][sigma_idx]
-            ) * 2 * np.sqrt(2 * np.log(2))
+    if cov is None:
+        return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
+    return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2)), np.sqrt(
+        cov[sigma_idx][sigma_idx]
+    ) * 2 * np.sqrt(2 * np.log(2))
 
 
 # This is defined here as to avoid a circular import inside `SumDists`
@@ -164,18 +162,15 @@ def hpge_get_fwfm(
                 frac_max=frac_max,
                 cov=dropped_cov,
             )
-        else:
-            return hpge_peak_fwfm(
-                pars[sigma_idx], pars[htail_idx], pars[tau_idx], frac_max=frac_max
-            )
+        return hpge_peak_fwfm(
+            pars[sigma_idx], pars[htail_idx], pars[tau_idx], frac_max=frac_max
+        )
 
-    else:
-        if cov is None:
-            return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
-        else:
-            return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max)), np.sqrt(
-                cov[sigma_idx][sigma_idx]
-            ) * 2 * np.sqrt(-2 * np.log(frac_max))
+    if cov is None:
+        return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
+    return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max)), np.sqrt(
+        cov[sigma_idx][sigma_idx]
+    ) * 2 * np.sqrt(-2 * np.log(frac_max))
 
 
 # This is defined here as to avoid a circular import inside `SumDists`
@@ -219,16 +214,13 @@ def hpge_get_mode(self, pars: np.ndarray, cov: np.ndarray = None) -> tuple:
                 pars[tau_idx],
                 dropped_cov,
             )
-        else:
-            return hpge_peak_mode(
-                pars[mu_idx], pars[sigma_idx], pars[htail_idx], pars[tau_idx]
-            )
+        return hpge_peak_mode(
+            pars[mu_idx], pars[sigma_idx], pars[htail_idx], pars[tau_idx]
+        )
 
-    else:
-        if cov is None:
-            return pars[mu_idx]
-        else:
-            return pars[mu_idx], np.sqrt(cov[mu_idx][mu_idx])
+    if cov is None:
+        return pars[mu_idx]
+    return pars[mu_idx], np.sqrt(cov[mu_idx][mu_idx])
 
 
 # hpge_peak.get_fwhm = hpge_get_fwhm
