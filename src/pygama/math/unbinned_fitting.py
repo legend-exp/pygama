@@ -20,8 +20,8 @@ def fit_unbinned(
     extended: bool = True,
     cost_func: str = "LL",
     simplex: bool = False,
-    bounds: list[tuple[float, float], ...] | None = None,
-    fixed: list[bool, ...] | None = None,
+    bounds: list[tuple[float, float]] | None = None,
+    fixed: list[bool] | None = None,
 ) -> tuple[np.ndarray, ...]:
     """Do a unbinned fit to data.
     Default is extended Log Likelihood fit, with option for other cost functions.

@@ -44,7 +44,7 @@ def get_par_names(func: Callable) -> tuple[str, ...]:
     return par[0][1:]
 
 
-def get_formatted_stats(mean: float, sigma: float, ndigs: int = 2) -> str:
+def get_formatted_stats(mean: float, sigma: float, ndigs: int = 2) -> tuple[str, str]:
     """
     convenience function for formatting mean +/- sigma to the right number of
     significant figures.
