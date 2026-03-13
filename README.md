@@ -14,11 +14,11 @@
 [![Read the Docs](https://img.shields.io/readthedocs/pygama?logo=readthedocs)](https://pygama.readthedocs.io)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10614246.svg)](https://zenodo.org/doi/10.5281/zenodo.10614246)
 
-*pygama* is a Python package for:
+_pygama_ is a Python package for:
 
 - converting physics data acquisition system output to
-  [LH5-format](https://legend-exp.github.io/legend-data-format-specs) HDF5
-  files (functionality provided by the
+  [LH5-format](https://legend-exp.github.io/legend-data-format-specs) HDF5 files
+  (functionality provided by the
   [legend-pydataobj](https://legend-pydataobj.readthedocs.io) and
   [legend-daq2lh5](https://legend-daq2lh5.readthedocs.io) packages)
 - performing bulk digital signal processing (DSP) on time-series data
@@ -36,7 +36,7 @@ If you are using this software, consider
 
 - [legend-exp/legend-pydataobj](https://github.com/legend-exp/legend-pydataobj)
   → LEGEND Python Data Objects
-- [legend-exp/legend-daq2lh5](https://github.com/legend-exp/legend-daq2lh5)
-  → Convert digitizer data to LEGEND HDF5
-- [legend-exp/dspeed](https://github.com/legend-exp/dspeed)
-  → Fast Digital Signal Processing for particle detector signals in Python
+- [legend-exp/legend-daq2lh5](https://github.com/legend-exp/legend-daq2lh5) →
+  Convert digitizer data to LEGEND HDF5
+- [legend-exp/dspeed](https://github.com/legend-exp/dspeed) → Fast Digital
+  Signal Processing for particle detector signals in Python

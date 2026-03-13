@@ -1,12 +1,13 @@
+from __future__ import annotations
+
 from math import erf, erfc
-from typing import Union
 
 import numba as nb
 import numpy as np
 
 
 @nb.vectorize([nb.float32(nb.float32), nb.float64(nb.float64)])
-def nb_erf(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def nb_erf(x: float | np.ndarray) -> float | np.ndarray:
     r"""
     Numba version of error function.
     Vectorization is necessary here for the math.erf
@@ -28,7 +29,7 @@ def nb_erf(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
 
 
 @nb.vectorize([nb.float32(nb.float32), nb.float64(nb.float64)])
-def nb_erfc(x: Union[float, np.ndarray]) -> Union[float, np.ndarray]:
+def nb_erfc(x: float | np.ndarray) -> float | np.ndarray:
     r"""
     Numba version of complementary error function
     Vectorization is necessary here for the math.erfc

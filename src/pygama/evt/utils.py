@@ -46,8 +46,7 @@ def make_numpy_full(size, fill_value, try_dtype):
     # turn fill_value into an array (or scalar) so we have a proper dtype
     if np.can_cast(np.array(fill_value).dtype, try_dtype):
         return np.full(size, fill_value, dtype=try_dtype)
-    else:
-        return np.full(size, fill_value)
+    return np.full(size, fill_value)
 
 
 def copy_lgdo_attrs(obj):
@@ -57,7 +56,7 @@ def copy_lgdo_attrs(obj):
 
 
 def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:
-    pre = table_id_fmt.split("{")[0]
+    pre = table_id_fmt.split("{", maxsplit=1)[0]
     post = table_id_fmt.split("}")[1]
     try:
         return int(ch.strip(pre).strip(post))
@@ -68,12 +67,10 @@ def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:
 def get_table_name_by_pattern(table_id_fmt: str, ch_id: int) -> str:
     # check table_id_fmt validity
     pattern_check = re.findall(r"{([^}]*?)}", table_id_fmt)[0]
-    if pattern_check == "" or ":" == pattern_check[0]:
+    if pattern_check == "" or pattern_check[0] == ":":
         return table_id_fmt.format(ch_id)
-    else:
-        raise NotImplementedError(
-            "only empty placeholders {} in format specifications are currently supported"
-        )
+    msg = "only empty placeholders {} in format specifications are currently supported"
+    raise NotImplementedError(msg)
 
 
 def find_parameters(
@@ -121,6 +118,7 @@ def find_parameters(
                     zip(
                         [f"{name}_" + e for e in ak.fields(tier_ak)],
                         ak.unzip(tier_ak),
+                        strict=False,
                     )
                 )
                 final_dict = final_dict | tier_dict
@@ -210,11 +208,12 @@ def get_data_at_channel(
 
         # in this method only 1D values are allowed
         if res.ndim > 1:
-            raise ValueError(
+            msg = (
                 f"expression '{expr}' must return 1D array. If you are using "
                 "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
                 "reduction functions to reduce the dimension"
             )
+            raise ValueError(msg)
 
     return res
 
@@ -272,11 +271,12 @@ def get_mask_from_query(
 
         limarr = ak.to_numpy(limarr, allow_missing=False)
         if limarr.ndim > 1:
-            raise ValueError(
+            msg = (
                 f"query '{query}' must return 1D array. If you are using "
                 "VectorOfVectors or ArrayOfEqualSizedArrays, use awkward "
                 "reduction functions to reduce the dimension"
             )
+            raise ValueError(msg)
 
     # or forward the array
     elif isinstance(query, np.ndarray):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numba as nb
 import numpy as np
 from numba import prange
@@ -140,13 +142,12 @@ def nb_linear_scaled_cdf(
 
 
 class LinearGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = None
         self.x_hi = None
         super().__init__(*args, **kwargs)
 
-    def _argcheck(self, x_lo, x_hi, m, b):
+    def _argcheck(self, _x_lo, _x_hi, _m, _b):
         return True
 
     def _pdf(self, x: np.ndarray, x_lo: float, x_hi: float, m, b) -> np.ndarray:

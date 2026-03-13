@@ -33,6 +33,8 @@ The first step function shares the mu_1, sigma_1 with the first Gaussian,
 and the second step function shares the mu_2, sigma_2 with the second Gaussian
 """
 
+from __future__ import annotations
+
 from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.gauss_on_step import gauss_on_step
 from pygama.math.functions.sum_dists import SumDists

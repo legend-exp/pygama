@@ -2,6 +2,8 @@
 Crystal ball distributions for Pygama
 """
 
+from __future__ import annotations
+
 from math import erf
 
 import numba as nb
@@ -51,7 +53,8 @@ def nb_crystal_ball_pdf(
     """
 
     if (beta <= 0) or (m <= 1):
-        raise ValueError("beta must be greater than 0, and m must be greater than 1")
+        msg = "beta must be greater than 0, and m must be greater than 1"
+        raise ValueError(msg)
 
     # Define some constants to calculate the function
     const_a = (m / np.abs(beta)) ** m * np.exp(-1 * beta**2 / 2.0)
@@ -115,7 +118,8 @@ def nb_crystal_ball_cdf(
     """
 
     if (beta <= 0) or (m <= 1):
-        raise ValueError("beta must be greater than 0, and m must be greater than 1")
+        msg = "beta must be greater than 0, and m must be greater than 1"
+        raise ValueError(msg)
     # Define some constants to calculate the function
     const_a = (m / np.abs(beta)) ** m * np.exp(-1 * beta**2 / 2.0)
     const_b = m / np.abs(beta) - np.abs(beta)
@@ -200,7 +204,6 @@ def nb_crystal_ball_scaled_cdf(
 
 
 class CrystalBallGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.x_lo = -1 * np.inf

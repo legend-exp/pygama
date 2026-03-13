@@ -58,6 +58,7 @@ Code style
   .. code-block:: python
 
     import logging
+
     log = logging.getLogger(__name__)
 
   at the top. In general, try to keep the number of :func:`logging.debug` calls

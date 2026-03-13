@@ -18,9 +18,9 @@ coin_groups = namedtuple("coin_groups", ["name", "window", "window_ref"])
 def generate_tcm_cols(
     iterators: list,
     coin_windows: float = 0,
-    table_keys: list[int] = None,
-    row_in_tables: list[int] = None,
-    fields: list[str] = None,
+    table_keys: list[int] | None = None,
+    row_in_tables: list[int] | None = None,
+    fields: list[str] | None = None,
 ) -> dict[np.ndarray]:
     r"""Generate the columns of a time coincidence map.
 
@@ -89,7 +89,7 @@ def generate_tcm_cols(
         # primary keys are coin_cols in given order, with table_key as a tie-breaker
         table_key_np = ak.to_numpy(arr["table_key"])
         coin_key_nps = [ak.to_numpy(arr[entry.name]) for entry in coin_windows_local]
-        order = np.lexsort([table_key_np] + list(reversed(coin_key_nps)))
+        order = np.lexsort([table_key_np, *list(reversed(coin_key_nps))])
         return arr[order]
 
     def _get_sort_keys(arr: ak.Array, coin_windows_local) -> list[np.ndarray]:
@@ -116,7 +116,7 @@ def generate_tcm_cols(
 
         while ia < na and ib < nb:
             take_a = False
-            for ka, kb in zip(a_keys, b_keys):
+            for ka, kb in zip(a_keys, b_keys, strict=False):
                 va = ka[ia]
                 vb = kb[ib]
                 if va < vb:
@@ -149,7 +149,7 @@ def generate_tcm_cols(
 
     if coin_windows in (None, 0):
         coin_windows = []
-    elif not isinstance(coin_windows, (list, tuple, np.ndarray)):
+    elif not isinstance(coin_windows, list | tuple | np.ndarray):
         coin_windows = [coin_windows]
 
     tcm = None
@@ -212,10 +212,7 @@ def generate_tcm_cols(
         new_tcm = ak.concatenate(arrays, axis=0) if len(arrays) > 0 else None
         new_tcm = _sort_tcm(new_tcm, coin_windows)
 
-        if tcm is None:
-            tcm = new_tcm
-        else:
-            tcm = _merge_sorted_tcms(tcm, new_tcm, coin_windows)
+        tcm = new_tcm if tcm is None else _merge_sorted_tcms(tcm, new_tcm, coin_windows)
 
         # Ensure tcm doesn't retain views into iterator-reused buffers.
         tcm = ak.copy(tcm)
@@ -230,7 +227,8 @@ def generate_tcm_cols(
             if entry.window_ref == "last":
                 mask = mask | (diffs > entry.window)
             else:
-                raise NotImplementedError(f"window_ref {entry.window_ref}")
+                msg = f"window_ref {entry.window_ref}"
+                raise NotImplementedError(msg)
 
         # grab up to evt including last instance of a channel to know that all channels
         # have been included in previous evts
@@ -250,7 +248,8 @@ def generate_tcm_cols(
         # build dict only for keys that appear in current tcm buffer (small)
         present = last_idx >= 0
         last_instance = {
-            int(k): int(v) for k, v in zip(table_keys_np[present], last_idx[present])
+            int(k): int(v)
+            for k, v in zip(table_keys_np[present], last_idx[present], strict=False)
         }
 
         log.debug(
@@ -324,9 +323,6 @@ def generate_tcm_cols(
                     ),
                 )
 
-        if last_entry is None:
-            tcm = None
-        else:
-            tcm = tcm[last_entry:]
+        tcm = None if last_entry is None else tcm[last_entry:]
 
         yield out_tbl

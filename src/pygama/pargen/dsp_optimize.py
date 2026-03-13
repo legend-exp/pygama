@@ -480,9 +480,7 @@ class BayesianOptimizer:
 
         # Add initial observations
         optimizer.add_initial_values(
-            np.array([[0], [2], [-1]]),
-            np.array([10.0, 5.0, 7.0]),
-            np.array([0.1, 0.2, 0.1])
+            np.array([[0], [2], [-1]]), np.array([10.0, 5.0, 7.0]), np.array([0.1, 0.2, 0.1])
         )
 
         # Update DSP parameters database with the current optimization point

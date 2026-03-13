@@ -20,6 +20,8 @@ gauss_on_exponential
     A subclass of :class:`SumDists` and :class:`rv_continuous`, has methods of :func:`pdf`, :func:`cdf`, etc.
 """
 
+from __future__ import annotations
+
 from pygama.math.functions.exponential import exponential
 from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.sum_dists import SumDists
