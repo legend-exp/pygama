@@ -503,7 +503,7 @@ def generate_cuts(
             {
                 "output_parameter_name": {
                     "expression": "cut_expression",
-                    "parameters": {"a": lower_bound, "b": upper_bound}
+                    "parameters": {"a": lower_bound, "b": upper_bound},
                 }
             }
 
