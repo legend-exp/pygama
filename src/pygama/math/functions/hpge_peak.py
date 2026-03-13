@@ -168,7 +168,7 @@ def hpge_get_fwfm(
         )
 
     if cov is None:
-        return pars[sigma_idx] * 2 * np.sqrt(2 * np.log(2))
+        return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max))
     return pars[sigma_idx] * 2 * np.sqrt(-2 * np.log(frac_max)), np.sqrt(
         cov[sigma_idx][sigma_idx]
     ) * 2 * np.sqrt(-2 * np.log(frac_max))

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.stats import exponnorm, norm
 
-from pygama.math.functions.hpge_peak import hpge_peak
+from pygama.math.functions.hpge_peak import hpge_get_fwfm, hpge_peak
 from pygama.math.functions.sum_dists import SumDists
 
 
@@ -132,3 +132,45 @@ def test_required_args():
 
 def test_name():
     assert hpge_peak.name == "hpge_peak"
+
+
+def test_hpge_get_fwfm_non_hpge_peak_fallback():
+    """Test that hpge_get_fwfm uses frac_max (not FWHM) for non-hpge-peak distributions."""
+    from pygama.math.functions.gauss import gaussian
+
+    sigma = 2.0
+    mu = 5.0
+    # gaussian required_args are (mu, sigma)
+    pars = np.array([mu, sigma])
+
+    frac_max_half = 0.5
+    frac_max_tenth = 0.1
+
+    # Without covariance: result should depend on frac_max
+    result_half = hpge_get_fwfm(gaussian, pars, frac_max=frac_max_half)
+    result_tenth = hpge_get_fwfm(gaussian, pars, frac_max=frac_max_tenth)
+    expected_half = sigma * 2 * np.sqrt(-2 * np.log(frac_max_half))
+    expected_tenth = sigma * 2 * np.sqrt(-2 * np.log(frac_max_tenth))
+
+    assert np.isclose(result_half, expected_half)
+    assert np.isclose(result_tenth, expected_tenth)
+    # Ensure the two results differ (i.e., frac_max is actually used)
+    assert not np.isclose(result_half, result_tenth)
+
+    # With covariance: result and error should both depend on frac_max
+    n_pars = len(pars)
+    cov = np.eye(n_pars) * 0.01
+    result_half_cov, err_half_cov = hpge_get_fwfm(
+        gaussian, pars, frac_max=frac_max_half, cov=cov
+    )
+    result_tenth_cov, err_tenth_cov = hpge_get_fwfm(
+        gaussian, pars, frac_max=frac_max_tenth, cov=cov
+    )
+    sigma_idx = np.where(np.array(gaussian.required_args()) == "sigma")[0][0]
+    expected_err = np.sqrt(cov[sigma_idx][sigma_idx]) * 2 * np.sqrt(
+        -2 * np.log(frac_max_half)
+    )
+
+    assert np.isclose(result_half_cov, expected_half)
+    assert np.isclose(err_half_cov, expected_err)
+    assert not np.isclose(result_half_cov, result_tenth_cov)
