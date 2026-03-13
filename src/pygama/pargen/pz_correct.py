@@ -253,8 +253,7 @@ def dpz_model_fit(
     # order so tau1 largest
     if m.values[1] > m.values[2]:
         return m.values[1], m.values[2], m.values[3], out_plot_dict
-    else:
-        return m.values[2], m.values[1], 1 - m.values[3], out_plot_dict
+    return m.values[2], m.values[1], 1 - m.values[3], out_plot_dict
 
 
 def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.array:
@@ -302,6 +301,24 @@ def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.
 
 
 class PZCorrect:
+    """
+    Extract pole-zero correction constants from HPGe waveform data.
+
+    Provides methods for determining single- and double-pole-zero (DPZ)
+    decay constants by fitting the exponential tail of raw waveforms.
+    Results are accumulated in :attr:`output_dict` in a format suitable for
+    direct use as a DSP parameter database.
+
+    Parameters
+    ----------
+    dsp_config
+        DSP processing chain configuration dictionary.
+    wf_field
+        Name of the waveform field in the input :class:`lgdo.Table`.
+    debug_mode
+        If True, additional diagnostic information is retained.
+    """
+
     def __init__(self, dsp_config, wf_field, debug_mode=False):
         self.dsp_config = dsp_config
         self.wf_field = wf_field
@@ -313,14 +330,28 @@ class PZCorrect:
         self, tb_data: lgdo.Table, slope_param="tail_slope", display=0
     ):
         """
-        Finds the decay constant from the modal value of the tail slope after cuts
-        and saves it to the specified json. Updates self.output_dict with tau value
+        Determine the single pole-zero decay constant from the tail slope.
+
+        Runs the DSP chain on *tb_data*, extracts the *slope_param* column,
+        estimates the mode and standard deviation of the slope distribution,
+        and converts the modal value to a time constant τ = −1/mode.  The
+        result is stored in :attr:`output_dict` under the ``"pz"`` key.
 
         Parameters
         ----------
-        - slopes: numpy array of tail slopes
-        - wfs: WaveformTable object containing waveform data
+        tb_data
+            LH5 table containing the raw waveforms and any parameters
+            needed by :attr:`dsp_config`.
+        slope_param
+            Name of the tail-slope output column produced by the DSP chain.
+        display
+            If > 0, return a plot dictionary; otherwise return ``None``.
 
+        Returns
+        -------
+        out_plot_dict
+            Dictionary of diagnostic figures (empty if *display* > 0), or
+            ``None`` when *display* ≤ 0.
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config)
         slopes = tb_out[slope_param].nda
@@ -332,8 +363,8 @@ class PZCorrect:
 
         sampling_rate = wfs["dt"].nda[0]
         units = wfs["dt"].attrs["units"]
-        tau = f"{tau*sampling_rate}*{units}"
-        err = f"{err*sampling_rate}*{units}"
+        tau = f"{tau * sampling_rate}*{units}"
+        err = f"{err * sampling_rate}*{units}"
 
         if "pz" in self.output_dict:
             self.output_dict["pz"].update({"tau1": tau, "tau1_err": err})
@@ -345,10 +376,9 @@ class PZCorrect:
         )
 
         if display <= 0:
-            return
-        else:
-            out_plot_dict = {}
-            return out_plot_dict
+            return None
+        out_plot_dict = {}
+        return out_plot_dict
 
     def get_dpz_decay_constants(
         self,
@@ -478,20 +508,20 @@ class PZCorrect:
         if "units" in dpz_opt_tb_out["tau1"].attrs and dpz_opt_tb_out["tau1"].attrs[
             "units"
         ] not in ["ADC", "sample"]:
-            tau1 = f'{tau1}*{dpz_opt_tb_out["tau1"].attrs["units"]}'
-            tau1_err = f'{tau1_err}*{dpz_opt_tb_out["tau1"].attrs["units"]}'
+            tau1 = f"{tau1}*{dpz_opt_tb_out['tau1'].attrs['units']}"
+            tau1_err = f"{tau1_err}*{dpz_opt_tb_out['tau1'].attrs['units']}"
         else:
-            tau1 = f"{tau1*sampling_rate}*{units}"
-            tau1_err = f"{tau1_err*sampling_rate}*{units}"
+            tau1 = f"{tau1 * sampling_rate}*{units}"
+            tau1_err = f"{tau1_err * sampling_rate}*{units}"
 
         if "units" in dpz_opt_tb_out["tau2"].attrs and dpz_opt_tb_out["tau2"].attrs[
             "units"
         ] not in ["ADC", "sample"]:
-            tau2 = f'{tau2}*{dpz_opt_tb_out["tau2"].attrs["units"]}'
-            tau2_err = f'{tau2_err}*{dpz_opt_tb_out["tau2"].attrs["units"]}'
+            tau2 = f"{tau2}*{dpz_opt_tb_out['tau2'].attrs['units']}"
+            tau2_err = f"{tau2_err}*{dpz_opt_tb_out['tau2'].attrs['units']}"
         else:
-            tau2 = f"{tau2*sampling_rate}*{units}"
-            tau2_err = f"{tau2_err*sampling_rate}*{units}"
+            tau2 = f"{tau2 * sampling_rate}*{units}"
+            tau2_err = f"{tau2_err * sampling_rate}*{units}"
 
         output_dict = {
             "tau1": tau1,
@@ -507,9 +537,8 @@ class PZCorrect:
             self.output_dict["pz"] = output_dict
 
         if display <= 0:
-            return
-        else:
-            return out_plot_dict
+            return None
+        return out_plot_dict
 
     def plot_waveforms_after_correction(
         self,
@@ -523,7 +552,45 @@ class PZCorrect:
         fontsize=8,
         n_waveforms=100,
         downsample=1,
-    ):
+    ) -> dict:
+        """
+        Plot a random selection of waveforms after applying the PZ correction.
+
+        Runs the DSP chain with the current :attr:`output_dict` parameters so
+        that the corrected waveform field (*wf_field*) reflects the fitted
+        pole-zero constants.
+
+        Parameters
+        ----------
+        tb_data
+            Raw waveform table (:class:`lgdo.Table`) to process.
+        wf_field
+            Name of the corrected waveform field in the DSP output table.
+        xlim
+            x-axis limits ``(lo, hi)`` in samples.
+        ylim
+            y-axis limits ``(lo, hi)`` in ADU, or None for auto-scaling.
+        norm_param
+            If given, each waveform is divided by the value of this DSP
+            output parameter so that traces are displayed on a normalised
+            scale.
+        display
+            If > 1, call ``plt.show()``; if ≤ 1, close the figure after
+            saving it to the returned dictionary.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Base font size for the plot.
+        n_waveforms
+            Number of waveforms to draw (sampled randomly).
+        downsample
+            Plot every *downsample*-th sample to reduce rendering load.
+
+        Returns
+        -------
+        plot_dict
+            Dictionary ``{"waveforms": fig}`` containing the matplotlib figure.
+        """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
         wf_idxs = np.random.choice(len(wfs), n_waveforms)
@@ -560,8 +627,37 @@ class PZCorrect:
         display=0,
         figsize=(8, 6),
         fontsize=8,
-    ):
+    ) -> dict:
+        """
+        Plot a histogram of waveform tail slopes before or after PZ correction.
 
+        Useful for visually assessing whether the fitted decay constant
+        successfully centres the slope distribution at zero.
+
+        Parameters
+        ----------
+        tb_data
+            Raw waveform table (:class:`lgdo.Table`) to process.
+        slope_field
+            Name of the tail-slope field in the DSP output table.
+        with_correction
+            If True, apply the current :attr:`output_dict` PZ parameters
+            before computing slopes.  If False, run the DSP chain without
+            any correction.
+        display
+            If > 1, call ``plt.show()``; if ≤ 1, close the figure after
+            saving it to the returned dictionary.
+        figsize
+            Figure size ``(width, height)`` in inches.
+        fontsize
+            Base font size for the plot.
+
+        Returns
+        -------
+        out_plot_dict
+            Dictionary ``{"slopes": fig}`` or ``{"corrected_slope": fig}``
+            containing the matplotlib figure.
+        """
         tb_out = opt.run_one_dsp(
             tb_data,
             self.dsp_config,

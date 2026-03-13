@@ -14,7 +14,6 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-import pygama.math.distributions as pmd  # noqa: pycln, F401
 from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
@@ -82,15 +81,15 @@ def dplms_ge_dict(
         bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
     log.info(
-        f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1-t0):.2f} s"
+        f"total events {len(raw_fft)}, {len(bls)} baseline selected in {(t1 - t0):.2f} s"
     )
     log.info(
-        f'Calculating noise matrix of length {dplms_dict["length"]} n. events: {bls.shape[0]}, size: {bls.shape[1]}'
+        f"Calculating noise matrix of length {dplms_dict['length']} n. events: {bls.shape[0]}, size: {bls.shape[1]}"
     )
 
     nmat = noise_matrix(bls, dplms_dict["length"])
     t2 = time.time()
-    log.info(f"Time to calculate noise matrix {(t2-t1):.2f} s")
+    log.info(f"Time to calculate noise matrix {(t2 - t1):.2f} s")
 
     log.info("Selecting signals")
     wsize = dplms_dict["wsize"]
@@ -101,7 +100,7 @@ def dplms_ge_dict(
     log.info(f"Produce dsp data for {len(raw_cal)} events")
     dsp_cal = run_one_dsp(raw_cal, dsp_config, db_dict=par_dsp)
     t3 = time.time()
-    log.info(f"Time to run dsp production {(t3-t2):.2f} s")
+    log.info(f"Time to run dsp production {(t3 - t2):.2f} s")
 
     dsp_config["outputs"] = [ene_par, ctc_par]
 
@@ -128,7 +127,7 @@ def dplms_ge_dict(
     min_idx = None
 
     for i, values in enumerate(prod):
-        coeff_values = dict(zip(coeff_keys, values))
+        coeff_values = dict(zip(coeff_keys, values, strict=False))
         log_msg = f"Case {i} ->"
         for key, value in coeff_values.items():
             log_msg += f" {key} = {value}"
@@ -159,7 +158,7 @@ def dplms_ge_dict(
         )
         par_dsp["dplms"] = {"length": dplms_dict["length"], "coefficients": x}
         log.info(
-            f"Filter synthesis in {time.time()-t_tmp:.1f} s, filter area {np.sum(x)}"
+            f"Filter synthesis in {time.time() - t_tmp:.1f} s, filter area {np.sum(x)}"
         )
 
         t_tmp = time.time()
@@ -185,7 +184,7 @@ def dplms_ge_dict(
         )
         p_val = chi2.sf(chisquare[0], chisquare[1])
         log.info(
-            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time()-t_tmp:.1f} s"
+            f"FWHM = {fwhm:.2f} ± {fwhm_err:.2f} keV, p_val={p_val} evaluated in {time.time() - t_tmp:.1f} s"
         )
         grid_dict[i]["fwhm"] = fwhm
         grid_dict[i]["fwhm_err"] = fwhm_err
@@ -203,7 +202,7 @@ def dplms_ge_dict(
         min_result = grid_dict[min_idx]
         best_case_values = {key: min_result[key] for key in min_result.keys()}
 
-        fwhm = best_case_values.get("fwhm", None)
+        fwhm = best_case_values.get("fwhm")
         fwhm_err = best_case_values.get("fwhm_err", 0)
         alpha = best_case_values.get("alpha", 0)
         nm_coeff = best_case_values.get("nm", dplms_dict["dp_def"]["nm"])
@@ -279,7 +278,7 @@ def dplms_ge_dict(
     }
     out_dict.update({"ctc_params": out_alpha_dict})
 
-    log.info(f"Time to complete DPLMS filter synthesis {time.time()-t0:.1f}")
+    log.info(f"Time to complete DPLMS filter synthesis {time.time() - t0:.1f}")
 
     if display > 0:
         plot_dict = {"ref": ref, "coefficients": x}
@@ -397,13 +396,34 @@ def dplms_ge_dict(
         ax.indicate_inset_zoom(axin)
 
         return out_dict, plot_dict
-    else:
-        return out_dict
+    return out_dict
 
 
-def is_valid_centroid(
-    centroid: np.array, lim: int, size: int, full_size: int
-) -> list[bool]:
+def is_valid_centroid(centroid: np.array, lim: int, size: int, full_size: int) -> tuple:
+    """
+    Select waveforms whose centroid lies within a valid alignment window.
+
+    Parameters
+    ----------
+    centroid
+        Per-event centroid positions (samples).
+    lim
+        Half-width of the allowed centroid displacement from the nominal
+        centre of the waveform window (samples).
+    size
+        Length of the waveform window used for filter synthesis (samples).
+    full_size
+        Total waveform buffer length (samples).
+
+    Returns
+    -------
+    idxs
+        Boolean mask that is True for valid events.
+    llim
+        Lower centroid boundary used (samples).
+    hlim
+        Upper centroid boundary used (samples).
+    """
     llim = size / 2 - lim
     hlim = full_size - size / 2
     idxs = (centroid > llim) & (centroid < hlim)
@@ -412,7 +432,38 @@ def is_valid_centroid(
 
 def is_not_pile_up(
     peak_pos: np.array, peak_pos_neg: np.array, thr: int, lim: int, size: int
-) -> list[bool]:
+) -> tuple:
+    """
+    Reject pile-up events based on the presence of secondary peaks.
+
+    A histogram of positive-peak positions is used to define a single-peak
+    band; events with additional peaks outside that band, or any negative
+    peaks, are flagged as pile-up.
+
+    Parameters
+    ----------
+    peak_pos
+        2-D array of positive peak positions per event (samples).
+    peak_pos_neg
+        2-D array of negative peak positions per event (samples).
+    thr
+        Amplitude threshold (percent of histogram maximum) used to define
+        the edges of the primary peak band.
+    lim
+        Half-width of the search window around the nominal waveform centre
+        (samples).
+    size
+        Length of the waveform window used for filter synthesis (samples).
+
+    Returns
+    -------
+    idxs
+        Per-event mask; True means the event is pile-up free.
+    llow
+        Lower boundary of the accepted peak band (samples).
+    lupp
+        Upper boundary of the accepted peak band (samples).
+    """
     bin_edges = np.linspace(size / 2 - lim, size / 2 + lim, 2 * lim)
     hist, bin_edges = np.histogram(peak_pos, bins=bin_edges)
 
@@ -428,7 +479,7 @@ def is_not_pile_up(
     llow, lupp = bin_edges[idx_low], bin_edges[idx_upp]
 
     idxs = []
-    for n, nn in zip(peak_pos, peak_pos_neg):
+    for n, nn in zip(peak_pos, peak_pos_neg, strict=False):
         condition1 = np.count_nonzero(n > 0) == 1
         condition2 = (
             np.count_nonzero((n > 0) & ((n < llow) | (n > lupp) & (n < size))) == 0
@@ -438,13 +489,60 @@ def is_not_pile_up(
     return idxs, llow, lupp
 
 
-def is_valid_risetime(risetime: np.array, llim: int, perc: float):
+def is_valid_risetime(risetime: np.array, llim: int, perc: float) -> tuple:
+    """
+    Select waveforms within an acceptable risetime range.
+
+    Parameters
+    ----------
+    risetime
+        Per-event risetime values (samples), e.g. ``tp_90 - tp_10``.
+    llim
+        Minimum allowed risetime (samples).
+    perc
+        Upper percentile cutoff applied to the non-NaN risetime distribution.
+
+    Returns
+    -------
+    idxs
+        Boolean mask; True for events within the accepted risetime range.
+    llim
+        Lower risetime boundary used (samples).
+    hlim
+        Upper risetime boundary used (samples, computed from *perc*).
+    """
     hlim = np.percentile(risetime[~np.isnan(risetime)], perc)
     idxs = (risetime >= llim) & (risetime <= hlim)
     return idxs, llim, hlim
 
 
-def signal_selection(dsp_cal, dplms_dict, coeff_values):
+def signal_selection(dsp_cal, dplms_dict, coeff_values) -> dict:
+    """
+    Apply centroid, pile-up, and risetime cuts to select clean calibration signals.
+
+    Parameters
+    ----------
+    dsp_cal
+        DSP output table (lgdo.Table) containing at minimum ``peak_pos``,
+        ``peak_pos_neg``, ``centroid``, ``tp_90``, and ``tp_10`` fields.
+    dplms_dict
+        Dictionary with DPLMS configuration parameters including
+        ``rt_low``, ``peak_lim``, ``wsize``, ``bsize``, ``centroid_lim``, and
+        ``dp_def`` sub-dictionary with ``rt`` and ``pt`` defaults.
+    coeff_values
+        Dictionary of per-optimisation-point overrides; may contain ``rt``
+        (risetime percentile) and ``pt`` (pile-up threshold) keys.
+
+    Returns
+    -------
+    sel_dict
+        Selection dictionary with keys:
+
+        * ``idxs`` – combined boolean mask of passing events
+        * ``ct_ll``, ``ct_hh`` – centroid window boundaries
+        * ``pp_ll``, ``pp_hh`` – pile-up peak band boundaries
+        * ``rt_ll``, ``rt_hh`` – risetime window boundaries
+    """
     peak_pos = dsp_cal["peak_pos"].nda
     peak_pos_neg = dsp_cal["peak_pos_neg"].nda
     centroid = dsp_cal["centroid"].nda
@@ -487,7 +585,27 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values):
     return sel_dict
 
 
-def noise_matrix(bls: np.array, length: int) -> np.array:
+def noise_matrix(bls: np.array, length: int) -> np.ndarray:
+    """
+    Compute the noise covariance matrix from baseline waveforms.
+
+    The baselines are mean-subtracted, the raw covariance is estimated, and
+    then compressed to the filter length via a sliding-window average
+    (convolution with an identity kernel).
+
+    Parameters
+    ----------
+    bls
+        2-D array of baseline waveform segments, shape ``(n_events, n_samples)``.
+    length
+        Target filter length (samples).  The output matrix has shape
+        ``(length, length)``.
+
+    Returns
+    -------
+    nmat
+        Noise covariance matrix of shape ``(length, length)``.
+    """
     nev, size = bls.shape
     ref = np.mean(bls, axis=0)
     offset = np.mean(ref)
@@ -501,6 +619,32 @@ def noise_matrix(bls: np.array, length: int) -> np.array:
 def noise_matrix_corr(
     bls: np.ndarray, bls_corr: list[np.ndarray], length: int
 ) -> np.ndarray:
+    """
+    Compute a block noise covariance matrix including cross-channel correlations.
+
+    Extends :func:`noise_matrix` to the multi-channel case by building an
+    ``(n_channels * length, n_channels * length)`` block matrix where each
+    block is the cross-channel noise covariance between two channels,
+    compressed to *length* via the same sliding-window average used in
+    :func:`noise_matrix`.
+
+    Parameters
+    ----------
+    bls
+        Baseline waveforms for the primary channel, shape
+        ``(n_events, n_samples)``.
+    bls_corr
+        List of baseline waveform arrays for correlated channels, each of
+        shape ``(n_events, n_samples)``.
+    length
+        Target filter length (samples).
+
+    Returns
+    -------
+    nmat
+        Symmetrised block noise covariance matrix of shape
+        ``(n_channels * length, n_channels * length)``.
+    """
     all_bls = [bls] + bls_corr
     n = len(all_bls)
 
@@ -541,7 +685,40 @@ def noise_matrix_corr(
 
 def signal_matrices(
     wfs: np.array, length: int, decay_const: float, ff: int = 2
-) -> np.array:
+) -> tuple:
+    """
+    Compute the signal-shape matrices needed for DPLMS filter synthesis.
+
+    Three matrices are constructed from the waveform ensemble:
+
+    * **rmat** – outer product of the mean reference pulse (shape constraint).
+    * **pmat** – pile-up penalty matrix built from an exponential decay model.
+    * **fmat** – flat-top matrix encoding the derivative of the flat-top region.
+
+    Parameters
+    ----------
+    wfs
+        2-D array of aligned signal waveforms, shape ``(n_events, n_samples)``.
+    length
+        Filter length (samples); determines the output matrix dimensions.
+    decay_const
+        Exponential decay constant used to build the pile-up penalty matrix.
+        Set to 0 to disable the pile-up term.
+    ff
+        Flat-top length (samples) used to construct the flat-top derivative
+        matrix.
+
+    Returns
+    -------
+    ref
+        Mean reference pulse of length *n_samples*.
+    rmat
+        Reference signal matrix, shape ``(length, length)``.
+    pmat
+        Pile-up penalty matrix, shape ``(length, length)``.
+    fmat
+        Flat-top derivative matrix, shape ``(length, length)``.
+    """
     nev, size = wfs.shape
     lo = size // 2 - 100
     flo = size // 2 - length // 2
@@ -583,7 +760,47 @@ def filter_synthesis(
     length: int,
     size: int,
     flip: bool = True,
-) -> np.array:
+) -> tuple:
+    """
+    Synthesise a DPLMS optimal filter for a single channel.
+
+    Solves the linear system ``(N + R + za*I + P + F) x = r`` for the filter
+    coefficients *x*, where *N*, *R*, *P*, and *F* are the noise, reference,
+    pile-up, and flat-top matrices respectively, *za* is a zero-area
+    regularisation term, and *r* is the reference pulse window.
+
+    Parameters
+    ----------
+    ref
+        Mean reference pulse of length *size*.
+    nmat
+        Noise covariance matrix, shape ``(length, length)``.
+    rmat
+        Reference signal matrix, shape ``(length, length)``.
+    za
+        Zero-area regularisation coefficient.
+    pmat
+        Pile-up penalty matrix, shape ``(length, length)``.
+    fmat
+        Flat-top derivative matrix, shape ``(length, length)``.
+    length
+        Filter length (samples).
+    size
+        Full waveform buffer length (samples); used to centre the reference
+        window.
+    flip
+        If True (default), return the time-reversed filter coefficients so
+        that the filter can be applied via convolution.
+
+    Returns
+    -------
+    x
+        Filter coefficients of length *length*.
+    y
+        Response of the filter convolved with the reference pulse.
+    refy
+        Reference pulse window aligned to *y* for comparison.
+    """
     # Reference slice
     flo = (size // 2) - (length // 2)
     fhi = (size // 2) + (length // 2)
@@ -604,8 +821,7 @@ def filter_synthesis(
 
     if flip:
         return np.flip(x), y, refy
-    else:
-        return x, y, refy
+    return x, y, refy
 
 
 def filter_synthesis_corr(
@@ -618,7 +834,49 @@ def filter_synthesis_corr(
     length: int,
     size: int,
     flip: bool = True,
-) -> np.array:
+) -> tuple:
+    """
+    Synthesise a DPLMS optimal filter exploiting cross-channel noise correlations.
+
+    Extends :func:`filter_synthesis` to the multi-channel case by building
+    block-extended versions of the signal-shape matrices and solving the
+    combined linear system.  Only the primary-channel slice of the solution
+    is returned.
+
+    Parameters
+    ----------
+    ref
+        Mean reference pulse for the primary channel, length *size*.
+    nmat_corr
+        Block noise covariance matrix from :func:`noise_matrix_corr`, shape
+        ``(n_channels * length, n_channels * length)``.
+    rmat
+        Reference signal matrix for the primary channel, shape
+        ``(length, length)``.
+    za
+        Zero-area regularisation coefficient.
+    pmat
+        Pile-up penalty matrix for the primary channel, shape
+        ``(length, length)``.
+    fmat
+        Flat-top derivative matrix for the primary channel, shape
+        ``(length, length)``.
+    length
+        Filter length per channel (samples).
+    size
+        Full waveform buffer length (samples).
+    flip
+        If True (default), return the time-reversed filter coefficients.
+
+    Returns
+    -------
+    x
+        Primary-channel filter coefficients of length *length*.
+    y
+        Response of the filter convolved with the (extended) reference pulse.
+    refy
+        Reference pulse window aligned to *y* for comparison.
+    """
     # Extract number of correlated geds
     n_geds = nmat_corr.shape[0] // length
 
@@ -658,5 +916,4 @@ def filter_synthesis_corr(
 
     if flip:
         return [np.flip(x[n * length : (n + 1) * length]) for n in range(n_geds)]
-    else:
-        return [x[n * length : (n + 1) * length] for n in range(n_geds)]
+    return [x[n * length : (n + 1) * length] for n in range(n_geds)]
