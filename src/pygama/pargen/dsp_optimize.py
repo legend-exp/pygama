@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import sys
 from collections import namedtuple
-from typing import Any, Callable, Mapping, Optional, Tuple, Union
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,48 +32,42 @@ def run_one_dsp(
     fom_function: Callable | None = None,
     verbosity: int = 0,
     fom_kwargs=None,
-) -> Union[float, Table]:
+) -> float | Table:
     """Run one iteration of DSP on ``tb_data`, based on the DSP specified in ``dsp_config``.
 
     Optionally returns a value for optimization
 
     Parameters
     ----------
-    tb_data : lh5 Table
-        An input table of lh5 data. Typically a selection is made prior to
-        sending tb_data to this function: optimization typically doesn't have to
-        run over all data
-    dsp_config : dict
-        Specifies the DSP to be performed for this iteration (see
-        build_processing_chain()) and the list of output variables to appear in
-        the output table
-    db_dict : dict (optional)
-        DSP parameters database. See build_processing_chain for formatting info
-    fom_function : function or None (optional)
-        When given the output lh5 table of this DSP iteration, the
-        fom_function must return a scalar figure-of-merit value upon which the
-        optimization will be based. Should accept verbosity as a second argument
-    verbosity : int (optional)
-        verbosity for the processing chain and fom_function calls
+    tb_data
+        Input LH5 table of waveform data.  Typically a pre-selected subset
+        is passed so optimisation does not run over the full dataset.
+    dsp_config
+        DSP processing chain configuration (see ``build_processing_chain``).
+    db_dict
+        Optional DSP parameter database dictionary.
+    fom_function
+        When provided, called on the output table to return a scalar
+        figure-of-merit.  Should accept a verbosity argument.
+    verbosity
+        Verbosity level for the processing chain and FOM callable.
     fom_kwargs
-        any keyword arguments to pass to the fom
+        Optional keyword arguments forwarded to *fom_function*.
 
     Returns
     -------
-    figure_of_merit : float
-        If fom_function is not None, returns figure-of-merit value for the DSP iteration
-    tb_out : lh5 Table
-        If fom_function is None, returns the output lh5 table for the DSP iteration
+    figure_of_merit
+        Scalar FOM value returned by *fom_function* when it is not ``None``.
+    tb_out
+        Output LH5 table when *fom_function* is ``None``.
     """
 
     tb_out = build_dsp(tb_data, dsp_config=dsp_config, database=db_dict)
     if fom_function is not None:
         if fom_kwargs is not None:
             return fom_function(tb_out, verbosity, fom_kwargs)
-        else:
-            return fom_function(tb_out, verbosity)
-    else:
-        return tb_out
+        return fom_function(tb_out, verbosity)
+    return tb_out
 
 
 ParGridDimension = namedtuple("ParGridDimension", "name parameter value_strs")
@@ -89,21 +86,37 @@ class ParGrid:
         self.dims = []
 
     def add_dimension(self, name, parameter, value_strs):
+        """
+        Add a new dimension to the parameter grid.
+
+        Parameters
+        ----------
+        name
+            Dimension name, matching the ``db.name`` prefix in the DSP chain.
+        parameter
+            Parameter name within *name*, matching ``db.name.parameter``.
+        value_strs
+            List of string values to sweep over for this dimension.
+        """
         self.dims.append(ParGridDimension(name, parameter, value_strs))
 
     def get_n_dimensions(self):
+        """Return the number of dimensions in the grid."""
         return len(self.dims)
 
     def get_n_points_of_dim(self, i):
+        """Return the number of grid points along dimension *i*."""
         return len(self.dims[i].value_strs)
 
     def get_shape(self):
+        """Return the shape of the N-dimensional grid as a tuple."""
         shape = ()
         for i in range(self.get_n_dimensions()):
             shape += (self.get_n_points_of_dim(i),)
         return shape
 
     def get_n_grid_points(self):
+        """Return the total number of grid points (product of all axis lengths)."""
         return np.prod(self.get_shape())
 
     def get_par_meshgrid(self, copy=False, sparse=False):
@@ -118,6 +131,7 @@ class ParGrid:
         return np.meshgrid(*axes, copy, sparse, indexing="ij")
 
     def get_zero_indices(self):
+        """Return a zero-initialised index array of length ``get_n_dimensions()``."""
         return np.zeros(self.get_n_dimensions(), dtype=np.uint32)
 
     def iterate_indices(self, indices):
@@ -141,12 +155,44 @@ class ParGrid:
     #    return False
 
     def get_data(self, i_dim, i_par):
+        """
+        Return the name, parameter, and value string for a grid cell.
+
+        Parameters
+        ----------
+        i_dim
+            Dimension index.
+        i_par
+            Parameter (point) index within that dimension.
+
+        Returns
+        -------
+        name
+            Dimension name string.
+        parameter
+            Parameter name string.
+        value_str
+            String value at position *i_par* along dimension *i_dim*.
+        """
         name = self.dims[i_dim].name
         parameter = self.dims[i_dim].parameter
         value_str = self.dims[i_dim].value_strs[i_par]
         return name, parameter, value_str
 
     def print_data(self, indices):
+        """
+        Format a human-readable description of a grid point.
+
+        Parameters
+        ----------
+        indices
+            Sequence of per-dimension indices identifying the grid point.
+
+        Returns
+        -------
+        print_string
+            Multi-line string listing each ``name.parameter = value`` entry.
+        """
         print_string = f"Grid point at indices {indices}:"
         for i_dim, i_par in enumerate(indices):
             name, parameter, value_str = self.get_data(i_dim, i_par)
@@ -154,6 +200,23 @@ class ParGrid:
         return print_string
 
     def set_dsp_pars(self, db_dict, indices):
+        """
+        Populate a DSP parameter database from grid indices.
+
+        Parameters
+        ----------
+        db_dict
+            Existing database dictionary to update, or ``None`` to create a
+            new one.
+        indices
+            Per-dimension index array identifying the grid point.
+
+        Returns
+        -------
+        db_dict
+            Updated database dictionary with the parameter values for the
+            specified grid point.
+        """
         if db_dict is None:
             db_dict = {}
         for i_dim, i_par in enumerate(indices):
@@ -178,31 +241,26 @@ def run_grid(
 
     Parameters
     ----------
-    tb_data : lh5 Table
-        An input table of lh5 data. Typically a selection is made prior to
-        sending tb_data to this function: optimization typically doesn't have to
-        run over all data
-    dsp_config : dict
-        Specifies the DSP to be performed (see build_processing_chain()) and the
-        list of output variables to appear in the output table for each grid point
-    grid : ParGrid
-        See ParGrid class for format
-    fom_function : function
-        When given the output lh5 table of this DSP iteration, the fom_function
-        must return a scalar figure-of-merit. Should accept verbosity as a
-        second keyword argument
-    db_dict : dict (optional)
-        DSP parameters database. See build_processing_chain for formatting info
-    verbosity : int (optional)
-        verbosity for the processing chain and fom_function calls
+    tb_data
+        Input LH5 table of waveform data.
+    dsp_config
+        DSP processing chain configuration.
+    grid
+        :class:`ParGrid` defining the parameter sweep.
+    fom_function
+        Callable that receives the output table and returns a scalar FOM.
+    db_dict
+        Optional base DSP parameter database dictionary.
+    verbosity
+        Verbosity level for the processing chain and FOM callable.
     **fom_kwargs
-        Any keyword arguments for fom_function
+        Additional keyword arguments forwarded to *fom_function*.
 
     Returns
     -------
-    grid_values : ndarray of floats
-        An N-dimensional numpy ndarray whose Mth axis corresponds to the Mth row
-        of the grid argument
+    grid_values
+        N-dimensional ``ndarray`` of FOM values; the *M*-th axis
+        corresponds to the *M*-th dimension of *grid*.
     """
 
     grid_values = np.ndarray(shape=grid.get_shape(), dtype="O")
@@ -239,11 +297,42 @@ def run_grid_point(
     fom_kwargs=None,
 ):
     """
-    Runs a single grid point for the index specified
+    Run DSP and evaluate the figure-of-merit at a single grid point.
+
+    Sets the DSP parameter database from *grids* and *iii*, runs the DSP
+    chain, and optionally evaluates one or more figure-of-merit functions.
+
+    Parameters
+    ----------
+    tb_data
+        Input LH5 table of waveform data.
+    dsp_config
+        DSP processing chain configuration dictionary.
+    grids
+        A single :class:`ParGrid` or a list of them.
+    fom_function
+        A single callable or list of callables; each is called as
+        ``fom_function(tb_out, verbosity, fom_kwargs[i])``.  When
+        ``None``, the raw output table is returned.
+    iii
+        List of per-grid index arrays, one per entry in *grids*.
+    db_dict
+        Optional base DSP parameter database to update.
+    verbosity
+        Verbosity level forwarded to the DSP chain and FOM callables.
+    fom_kwargs
+        List of keyword-argument dicts, one per FOM callable.
+
+    Returns
+    -------
+    out
+        Dictionary with keys ``"indexes"`` (list of grid-point tuples)
+        and ``"results"`` (array of FOM values, or the output table when
+        *fom_function* is ``None``).
     """
     if not isinstance(grids, list):
         grids = [grids]
-    for index, grid in zip(iii, grids):
+    for index, grid in zip(iii, grids, strict=False):
         db_dict = grid.set_dsp_pars(db_dict, index)
 
     log.debug(db_dict)
@@ -258,11 +347,10 @@ def run_grid_point(
                     res[i] = fom_function[i](tb_out, verbosity, fom_kwargs[i])
                 else:
                     res[i] = fom_function[0](tb_out, verbosity, fom_kwargs[i])
+            elif len(fom_function) > 1:
+                res[i] = fom_function[i](tb_out, verbosity)
             else:
-                if len(fom_function) > 1:
-                    res[i] = fom_function[i](tb_out, verbosity)
-                else:
-                    res[i] = fom_function[0](tb_out, verbosity)
+                res[i] = fom_function[0](tb_out, verbosity)
         log.debug("value:", res)
         out = {"indexes": [tuple(ii) for ii in iii], "results": res}
 
@@ -273,7 +361,22 @@ def run_grid_point(
 
 def get_grid_points(grid):
     """
-    Generates a list of the indices of all possible grid points
+    Generate a list of all grid-point index combinations.
+
+    Iterates all grids simultaneously, cycling each grid back to its zero
+    index when it is exhausted.  Iteration stops when every grid has
+    completed at least one full cycle.
+
+    Parameters
+    ----------
+    grid
+        List of :class:`ParGrid` objects defining the search space.
+
+    Returns
+    -------
+    out
+        List of ``[tuple, ...]`` entries, where each entry contains one
+        index tuple per grid.
     """
     out = []
     iii = [gri.get_zero_indices() for gri in grid]
@@ -281,7 +384,7 @@ def get_grid_points(grid):
     while True:
         out.append([tuple(ii) for ii in iii])
 
-        for i, gri in enumerate(zip(iii, grid)):
+        for i, gri in enumerate(zip(iii, grid, strict=False)):
             if not gri[1].iterate_indices(gri[0]):
                 log.info(f"{i} grid end")
                 iii[i] = gri[1].get_zero_indices()
@@ -396,12 +499,11 @@ class BayesianOptimizer:
         self,
         acq_func: str,
         batch_size: int,
-        kernel: Optional[Kernel] = None,
-        sampling_rate: Optional[Union[str, pint.Quantity]] = None,
+        kernel: Kernel | None = None,
+        sampling_rate: str | pint.Quantity | None = None,
         fom_value: str = "y_val",
         fom_error: str = "y_val_err",
     ) -> None:
-
         np.random.seed(55)
 
         self.lambda_param = 0.01
@@ -459,7 +561,7 @@ class BayesianOptimizer:
         min_val: float,
         max_val: float,
         round_to_samples: bool = False,
-        unit: Optional[Union[str, pint.Quantity]] = None,
+        unit: str | pint.Quantity | None = None,
     ) -> None:
         """
         Add a new dimension (parameter) to the optimizer's search space.
@@ -497,6 +599,7 @@ class BayesianOptimizer:
         )
 
     def get_n_dimensions(self):
+        """Return the number of dimensions in the search space."""
         return len(self.dims)
 
     def add_initial_values(self, x_init: Any, y_init: Any, yerr_init: Any) -> None:
@@ -525,6 +628,7 @@ class BayesianOptimizer:
         self.yerr_init = yerr_init
 
     def _get_expected_improvement(self, x_new):
+        """Compute the Expected Improvement acquisition value at *x_new*."""
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
@@ -538,18 +642,35 @@ class BayesianOptimizer:
         return exp_imp
 
     def _get_ucb(self, x_new):
+        """Compute the Upper Confidence Bound acquisition value at *x_new*."""
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
         return mean_y_new[0] + self.lambda_param * sigma_y_new[0]
 
     def _get_lcb(self, x_new):
+        """Compute the Lower Confidence Bound acquisition value at *x_new*."""
         mean_y_new, sigma_y_new = self.gauss_pr.predict(
             np.array([x_new]), return_std=True
         )
         return mean_y_new[0] - self.lambda_param * sigma_y_new[0]
 
     def _get_next_probable_point(self):
+        """
+        Find the next candidate point by minimising the acquisition function.
+
+        Samples *batch_size* random starting points within the search bounds
+        and runs L-BFGS-B from each.  Values that coincide with an existing
+        sample are perturbed slightly.  Parameters with ``round_to_samples``
+        set are rounded to the nearest multiple of :attr:`sampling_rate`.
+
+        Returns
+        -------
+        x_optimal
+            List of parameter values for the next candidate point.
+        min_ei
+            Acquisition function value at *x_optimal*.
+        """
         min_ei = float(sys.maxsize)
         x_optimal = None
         # Trial with an array of random data points
@@ -568,7 +689,7 @@ class BayesianOptimizer:
             if response.fun < min_ei:
                 min_ei = response.fun
                 x_optimal = []
-                for y, dim in zip(response.x, self.dims):
+                for y, dim in zip(response.x, self.dims, strict=False):
                     if dim.round is True and dim.unit is not None:
                         # round so samples is integer
 
@@ -593,7 +714,7 @@ class BayesianOptimizer:
             )
             x_optimal += perturb
             new_x_optimal = []
-            for y, dim in zip(x_optimal[0], self.dims):
+            for y, dim in zip(x_optimal[0], self.dims, strict=False):
                 if dim.round is True and dim.unit is not None:
                     # round so samples is integer
                     new_x_optimal.append(
@@ -618,11 +739,12 @@ class BayesianOptimizer:
         return x_optimal, min_ei
 
     def _extend_prior_with_posterior_data(self, x, y, yerr):
+        """Append a new observation ``(x, y, yerr)`` to the internal training arrays."""
         self.x_init = np.append(self.x_init, np.array([x]), axis=0)
         self.y_init = np.append(self.y_init, np.array(y), axis=0)
         self.yerr_init = np.append(self.yerr_init, np.array(yerr), axis=0)
 
-    def get_first_point(self) -> Tuple[Any, None]:
+    def get_first_point(self) -> tuple[Any, None]:
         """
         Get the first optimization point based on initial data.
 
@@ -652,8 +774,19 @@ class BayesianOptimizer:
 
     @ignore_warnings(category=ConvergenceWarning)
     def iterate_values(self):
-        """Iterate the optimization process by fitting the Gaussian Process to the
-        current data and selecting the next point based on the acquisition function.
+        """
+        Fit the GP to current data and propose the next evaluation point.
+
+        Trains the Gaussian Process on all valid (non-NaN) observations
+        accumulated so far, then calls :meth:`_get_next_probable_point` to
+        select the next candidate.
+
+        Returns
+        -------
+        x_next
+            Parameter values for the next candidate point.
+        ei
+            Acquisition function value at *x_next*.
         """
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
@@ -728,12 +861,11 @@ class BayesianOptimizer:
 
         if np.isnan(y_val) | np.isnan(y_err):
             pass
-        else:
-            if y_val < self.y_min:
-                self.y_min = y_val
-                self.optimal_x = self.current_x
-                self.optimal_ei = self.current_ei
-                self.optimal_results = results
+        elif y_val < self.y_min:
+            self.y_min = y_val
+            self.optimal_x = self.current_x
+            self.optimal_ei = self.current_ei
+            self.optimal_results = results
 
         if self.current_iter == 1:
             self.prev_x = self.current_x
@@ -751,7 +883,6 @@ class BayesianOptimizer:
             and new_entry.notnull().any().any()
             and len(new_entry) >= 1
         ):
-
             if self.best_samples_.empty:
                 self.best_samples_ = new_entry.copy()
             else:
@@ -761,7 +892,17 @@ class BayesianOptimizer:
                 )
 
     def get_best_vals(self):
-        """Extract the best observed values in a dictionary format suitable for updating the DSP parameters database."""
+        """
+        Return the best-observed parameter values as a DSP database dictionary.
+
+        Formats :attr:`optimal_x` into the same ``{name: {parameter: value_str}}``
+        structure expected by :func:`run_one_dsp`.
+
+        Returns
+        -------
+        out_dict
+            DSP parameter database dictionary with the optimal values.
+        """
 
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
@@ -772,7 +913,7 @@ class BayesianOptimizer:
                     value_str = value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
-            if name not in out_dict.keys():
+            if name not in out_dict:
                 out_dict[name] = {parameter: value_str}
             else:
                 out_dict[name][parameter] = value_str
@@ -803,7 +944,7 @@ class BayesianOptimizer:
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        elif len(self.dims) == 1:
+        if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
 
             ys, ys_err = self.gauss_pr.predict(points.reshape(-1, 1), return_std=True)
@@ -908,7 +1049,7 @@ class BayesianOptimizer:
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
             raise Exception("Acquisition Function Plotting not implemented for dim!=2")
-        elif len(self.dims) == 1:
+        if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)
             for i, point in enumerate(points):
@@ -1010,7 +1151,7 @@ def run_bayesian_optimisation(
     db_dict: Mapping | None = None,
     nan_val: float | list = 10,
     n_iter: int = 10,
-) -> Tuple[Mapping, list]:
+) -> tuple[Mapping, list]:
     """Run Bayesian optimization loop to optimize DSP parameters.
 
     Parameters
@@ -1066,7 +1207,7 @@ def run_bayesian_optimisation(
         for optimiser in optimisers:
             db_dict = optimiser.update_db_dict(db_dict)
 
-        log.info(f"Iteration number: {j+1}")
+        log.info(f"Iteration number: {j + 1}")
         log.info(f"Processing with {db_dict}")
 
         tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict)
@@ -1079,13 +1220,12 @@ def run_bayesian_optimisation(
                     res[i] = fom_function[i](tb_out, fom_kwargs[i])
                 else:
                     res[i] = fom_function[0](tb_out, fom_kwargs[i])
+            elif len(fom_function) > 1:
+                res[i] = fom_function[i](tb_out)
             else:
-                if len(fom_function) > 1:
-                    res[i] = fom_function[i](tb_out)
-                else:
-                    res[i] = fom_function[0](tb_out)
+                res[i] = fom_function[0](tb_out)
 
-        log.info(f"Results of iteration {j+1} are {res}")
+        log.info(f"Results of iteration {j + 1} are {res}")
 
         for i, optimiser in enumerate(optimisers):
             if np.isnan(res[i][optimiser.fom_value]):
@@ -1100,7 +1240,6 @@ def run_bayesian_optimisation(
     out_results_list = []
 
     for optimiser in optimisers:
-
         param_dict = optimiser.get_best_vals()
         out_param_dict.update(param_dict)
         results_dict = optimiser.optimal_results
