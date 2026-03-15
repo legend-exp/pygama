@@ -2552,7 +2552,7 @@ def get_peak_label(peak: float) -> str:
         return "Tl SEP @"
     if peak == 2614.5:
         return "Tl FEP @"
-    return None
+    return ""
 
 
 def plot_survival_fraction_curves(
