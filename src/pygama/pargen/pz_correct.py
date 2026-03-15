@@ -334,7 +334,7 @@ class PZCorrect:
 
         Runs the DSP chain on *tb_data*, extracts the *slope_param* column,
         estimates the mode and standard deviation of the slope distribution,
-        and converts the modal value to a time constant τ = −1/mode.  The
+        and converts the modal value to a time constant tau = -1/mode.  The  # noqa: RUF002
         result is stored in :attr:`output_dict` under the ``"pz"`` key.
 
         Parameters
@@ -468,7 +468,7 @@ class PZCorrect:
             "tau2": f"{tau2s_fit * sampling_rate}*{units}",
             "frac": f2s_fit,
         }.items():
-            log.debug(f"{item}: {value}")
+            log.debug("%s: %s", item, value)
 
         self.results_dict.update(
             {
@@ -590,7 +590,7 @@ class PZCorrect:
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
-        wf_idxs = np.random.choice(len(wfs), n_waveforms)
+        wf_idxs = np.random.choice(len(wfs), n_waveforms)  # noqa: NPY002
         if norm_param is not None:
             means = tb_out[norm_param].nda[wf_idxs]
             wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
