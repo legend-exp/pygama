@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import numpy as np
+import pytest
 from iminuit import Minuit, cost
-from pytest import approx
 from scipy.stats import exponnorm
 
 from pygama.math.distributions import exgauss, hpge_peak
@@ -35,9 +37,9 @@ def test_unbinned_nll():
     fit_mu = m.values["mu"]
     fit_sigma = m.values["sigma"]
 
-    assert tau == approx(fit_tau, 0.1)
-    assert mu == approx(fit_mu, 0.1)
-    assert sigma == approx(fit_sigma, 0.1)
+    assert tau == pytest.approx(fit_tau, 0.1)
+    assert mu == pytest.approx(fit_mu, 0.1)
+    assert sigma == pytest.approx(fit_sigma, 0.1)
 
 
 def test_extended_unbinned_nll():
@@ -54,10 +56,10 @@ def test_extended_unbinned_nll():
     fit_mu = m.values["mu"]
     fit_sigma = m.values["sigma"]
 
-    assert area == approx(fit_area, 0.1)
-    assert tau == approx(fit_tau, 0.1)
-    assert mu == approx(fit_mu, 0.1)
-    assert sigma == approx(fit_sigma, 0.1)
+    assert area == pytest.approx(fit_area, 0.1)
+    assert tau == pytest.approx(fit_tau, 0.1)
+    assert mu == pytest.approx(fit_mu, 0.1)
+    assert sigma == pytest.approx(fit_sigma, 0.1)
 
 
 def test_binned_nll():
@@ -74,9 +76,9 @@ def test_binned_nll():
     fit_mu = m.values["mu"]
     fit_sigma = m.values["sigma"]
 
-    assert tau == approx(fit_tau, 0.1)
-    assert mu == approx(fit_mu, 0.1)
-    assert sigma == approx(fit_sigma, 0.1)
+    assert tau == pytest.approx(fit_tau, 0.1)
+    assert mu == pytest.approx(fit_mu, 0.1)
+    assert sigma == pytest.approx(fit_sigma, 0.1)
 
 
 def test_extended_binned_nll():
@@ -93,10 +95,10 @@ def test_extended_binned_nll():
     fit_mu = m.values["mu"]
     fit_sigma = m.values["sigma"]
 
-    assert area == approx(fit_area, 0.1)
-    assert tau == approx(fit_tau, 0.1)
-    assert mu == approx(fit_mu, 0.1)
-    assert sigma == approx(fit_sigma, 0.1)
+    assert area == pytest.approx(fit_area, 0.1)
+    assert tau == pytest.approx(fit_tau, 0.1)
+    assert mu == pytest.approx(fit_mu, 0.1)
+    assert sigma == pytest.approx(fit_sigma, 0.1)
 
 
 def test_name_introspection():

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 
 import pygama.math.utils as pgu
@@ -24,10 +26,10 @@ def test_print_fit_results(caplog):
     pgu.print_fit_results(
         np.ones((3,)), np.ones((3, 3)), func=None, title="Test", pad=True
     )
-    assert [
+    assert [rec.message for rec in caplog.records] == [
         "Test:",
         "p0 = 1.0 +/- 1.0",
         "p1 = 1.0 +/- 1.0",
         "p2 = 1.0 +/- 1.0",
         "",
-    ] == [rec.message for rec in caplog.records]
+    ]

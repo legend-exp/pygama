@@ -16,6 +16,7 @@ The main entry point is the :class:`LQCal` class.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from datetime import datetime
@@ -69,9 +70,8 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
 
     left_edge = mu - 2.5 * sigma
     right_edge = mu + 2.5 * sigma
-    fit_range = (left_edge, right_edge)
+    return (left_edge, right_edge)
 
-    return fit_range
 
 
 def get_lq_hist(
@@ -190,7 +190,7 @@ def binned_lq_fit(
         Bin-edge array used for the binned fit.
     """
 
-    hist, bins, var = get_lq_hist(df, lq_param, cal_energy_param, peak, sidebands)
+    hist, bins, _var = get_lq_hist(df, lq_param, cal_energy_param, peak, sidebands)
 
     # Temporary fix for negative bin counts
     # TODO: Adjust fitting to handle negative bin counts
@@ -371,7 +371,7 @@ class LQCal:
         update_dict
             Dictionary of new calibration entries to merge.
         """
-        if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+        if re.match(r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))):
             for tstamp in self.cal_dicts:
                 if tstamp in update_dict:
                     self.cal_dicts[tstamp].update(update_dict[tstamp])
@@ -458,7 +458,7 @@ class LQCal:
                             ]
                         )
 
-                self.timecorr_df.set_index("run_timestamp", inplace=True)
+                self.timecorr_df = self.timecorr_df.set_index("run_timestamp")
                 time_dict = fit_time_means(
                     np.array(self.timecorr_df.index),
                     np.array(self.timecorr_df["mean"]),
@@ -790,7 +790,7 @@ class LQCal:
                     ]
                 )
                 log.error(f"LQ Survival fraction determination failed for {peak} peak")
-        self.low_side_sf.set_index("peak", inplace=True)
+        self.low_side_sf = self.low_side_sf.set_index("peak")
 
 
 def plot_lq_mean_time(
@@ -863,7 +863,7 @@ def plot_drift_time_correction(
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
-    fig, ax = plt.subplots(1, 1)
+    fig, _ax = plt.subplots(1, 1)
 
     try:
         dep_range = (1590, 1595)
@@ -980,18 +980,16 @@ def plot_survival_fraction_curves(
         )
 
         for peak, survival_df in lq_class.low_side_peak_dfs.items():
-            try:
+            with contextlib.suppress(Exception):
                 plt.errorbar(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
                     label=f"{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]['sf']:2.1f} +/- {lq_class.low_side_sf.loc[peak]['sf_err']:2.1f} %",
                 )
-            except Exception:
-                pass
     except Exception:
         pass
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.legend(loc="lower right")
     plt.xlabel("cut value")
@@ -1028,7 +1026,7 @@ def plot_sf_vs_energy(
     except Exception:
         pass
     plt.ylim([0, 100])
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.xlabel("energy (keV)")
     plt.ylabel("survival percentage")
@@ -1142,7 +1140,7 @@ def plot_classifier(
     plt.rcParams["font.size"] = fontsize
 
     fig = plt.figure()
-    try:
+    with contextlib.suppress(Exception):
         plt.hist2d(
             data.query(lq_class.selection_string)[lq_class.cal_energy_param],
             data.query(lq_class.selection_string)[lq_param],
@@ -1152,8 +1150,6 @@ def plot_classifier(
             ],
             norm=LogNorm(),
         )
-    except Exception:
-        pass
     plt.xlabel("energy (keV)")
     plt.ylabel(lq_param)
     plt.xlim(xrange)

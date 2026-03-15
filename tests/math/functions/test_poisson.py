@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from scipy.stats import poisson as scipy_poisson
 from scipy.stats import rv_discrete

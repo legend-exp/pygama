@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import numpy as np
@@ -23,7 +25,7 @@ def files_config(lgnd_test_data, tmp_dir):
     }
 
 
-def test_xtalk_corrected_energy(lgnd_test_data, files_config):
+def test_xtalk_corrected_energy(lgnd_test_data, files_config):  # noqa: ARG001
 
     energy = np.array([[1, 2, 3], [4, 5, 6], [2, 0, 1], [0, 1, 0]])
     matrix = np.array([[0, 0, 1], [1, 0, 2], [0, 2, 0]])
@@ -46,7 +48,7 @@ def test_xtalk_corrected_energy(lgnd_test_data, files_config):
     )
 
 
-def test_gather_energy(lgnd_test_data, files_config):
+def test_gather_energy(lgnd_test_data, files_config):  # noqa: ARG001
     f = utils.make_files_config(files_config)
     tcm = utils.TCMData(
         table_key=lh5.read_as(f"/{f.tcm.group}/table_key", f.tcm.file, library="ak"),
@@ -63,7 +65,7 @@ def test_gather_energy(lgnd_test_data, files_config):
     assert np.shape(energy) == (n_rows, 2)
 
 
-def test_filter_hits(lgnd_test_data, files_config):
+def test_filter_hits(lgnd_test_data, files_config):  # noqa: ARG001
     f = utils.make_files_config(files_config)
     tcm = utils.TCMData(
         table_key=lh5.read_as(f"/{f.tcm.group}/table_key", f.tcm.file, library="ak"),

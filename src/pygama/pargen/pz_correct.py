@@ -377,8 +377,7 @@ class PZCorrect:
 
         if display <= 0:
             return None
-        out_plot_dict = {}
-        return out_plot_dict
+        return {}
 
     def get_dpz_decay_constants(
         self,
@@ -483,9 +482,7 @@ class PZCorrect:
         dpz_opt_tb_out = opt.run_one_dsp(
             tb_data,
             self.dsp_config,
-            db_dict=dict(
-                {"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}
-            ),
+            db_dict={"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}},
         )
 
         # Update tau_dict with the dpz constants
@@ -674,7 +671,7 @@ class PZCorrect:
             np.nanpercentile(slopes, 99),
             np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
         )
-        counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
+        _counts, bins, _bars = ax.hist(slopes, bins=bins, histtype="step")
         plt.xlabel("Slope")
         plt.ylabel("Counts")
         if "single_decay_constant" in self.results_dict:
@@ -692,10 +689,7 @@ class PZCorrect:
             axins.axvline(high_bin, color="red")
             axins.set_xlim(in_min, in_max)
             ax.set_xlim(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99))
-        if with_correction:
-            out_plot_dict = {"corrected_slope": fig}
-        else:
-            out_plot_dict = {"slope": fig}
+        out_plot_dict = {"corrected_slope": fig} if with_correction else {"slope": fig}
         if display > 1:
             plt.show()
         else:

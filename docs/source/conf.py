@@ -1,4 +1,5 @@
 # Configuration file for the Sphinx documentation builder.
+from __future__ import annotations
 
 import sys
 from importlib.metadata import version as im_version

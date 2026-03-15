@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from scipy.stats import exponnorm, norm
 
@@ -136,7 +138,7 @@ def test_name():
 
 def test_hpge_get_fwfm_non_hpge_peak_fallback():
     """Test that hpge_get_fwfm uses frac_max (not FWHM) for non-hpge-peak distributions."""
-    from pygama.math.functions.gauss import gaussian
+    from pygama.math.functions.gauss import gaussian  # noqa: PLC0415
 
     sigma = 2.0
     mu = 5.0
@@ -163,7 +165,7 @@ def test_hpge_get_fwfm_non_hpge_peak_fallback():
     result_half_cov, err_half_cov = hpge_get_fwfm(
         gaussian, pars, frac_max=frac_max_half, cov=cov
     )
-    result_tenth_cov, err_tenth_cov = hpge_get_fwfm(
+    result_tenth_cov, _err_tenth_cov = hpge_get_fwfm(
         gaussian, pars, frac_max=frac_max_tenth, cov=cov
     )
     sigma_idx = np.where(np.array(gaussian.required_args()) == "sigma")[0][0]

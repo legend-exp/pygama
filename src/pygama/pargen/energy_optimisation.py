@@ -78,10 +78,10 @@ def simple_guess(energy, func, fit_range=None, bin_width=None):
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
     # make binning dynamic based on max, % of events/ n of events?
-    hist, bins, var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
+    hist, bins, _var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
 
-    if func == pgd.hpge_peak or func == pgd.gauss_on_step:
-        mu, sigma, amp = pgh.get_gaussian_guess(hist, bins)
+    if func in (pgd.hpge_peak, pgd.gauss_on_step):
+        mu, sigma, _amp = pgh.get_gaussian_guess(hist, bins)
         i_0 = np.argmax(hist)
         bg = np.mean(hist[-10:])
         step = bg - np.mean(hist[:10])
@@ -273,7 +273,7 @@ def get_peak_fwhm_with_dt_corr(
 
         if display > 0:
             plt.figure()
-            hist, bins, var = pgh.get_hist(
+            hist, bins, _var = pgh.get_hist(
                 ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
             )
             plt.step(pgh.get_bin_centers(bins), hist)
@@ -398,7 +398,7 @@ def fom_fwhm_with_alpha_fit(
                 _,
                 _,
                 _,
-                fit_pars,
+                _fit_pars,
             ) = get_peak_fwhm_with_dt_corr(
                 energies,
                 alpha,
@@ -420,10 +420,9 @@ def fom_fwhm_with_alpha_fit(
             ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
                 fwhm_errs > 1e-10
             )
-            if len(fwhms[ids]) > 5:
-                if (np.diff(fwhms[ids])[-3:] > 0).all():
-                    early_break = True
-                    break
+            if len(fwhms[ids]) > 5 and (np.diff(fwhms[ids])[-3:] > 0).all():
+                early_break = True
+                break
 
         # Make sure fit isn't based on only a few points
         if len(fwhms) < nsteps * 0.2 and early_break is False:
@@ -686,7 +685,7 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0) -> dict:
     ctc_param = kwarg_dict["ctc_param"]
     peak_dicts = kwarg_dict["peak_dicts"]
     frac_max = kwarg_dict.get("frac_max", 0.2)
-    out_dict = fom_fwhm_with_alpha_fit(
+    return fom_fwhm_with_alpha_fit(
         data,
         peak_dicts[0],
         ctc_param,
@@ -694,7 +693,6 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0) -> dict:
         frac_max=frac_max,
         display=display,
     )
-    return out_dict
 
 
 def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
@@ -798,19 +796,19 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     results = pgc.HPGeCalibration.interpolate_energy_res(
         fwhm_func, peaks[~nan_mask], results, interp_energy
     )
-    interp_res = results[f"{list(interp_energy)[0]}_fwhm_in_kev"]
-    interp_res_err = results[f"{list(interp_energy)[0]}_fwhm_err_in_kev"]
+    interp_res = results[f"{next(iter(interp_energy))}_fwhm_in_kev"]
+    interp_res_err = results[f"{next(iter(interp_energy))}_fwhm_err_in_kev"]
 
     if nan_mask[-1] is True or nan_mask[-2] is True:
         interp_res_err = np.nan
     if interp_res_err / interp_res > 0.1:
         interp_res_err = np.nan
 
-    log.info(f"{list(interp_energy)[0]} fwhm is {interp_res} keV +- {interp_res_err}")
+    log.info(f"{next(iter(interp_energy))} fwhm is {interp_res} keV +- {interp_res_err}")
 
     return {
-        f"{list(interp_energy)[0]}_fwhm": interp_res,
-        f"{list(interp_energy)[0]}_fwhm_err": interp_res_err,
+        f"{next(iter(interp_energy))}_fwhm": interp_res,
+        f"{next(iter(interp_energy))}_fwhm_err": interp_res_err,
         "alpha": alpha,
         "peaks": peaks.tolist(),
         "fwhms": fwhms,

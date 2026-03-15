@@ -169,7 +169,7 @@ def get_mode_stdev(par_array) -> tuple:
 
         fwhm = pgh.get_fwhm(counts, bins)[0]
         mean = float(bin_centres[np.argmax(counts)])
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, _cov = pgf.gauss_mode_width_max(
             counts,
             bins,
             mode_guess=mean,
@@ -202,7 +202,7 @@ def get_mode_stdev(par_array) -> tuple:
             if dx == 0:
                 dx = bin_width
 
-            counts, bins, var = pgh.get_hist(
+            counts, bins, _var = pgh.get_hist(
                 par_array,
                 dx=dx,
                 range=(lower_bound, upper_bound),
@@ -429,10 +429,7 @@ def fit_distributions(x_lo, x_hi, norm_par_array, display=0) -> tuple:
         double_exgauss_csqr[0],
     ]
 
-    if (pvals == 0).all():
-        idx = np.nanargmin(csqrs)
-    else:
-        idx = np.nanargmax(pvals)
+    idx = np.nanargmin(csqrs) if (pvals == 0).all() else np.nanargmax(pvals)
     func = funcs[idx]
     pars = pars[idx]
     return func, pars
@@ -538,7 +535,8 @@ def generate_cuts(
             bad_entries = (~np.isnan(all_par_array)) & (~np.isinf(all_par_array))
 
             if len(np.where(bad_entries)[0]) == 0:
-                raise RuntimeError(f"no valid entries for {par}")
+                msg = f"no valid entries for {par}"
+                raise RuntimeError(msg)
 
             mean, std = get_mode_stdev(
                 all_par_array[(~np.isnan(all_par_array)) & (~np.isinf(all_par_array))]
@@ -654,7 +652,8 @@ def get_cut_indexes(data, cut_parameters):
             data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
             ct_mask = ct_mask & data[outname]
     else:
-        raise ValueError("Data must be a Table or DataFrame")
+        msg = "Data must be a Table or DataFrame"
+        raise ValueError(msg)
 
     return ct_mask
 
@@ -810,12 +809,13 @@ def generate_cut_classifiers(
                             pars["mu"],
                             pars["sigma"],
                         )
-                    elif func == gauss_on_exgauss_areas or func == double_exgauss:
+                    elif func in (gauss_on_exgauss_areas, double_exgauss):
                         cdf = func.cdf_norm(xs, range_low, range_high, *pars[2:])
                     elif func == skewed_fit:
                         cdf = skewnorm.cdf(xs, pars["alpha"], pars["mu"], pars["sigma"])
                     else:
-                        raise ValueError("unknown func")
+                        msg = "unknown func"
+                        raise ValueError(msg)
 
                     if isinstance(percentile, (int, float)):
                         cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
@@ -874,7 +874,8 @@ def generate_cut_classifiers(
                     if cut_right is not None:
                         cut_right = max(cut_right, default_cut_right)
                 else:
-                    raise ValueError("unknown mode")
+                    msg = "unknown mode"
+                    raise ValueError(msg)
 
             if mode == "inclusive":
                 if cut_right is not None and cut_left is not None:
@@ -907,7 +908,7 @@ def generate_cut_classifiers(
                 fig = plt.figure()
                 low = -10 if cut_left is None or cut_left > -10 else cut_left
                 hi = 10 if cut_right is None or cut_right < 10 else cut_right
-                hist, _, _ = plt.hist(
+                _hist, _, _ = plt.hist(
                     norm_par_array,
                     bins=np.arange(low, hi, 0.1),
                     histtype="step",
@@ -972,7 +973,7 @@ def find_pulser_properties(df, energy="daqenergy"):
         var[np.where(var == 0)] = 1
     imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 3)
     peak_energies = pgh.get_bin_centers(bins)[imaxes]
-    pt_pars, pt_covs = pgc.hpge_fit_E_peak_tops(
+    pt_pars, _pt_covs = pgc.hpge_fit_E_peak_tops(
         hist, bins, var, peak_energies, n_to_fit=10
     )
     peak_e_err = pt_pars[:, 1] * 4
@@ -982,22 +983,21 @@ def find_pulser_properties(df, energy="daqenergy"):
         i += 1
         if peak_e_err[i] > allowed_err:
             continue
-        if i == 1:
-            if (
-                e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
-                and peak_e_err[i - 1] < allowed_err
-            ):
-                overlap = (
-                    peak_energies[i - 1]
-                    + peak_e_err[i - 1]
-                    - (peak_energies[i] - peak_e_err[i])
-                )
-                peak_e_err[i] -= overlap * (
-                    peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
-                peak_e_err[i - 1] -= overlap * (
-                    peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
+        if i == 1 and (
+            e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
+            and peak_e_err[i - 1] < allowed_err
+        ):
+            overlap = (
+                peak_energies[i - 1]
+                + peak_e_err[i - 1]
+                - (peak_energies[i] - peak_e_err[i])
+            )
+            peak_e_err[i] -= overlap * (
+                peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
+            peak_e_err[i - 1] -= overlap * (
+                peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
 
         if (
             e + peak_e_err[i] > peak_energies[i + 1] - peak_e_err[i + 1]
@@ -1086,10 +1086,7 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold) -> tuple:
         Boolean mask of the same length as the channel event list.
     """
     if isinstance(channel, str):
-        if channel[:2] == "ch":
-            chan = int(channel[2:])
-        else:
-            chan = int(channel)
+        chan = int(channel[2:]) if channel[:2] == "ch" else int(channel)
     else:
         chan = channel
     if isinstance(tcm_file, list):

@@ -221,7 +221,7 @@ class ParGrid:
             db_dict = {}
         for i_dim, i_par in enumerate(indices):
             name, parameter, value_str = self.get_data(i_dim, i_par)
-            if name not in db_dict.keys():
+            if name not in db_dict:
                 db_dict[name] = {parameter: value_str}
             else:
                 db_dict[name][parameter] = value_str
@@ -519,7 +519,8 @@ class BayesianOptimizer:
             self.sampling_rate = sampling_rate
         else:
             if sampling_rate is not None:
-                raise TypeError("Unknown type for sampling rate")
+                msg = "Unknown type for sampling rate"
+                raise TypeError(msg)
 
             self.sampling_rate = None
 
@@ -587,7 +588,8 @@ class BayesianOptimizer:
         """
 
         if round_to_samples is True and self.sampling_rate is None:
-            raise ValueError("Must provide sampling rate to round to samples")
+            msg = "Must provide sampling rate to round to samples"
+            raise ValueError(msg)
         if unit is not None:
             unit = ureg.Quantity(unit)
         self.dims.append(
@@ -634,10 +636,9 @@ class BayesianOptimizer:
         mean_y = self.gauss_pr.predict(self.x_init)
         min_mean_y = np.min(mean_y)
         z = (mean_y_new[0] - min_mean_y - 1) / (sigma_y_new[0] + 1e-9)
-        exp_imp = (mean_y_new[0] - min_mean_y - 1) * norm.cdf(z) + sigma_y_new[
+        return (mean_y_new[0] - min_mean_y - 1) * norm.cdf(z) + sigma_y_new[
             0
         ] * norm.pdf(z)
-        return exp_imp
 
     def _get_ucb(self, x_new):
         """Compute the Upper Confidence Bound acquisition value at *x_new*."""
@@ -821,14 +822,14 @@ class BayesianOptimizer:
         self.current_ei = ei
 
         for i, val in enumerate(x_new):
-            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
+            name, parameter, _min_val, _max_val, _rounding, unit = self.dims[i]
             if unit is not None:
                 value_str = f"{val}*{unit.units:~}"
                 if "µ" in value_str:
                     value_str = value_str.replace("µ", "u")
             else:
                 value_str = f"{val}"
-            if name not in db_dict.keys():
+            if name not in db_dict:
                 db_dict[name] = {parameter: value_str}
             else:
                 db_dict[name][parameter] = value_str
@@ -904,7 +905,7 @@ class BayesianOptimizer:
 
         out_dict = {}
         for i, val in enumerate(self.optimal_x):
-            name, parameter, min_val, max_val, rounding, unit = self.dims[i]
+            name, parameter, _min_val, _max_val, _rounding, unit = self.dims[i]
             if unit is not None:
                 value_str = f"{val}*{unit.units:~}"
                 if "µ" in value_str:
@@ -941,7 +942,8 @@ class BayesianOptimizer:
         fail_idxs = np.isnan(self.yerr_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
-            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+            msg = "Acquisition Function Plotting not implemented for dim!=2"
+            raise Exception(msg)
         if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
 
@@ -1046,7 +1048,8 @@ class BayesianOptimizer:
         nan_idxs = np.isnan(self.y_init)
         self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
         if (len(self.dims) != 2) and (len(self.dims) != 1):
-            raise Exception("Acquisition Function Plotting not implemented for dim!=2")
+            msg = "Acquisition Function Plotting not implemented for dim!=2"
+            raise Exception(msg)
         if len(self.dims) == 1:
             points = np.arange(self.dims[0].min_val, self.dims[0].max_val, 0.1)
             ys = np.zeros_like(points)

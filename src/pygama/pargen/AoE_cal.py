@@ -4,6 +4,7 @@ This module provides functions for correcting the a/e energy dependence, determi
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import re
 from collections.abc import Callable
@@ -279,7 +280,7 @@ def aoe_peak_fixed(func, **kwargs):
         Boolean array aligned with ``func.required_args()``; ``True`` for
         free parameters, ``False`` for fixed ones.
     """
-    if func == aoe_peak or func == aoe_peak_with_high_tail:
+    if func in (aoe_peak, aoe_peak_with_high_tail):
         fixed = ["x_lo", "x_hi"]
     elif func == exgauss:
         fixed = ["x_lo", "x_hi", "mu", "sigma"]
@@ -568,7 +569,7 @@ def unbinned_aoe_fit(
 
         plt.figure()
         xs = np.linspace(fmin, fmax, 1000)
-        counts, bins, bars = plt.hist(aoe, bins=nbins, histtype="step", label="Data")
+        counts, bins, _bars = plt.hist(aoe, bins=nbins, histtype="step", label="Data")
         dx = np.diff(bins)
         plt.plot(xs, pdf.get_pdf(xs, *x0) * dx[0], label="Guess")
         plt.plot(xs, pdf.get_pdf(xs, *fit[0]) * dx[0], label="Full Fit")
@@ -749,14 +750,14 @@ class CalAoE:
 
     def __init__(
         self,
-        cal_dicts: dict = None,
+        cal_dicts: dict | None = None,
         cal_energy_param: str = "cuspEmax_ctc_cal",
         eres_func: callable = lambda x: 1,
         pdf=aoe_peak,
         selection_string: str = "index==index",
         dt_corr: bool = False,
         dep_correct: bool = False,
-        dt_cut: dict = None,
+        dt_cut: dict | None = None,
         dt_param: str = "dt_eff",
         high_cut_val: float = 3,
         mean_func: Callable = Pol1,
@@ -843,7 +844,7 @@ class CalAoE:
             Dictionary of new calibration entries to merge.
         """
         if len(self.cal_dicts) > 0 and re.match(
-            r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]
+            r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))
         ):
             for tstamp in self.cal_dicts:
                 if tstamp in update_dict:
@@ -947,7 +948,7 @@ class CalAoE:
                                 ),
                             ]
                         )
-                self.timecorr_df.set_index("run_timestamp", inplace=True)
+                self.timecorr_df = self.timecorr_df.set_index("run_timestamp")
                 if len(self.timecorr_df) > 1:
                     if mode == "partial":
                         time_dict = fit_time_means(
@@ -966,14 +967,11 @@ class CalAoE:
                         }
 
                     elif mode == "full":
-                        time_dict = {
-                            time: mean
-                            for time, mean in zip(
+                        time_dict = dict(zip(
                                 np.array(self.timecorr_df.index),
                                 np.array(self.timecorr_df["mean"]),
                                 strict=False,
-                            )
-                        }
+                            ))
                         final_time_dict = {
                             tstamp: {
                                 output_name: {
@@ -1032,21 +1030,20 @@ class CalAoE:
                                 aoe_param,
                                 output_name,
                             )
-                            time_dict = {
-                                time: mean
-                                for time, mean in zip(
+                            time_dict = dict(zip(
                                     np.array(self.timecorr_df.index),
                                     np.array(self.timecorr_df["mean"]),
                                     strict=False,
-                                )
-                            }
+                                ))
                         else:
+                            msg = "need timestamp column in dataframe for interpolation"
                             raise ValueError(
-                                "need timestamp column in dataframe for interpolation"
+                                msg
                             )
 
                     else:
-                        raise ValueError("unknown mode")
+                        msg = "unknown mode"
+                        raise ValueError(msg)
 
                     df[output_name] = df[aoe_param] / np.array(
                         [time_dict[tstamp] for tstamp in df["run_timestamp"]]
@@ -1208,7 +1205,7 @@ class CalAoE:
 
             bcs = pgh.get_bin_centers(bins)
             mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
-            pk_pars, pk_covs = pgc.hpge_fit_energy_peak_tops(
+            pk_pars, _pk_covs = pgc.hpge_fit_energy_peak_tops(
                 hist,
                 bins,
                 var=var,
@@ -1414,7 +1411,7 @@ class CalAoE:
                             ),
                         ]
                     )
-            self.energy_corr_fits.set_index("compt_bands", inplace=True)
+            self.energy_corr_fits = self.energy_corr_fits.set_index("compt_bands")
             valid_fits = self.energy_corr_fits.query(
                 "mean_err==mean_err&sigma_err==sigma_err & sigma_err!=0 & mean_err!=0"
             )
@@ -1521,11 +1518,11 @@ class CalAoE:
             if e == KeyboardInterrupt or self.debug_mode:
                 raise (e)
             log.error("A/E energy correction failed")
-            mu_pars, mu_errs, mu_cov = return_nans(self.mean_func.func)
+            mu_pars, mu_errs, _mu_cov = return_nans(self.mean_func.func)
             csqr_mu, dof_mu, p_val_mu = (np.nan, np.nan, np.nan)
             csqr_sig, dof_sig, p_val_sig = (np.nan, np.nan, np.nan)
-            sig_pars, sig_errs, sig_cov = return_nans(self.sigma_func.func)
-            dep_pars, dep_err, dep_cov = return_nans(self.pdf)
+            sig_pars, sig_errs, _sig_cov = return_nans(self.sigma_func.func)
+            dep_pars, dep_err, _dep_cov = return_nans(self.pdf)
             data[corrected_param] = data[aoe_param] * np.nan
             data[classifier_param] = data[aoe_param] * np.nan
 
@@ -1806,7 +1803,7 @@ class CalAoE:
                 log.error(
                     f"A/E Survival fraction sweep determination failed for {peak} peak"
                 )
-        sfs.set_index("peak", inplace=True)
+        sfs = sfs.set_index("peak")
         return sfs, peak_dfs
 
     def calculate_survival_fractions(
@@ -1905,15 +1902,14 @@ class CalAoE:
                     ]
                 )
                 log.error(f"A/E survival fraction determination failed for {peak} peak")
-        sfs.set_index("peak", inplace=True)
-        return sfs
+        return sfs.set_index("peak")
 
     def calibrate(
         self,
         df: pd.DataFrame,
         initial_aoe_param: str,
-        peaks_of_interest: list = None,
-        fit_widths: list[tuple] = None,
+        peaks_of_interest: list | None = None,
+        fit_widths: list[tuple] | None = None,
         cut_peak_idx: int = 0,
         dep_acc: float = 0.9,
         sf_nsamples: int = 11,
@@ -2019,7 +2015,7 @@ class CalAoE:
             df, "AoE_Classifier", peaks_of_interest, fit_widths, mode="greater"
         )
 
-        if re.match(r"(\d{8})T(\d{6})Z", list(self.cal_dicts)[0]):
+        if re.match(r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))):
             self.low_side_sfs_by_run = {}
             self.two_side_sfs_by_run = {}
             for tstamp in self.cal_dicts:
@@ -2113,7 +2109,7 @@ def plot_aoe_res_time(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
     fig, ax = plt.subplots(1, 1)
-    try:
+    with contextlib.suppress(Exception):
         ax.errorbar(
             [
                 datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
@@ -2124,8 +2120,6 @@ def plot_aoe_res_time(
             linestyle=" ",
             marker="x",
         )
-    except Exception:
-        pass
     ax.set_xlabel("time")
     ax.set_ylabel("A/E res")
     myfmt = mdates.DateFormatter("%b %d")
@@ -2182,7 +2176,7 @@ def drifttime_corr_plot(
         aoe_pars2 = aoe_class.dt_res_dict["aoe_fit2"]["pars"]
         plt.subplot(2, 2, 2)
         xs = np.linspace(aoe_pars2["x_lo"], aoe_pars2["x_hi"], 100)
-        counts, aoe_bins2, bars = plt.hist(
+        _counts, aoe_bins2, _bars = plt.hist(
             final_df.query(
                 f"{aoe_class.dt_res_dict['aoe_grp2']}&({aoe_param}<{aoe_pars2['x_hi']})&({aoe_param}>{aoe_pars2['x_lo']})"
             )[aoe_param],
@@ -2203,7 +2197,7 @@ def drifttime_corr_plot(
         plt.xlabel("A/E")
         plt.ylabel("counts")
 
-        hist, bins, var = pgh.get_hist(
+        hist, bins, _var = pgh.get_hist(
             final_df[aoe_class.dt_param],
             dx=32,
             range=(
@@ -2253,7 +2247,7 @@ def plot_compt_bands_overlayed(
     data,
     eranges: list[tuple],
     aoe_param="AoE_Timecorr",
-    aoe_range: list[float] = None,
+    aoe_range: list[float] | None = None,
     title="Compton Bands",
     density=True,
     n_bins=50,
@@ -2301,7 +2295,7 @@ def plot_dt_dep(
     aoe_class,
     data,
     eranges: list[tuple],
-    titles: list = None,
+    titles: list | None = None,
     aoe_param="AoE_Timecorr",
     bins=(200, 100),
     dt_max=2000,
@@ -2322,7 +2316,7 @@ def plot_dt_dep(
                 f"{aoe_class.selection_string}&{aoe_class.cal_energy_param}<{erange[1]}&{aoe_class.cal_energy_param}>{erange[0]}&{aoe_param}=={aoe_param}"
             )
 
-            hist, bs, var = pgh.get_hist(select_df[aoe_param], bins=500)
+            hist, bs, _var = pgh.get_hist(select_df[aoe_param], bins=500)
             bin_cs = (bs[1:] + bs[:-1]) / 2
             mu = bin_cs[np.argmax(hist)]
             aoe_range = [mu * 0.9, mu * 1.1]
@@ -2442,7 +2436,8 @@ def plot_sigma_fit(aoe_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
         if aoe_class.sigma_func == SigmaFit:
             label = f"sqrt model: \nsqrt({sig_pars['a']:1.4f}+({sig_pars['b']:1.1f}/E)^{sig_pars['c']:1.1f})"
         else:
-            raise ValueError("unknown sigma function")
+            msg = "unknown sigma function"
+            raise ValueError(msg)
         ax1.plot(
             aoe_class.energy_corr_fits.index.to_numpy(),
             aoe_class.sigma_func.func(
@@ -2528,7 +2523,7 @@ def plot_cut_fit(
             linestyle="--",
         )
         plt.xlim([-8.1, 0.1])
-        vals, labels = plt.yticks()
+        vals, _labels = plt.yticks()
         plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
         plt.ylim([np.nanmin(aoe_class.cut_fits["sf"]) * 0.9, 102])
     except Exception:
@@ -2550,6 +2545,7 @@ def get_peak_label(peak: float) -> str:
         return "Tl SEP @"
     if peak == 2614.5:
         return "Tl FEP @"
+    return None
 
 
 def plot_survival_fraction_curves(
@@ -2569,18 +2565,16 @@ def plot_survival_fraction_curves(
         )
 
         for peak, survival_df in aoe_class.low_side_peak_dfs.items():
-            try:
+            with contextlib.suppress(Exception):
                 plt.errorbar(
                     survival_df.index,
                     survival_df["sf"],
                     yerr=survival_df["sf_err"],
                     label=f"{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sfs.loc[peak]['sf']:2.1f} +/- {aoe_class.low_side_sfs.loc[peak]['sf_err']:2.1f} %",
                 )
-            except Exception:
-                pass
     except Exception:
         pass
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.legend(loc="upper right")
     plt.xlabel("cut value")
@@ -2704,7 +2698,7 @@ def plot_sf_vs_energy(
     except Exception:
         pass
     plt.ylim([0, 100])
-    vals, labels = plt.yticks()
+    vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.xlabel("energy (keV)")
     plt.ylabel("survival percentage")
@@ -2727,7 +2721,7 @@ def plot_classifier(
     plt.rcParams["font.size"] = fontsize
 
     fig = plt.figure()
-    try:
+    with contextlib.suppress(Exception):
         plt.hist2d(
             data.query(aoe_class.selection_string)[aoe_class.cal_energy_param],
             data.query(aoe_class.selection_string)[aoe_param],
@@ -2737,8 +2731,6 @@ def plot_classifier(
             ],
             norm=LogNorm(),
         )
-    except Exception:
-        pass
     plt.xlabel("energy (keV)")
     plt.ylabel(aoe_param)
     plt.xlim(xrange)

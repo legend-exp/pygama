@@ -81,7 +81,7 @@ def noise_optimization(
         plt.close()
 
     result_dict = {}
-    ene_pars = [par for par in opt_dict_par.keys()]
+    ene_pars = list(opt_dict_par.keys())
     log.info(f"\nRunning optimization for {ene_pars}")
     for i, x in enumerate(samples):
         x = f"{x:.1f}"
@@ -126,12 +126,12 @@ def noise_optimization(
         log.info(f"\nOptimization for {ene_par}")
         dict_str = opt_dict_par[ene_par]["dict_str"]
         par_dict_res = result_dict[dict_str]
-        sample_list = np.array([float(x) for x in result_dict[dict_str].keys()])
+        sample_list = np.array([float(x) for x in result_dict[dict_str]])
         fom_list = np.array(
-            [result_dict[dict_str][x]["fom"] for x in result_dict[dict_str].keys()]
+            [result_dict[dict_str][x]["fom"] for x in result_dict[dict_str]]
         )
         fom_err_list = np.array(
-            [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str].keys()]
+            [result_dict[dict_str][x]["fom_err"] for x in result_dict[dict_str]]
         )
 
         guess_par = sample_list[np.nanargmin(fom_list)]
@@ -175,7 +175,7 @@ def noise_optimization(
                 x = f"{x:.1f}"
                 energies = par_dict_res[x]["energies"]
                 par_dict_res[x].pop("energies")
-                hist, bins, var = get_hist(
+                hist, bins, _var = get_hist(
                     energies, range=plot_range, dx=opt_dict["dx"]
                 )
                 bc = (bins[:-1] + bins[1:]) / 2.0
@@ -332,7 +332,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20) -> dic
     fwhm = pars[1] * 2 * np.sqrt(2 * np.log(2))
     fwhm_err = errs[1] * 2 * np.sqrt(2 * np.log(2))
 
-    hist, bins, var = get_hist(energies_fit, range=fit_range, dx=dx)
+    hist, bins, _var = get_hist(energies_fit, range=fit_range, dx=dx)
     gof_pars = pars
     gof_pars[2] *= dx
     chisq, dof = goodness_of_fit(
@@ -365,7 +365,7 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20) -> dic
         fwhm = guess[1] * 2 * np.sqrt(2 * np.log(2))
         fwhm_err = 0
 
-    results = {
+    return {
         "pars": pars,
         "errors": errs,
         "covariance": cov,
@@ -376,7 +376,6 @@ def simple_gaussian_fit(energies, dx=1, sigma_thr=4, allowed_p_val=1e-20) -> dic
         "chisq": chisq / dof,
         "p_val": p_val,
     }
-    return results
 
 
 def simple_gaussian_guess(hist, bins, func, toll=0.2) -> tuple:
@@ -440,10 +439,10 @@ def simple_gaussian_guess(hist, bins, func, toll=0.2) -> tuple:
     }
 
     for par in func.required_args():
-        if par == "x_lo" or par == "x_hi":
+        if par in {"x_lo", "x_hi"}:
             guess[par] = np.inf
             bounds[par] = None
-        elif par == "n_bkg" or par == "hstep":
+        elif par in {"n_bkg", "hstep"}:
             guess[par] = 0
             bounds[par] = None
     return guess, bounds

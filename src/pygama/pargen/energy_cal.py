@@ -362,7 +362,7 @@ class HPGeCalibration:
         matched_energies = peaks_kev[
             [np.argmin(abs(peaks_kev - i)) for i in got_peak_energies]
         ]
-        while not all([list(matched_energies).count(x) == 1 for x in matched_energies]):
+        while not all(list(matched_energies).count(x) == 1 for x in matched_energies):
             for i in range(len(matched_energies)):
                 if matched_energies[i + 1] == matched_energies[i]:
                     # remove duplicates
@@ -474,7 +474,7 @@ class HPGeCalibration:
 
         peak_pars_lines = [i[0] for i in peak_pars]
         peaks_mask = np.array(
-            [True if peak in peaks_kev else False for peak in peak_pars_lines],
+            [peak in peaks_kev for peak in peak_pars_lines],
             dtype=bool,
         )
         peak_pars = peak_pars[peaks_mask]
@@ -507,7 +507,7 @@ class HPGeCalibration:
 
         uncal_peak_pars = []
         for pars in peak_pars:
-            peak, fit_range, func = pars
+            peak, _fit_range, func = pars
 
             if peak in self.peaks_kev:
                 loc = self.peak_locs[np.where(peak == self.peaks_kev)][0]
@@ -684,7 +684,7 @@ class HPGeCalibration:
                 log.info("\t\tParameter  |    Value +/- Sigma  ")
                 for vari, pari, errorsi in zip(varnames, pars, errors, strict=False):
                     log.info(
-                        f"\t\t{str(vari).ljust(10)} | {('%4.2f' % pari).rjust(8)} +/- {('%4.2f' % errorsi).ljust(8)}"
+                        f"\t\t{str(vari).ljust(10)} | {(f'{pari:4.2f}').rjust(8)} +/- {(f'{errorsi:4.2f}').ljust(8)}"
                     )
 
         if len(fitted_peaks_kev) == 0:
@@ -816,7 +816,7 @@ class HPGeCalibration:
 
         peak_pars_lines = [i[0] for i in peak_pars]
         peaks_mask = np.array(
-            [True if peak in peaks_kev else False for peak in peak_pars_lines],
+            [peak in peaks_kev for peak in peak_pars_lines],
             dtype=bool,
         )
         peak_pars = peak_pars[peaks_mask]
@@ -1061,7 +1061,7 @@ class HPGeCalibration:
                 log.info("\t\tParameter  |    Value +/- Sigma  ")
                 for vari, pari, errorsi in zip(varnames, pars, errors, strict=False):
                     log.info(
-                        f"\t\t{str(vari).ljust(10)} | {('%4.2f' % pari).rjust(8)} +/- {('%4.2f' % errorsi).ljust(8)}"
+                        f"\t\t{str(vari).ljust(10)} | {(f'{pari:4.2f}').rjust(8)} +/- {(f'{errorsi:4.2f}').ljust(8)}"
                     )
 
         if len(fitted_peaks_kev) == 0:
@@ -1302,8 +1302,9 @@ class HPGeCalibration:
             for key, energy in interp_energy_kev.items():
                 try:
                     if energy > np.nanmax(fwhm_peaks) or energy < np.nanmin(fwhm_peaks):
+                        msg = "Interpolating energy out of range of fitted peaks"
                         raise RuntimeError(
-                            "Interpolating energy out of range of fitted peaks"
+                            msg
                         )
                     rng = np.random.default_rng(1)
                     pars_b = rng.multivariate_normal(
@@ -1802,7 +1803,7 @@ class HPGeCalibration:
                 binning = np.arange(pk_ranges[0], pk_ranges[1], 0.1 / der[i])
                 bin_cs = (binning[1:] + binning[:-1]) / 2
 
-                counts, bs, bars = plt.hist(energies, bins=binning, histtype="step")
+                counts, bs, _bars = plt.hist(energies, bins=binning, histtype="step")
                 if pk_pars is not None:
                     fit_vals = pk_func.get_pdf(bin_cs, *pk_pars, 0) * np.diff(bs)[0]
                     plt.plot(bin_cs, fit_vals)
@@ -1827,7 +1828,7 @@ class HPGeCalibration:
                     plt.ylabel("Counts")
 
                     plt.xlim([mu - range_adu, mu + range_adu])
-                    locs, labels = plt.xticks()
+                    locs, _labels = plt.xticks()
 
                     def get_peak_labels(
                         labels: list[str], pars: list[float]
@@ -1883,8 +1884,7 @@ class HPGeCalibration:
         )
 
         if pk_parameters is None:
-            fig = plt.figure()
-            return fig
+            return plt.figure()
 
         #####
         # Remove the Tl SEP and DEP from calibration if found
@@ -1894,11 +1894,7 @@ class HPGeCalibration:
 
         for peak, pk_dict in pk_parameters.items():
             if (
-                peak == 2103.53
-                or peak == 1592.53
-                or peak == 511.0
-                or pk_dict["validity"] is False
-                or np.isnan(pk_dict["fwhm_err_in_kev"])
+                peak in {2103.53, 1592.53, 511.0} or pk_dict["validity"] is False or np.isnan(pk_dict["fwhm_err_in_kev"])
             ):
                 pass
             else:
@@ -2185,13 +2181,10 @@ def get_hpge_energy_peak_par_guess(
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
     if (
-        func == pgf.gauss_on_step
-        or func == pgf.hpge_peak
-        or func == pgf.gauss_on_uniform
-        or func == pgf.gauss_on_linear
+        func in (pgf.gauss_on_step, pgf.hpge_peak, pgf.gauss_on_uniform, pgf.gauss_on_linear)
     ):
         # get mu and height from a gauss fit, also sigma as fallback
-        pars, cov = pgb.gauss_mode_width_max(
+        pars, _cov = pgb.gauss_mode_width_max(
             hist, bins, var, mode_guess=mode_guess, n_bins=5
         )
 
@@ -2286,7 +2279,7 @@ def get_hpge_energy_peak_par_guess(
             parguess["m"] = 0
             parguess["b"] = 1
 
-        elif func == pgf.gauss_on_step or func == pgf.hpge_peak:
+        elif func in (pgf.gauss_on_step, pgf.hpge_peak):
             hstep = step / (bg + np.mean(hist[:10]))
             parguess["hstep"] = hstep
 
@@ -2328,10 +2321,7 @@ def get_hpge_energy_fixed(func):
     """
 
     if (
-        func == pgf.gauss_on_step
-        or func == pgf.hpge_peak
-        or func == pgf.gauss_on_uniform
-        or func == pgf.gauss_on_linear
+        func in (pgf.gauss_on_step, pgf.hpge_peak, pgf.gauss_on_uniform, pgf.gauss_on_linear)
     ):
         # pars are: n_sig, mu, sigma, n_bkg, hstep, components
         fixed = ["x_lo", "x_hi"]

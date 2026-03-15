@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
-from pytest import approx
+import pytest
 
 import pygama.math.histogram as pgh
 
@@ -9,9 +11,9 @@ def test_get_hist():
     hist, bins, err = pgh.get_hist(data, bins=20, range=(-10, 10))
     numpy_hist, numpy_bins = np.histogram(data, bins=20, range=(-10, 10))
     # Check that we agree with numpy
-    assert hist == approx(numpy_hist, rel=1e-5)
-    assert bins == approx(numpy_bins, rel=1e-5)
-    assert err == approx(
+    assert hist == pytest.approx(numpy_hist, rel=1e-5)
+    assert bins == pytest.approx(numpy_bins, rel=1e-5)
+    assert err == pytest.approx(
         numpy_hist, rel=1e-5
     )  # for no weights, the variances should be the same as the histogram!
     # check that the values match what we expect
@@ -29,9 +31,9 @@ def test_get_hist():
         data, bins=10, range=(-10, 10), weights=weight * weight
     )
 
-    assert hist == approx(numpy_hist, rel=1e-5)
-    assert bins == approx(numpy_bins, rel=1e-5)
-    assert var == approx(numpy_var, rel=1e-5)
+    assert hist == pytest.approx(numpy_hist, rel=1e-5)
+    assert bins == pytest.approx(numpy_bins, rel=1e-5)
+    assert var == pytest.approx(numpy_var, rel=1e-5)
 
     assert np.allclose(
         hist, np.full(10, 2 * 0.2), rtol=1e-8
@@ -72,8 +74,8 @@ def test_find_bin():
 
 
 def test_range_slice():
-    np.random.seed(42)
-    data = np.random.normal(size=100).astype(np.float32)
+    np.random.seed(42)  # noqa: NPY002
+    data = np.random.normal(size=100).astype(np.float32)  # noqa: NPY002
     hist, bins, err = pgh.get_hist(data, bins=10, range=(-1, 1))
 
     hist_slice, bins_slice, var_slice = pgh.range_slice(0.1, 0.6, hist, bins, err)
@@ -86,48 +88,48 @@ def test_range_slice():
 
 
 def test_get_fwfm():
-    from numpy.random import normal
+    from numpy.random import normal  # noqa: PLC0415
 
-    np.random.seed(42)
-    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="bins_over_f")
-    assert fwfm == approx(2.4)
-    assert dfwfm == approx(0.1911676414793058)
+    assert fwfm == pytest.approx(2.4)
+    assert dfwfm == pytest.approx(0.1911676414793058)
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="interpolate")
-    assert fwfm == approx(1.9897727272727268)
-    assert dfwfm == approx(1.0740819016912582)
+    assert fwfm == pytest.approx(1.9897727272727268)
+    assert dfwfm == pytest.approx(1.0740819016912582)
 
     fwfm, dfwfm = pgh.get_fwfm(0.5, hist, bins, var, method="fit_slopes")
-    assert fwfm == approx(2.2320859865745684)
-    assert dfwfm == approx(0.14298871443488284)
+    assert fwfm == pytest.approx(2.2320859865745684)
+    assert dfwfm == pytest.approx(0.14298871443488284)
 
 
 def test_get_fwhm():
-    from numpy.random import normal
+    from numpy.random import normal  # noqa: PLC0415
 
-    np.random.seed(42)
-    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="bins_over_f")
-    assert fwfm == approx(2.4)
-    assert dfwfm == approx(0.1911676414793058)
+    assert fwfm == pytest.approx(2.4)
+    assert dfwfm == pytest.approx(0.1911676414793058)
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="interpolate")
-    assert fwfm == approx(1.9897727272727268)
-    assert dfwfm == approx(1.0740819016912582)
+    assert fwfm == pytest.approx(1.9897727272727268)
+    assert dfwfm == pytest.approx(1.0740819016912582)
 
     fwfm, dfwfm = pgh.get_fwhm(hist, bins, var, method="fit_slopes")
-    assert fwfm == approx(2.2320859865745684)
-    assert dfwfm == approx(0.14298871443488284)
+    assert fwfm == pytest.approx(2.2320859865745684)
+    assert dfwfm == pytest.approx(0.14298871443488284)
 
 
 def test_get_gaussian_guess():
-    from numpy.random import normal
+    from numpy.random import normal  # noqa: PLC0415
 
-    np.random.seed(42)
-    hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, _var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
     gauss_params = pgh.get_gaussian_guess(hist, bins)
     assert np.allclose(
@@ -141,7 +143,7 @@ def test_get_gaussian_guess():
 
 
 def test_get_bin_estimates():
-    from pygama.math.functions.gauss import nb_gauss
+    from pygama.math.functions.gauss import nb_gauss  # noqa: PLC0415
 
     par = np.array([1, 2])
     bins = np.arange(1, 10)
