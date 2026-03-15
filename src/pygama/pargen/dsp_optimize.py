@@ -280,7 +280,7 @@ def run_grid(
             verbosity=verbosity,
             fom_kwargs=fom_kwargs,
         )
-        log.debug("value:", grid_values[tuple(iii)])
+        log.debug("value: %s", grid_values[tuple(iii)])
         if not grid.iterate_indices(iii):
             break
     return grid_values
@@ -351,7 +351,7 @@ def run_grid_point(
                 res[i] = fom_function[i](tb_out, verbosity)
             else:
                 res[i] = fom_function[0](tb_out, verbosity)
-        log.debug("value:", res)
+        log.debug("value: %s", res)
         out = {"indexes": [tuple(ii) for ii in iii], "results": res}
 
     else:
@@ -386,7 +386,7 @@ def get_grid_points(grid):
 
         for i, gri in enumerate(zip(iii, grid, strict=False)):
             if not gri[1].iterate_indices(gri[0]):
-                log.info(f"{i} grid end")
+                log.info("%s grid end", i)
                 iii[i] = gri[1].get_zero_indices()
                 complete[i] = True
         if all(complete):
@@ -502,7 +502,7 @@ class BayesianOptimizer:
         fom_value: str = "y_val",
         fom_error: str = "y_val_err",
     ) -> None:
-        np.random.seed(55)
+        np.random.seed(55)  # noqa: NPY002
 
         self.lambda_param = 0.01
         self.eta_param = 0
@@ -673,7 +673,7 @@ class BayesianOptimizer:
         min_ei = float(sys.maxsize)
         x_optimal = None
         # Trial with an array of random data points
-        rands = np.random.uniform(
+        rands = np.random.uniform(  # noqa: NPY002
             np.array([dim.min_val for dim in self.dims]),
             np.array([dim.max_val for dim in self.dims]),
             (self.batch_size, self.get_n_dimensions()),
@@ -706,7 +706,7 @@ class BayesianOptimizer:
                     else:
                         x_optimal.append(y)
         if x_optimal in self.x_init:
-            perturb = np.random.uniform(
+            perturb = np.random.uniform(  # noqa: NPY002
                 -np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
                 np.array([(dim.max_val - dim.min_val) / 10 for dim in self.dims]),
                 (1, len(self.dims)),
@@ -879,7 +879,7 @@ class BayesianOptimizer:
         )
         if (
             not new_entry.empty
-            and new_entry.notnull().any().any()
+            and new_entry.notna().any().any()
             and len(new_entry) >= 1
         ):
             if self.best_samples_.empty:
@@ -992,12 +992,10 @@ class BayesianOptimizer:
                 )
             )
 
-            j = 0
-            for i, _ in np.ndenumerate(out_grid):
+            for j, (i, _) in enumerate(np.ndenumerate(out_grid)):
                 out_grid[i] = self.gauss_pr.predict(
                     points[j].reshape(1, -1), return_std=False
                 )
-                j += 1
 
             fig = plt.figure()
             plt.imshow(
@@ -1092,10 +1090,8 @@ class BayesianOptimizer:
                 )
             )
 
-            j = 0
-            for i, _ in np.ndenumerate(out_grid):
+            for j, (i, _) in enumerate(np.ndenumerate(out_grid)):
                 out_grid[i] = self.acq_function(points[j])
-                j += 1
 
             fig = plt.figure()
             plt.imshow(
@@ -1208,8 +1204,8 @@ def run_bayesian_optimisation(
         for optimiser in optimisers:
             db_dict = optimiser.update_db_dict(db_dict)
 
-        log.info(f"Iteration number: {j + 1}")
-        log.info(f"Processing with {db_dict}")
+        log.info("Iteration number: %s", j + 1)
+        log.info("Processing with %s", db_dict)
 
         tb_out = run_one_dsp(tb_data, dsp_config, db_dict=db_dict)
 
@@ -1226,7 +1222,7 @@ def run_bayesian_optimisation(
             else:
                 res[i] = fom_function[0](tb_out)
 
-        log.info(f"Results of iteration {j + 1} are {res}")
+        log.info("Results of iteration %s are %s", j + 1, res)
 
         for i, optimiser in enumerate(optimisers):
             if np.isnan(res[i][optimiser.fom_value]):
@@ -1246,7 +1242,7 @@ def run_bayesian_optimisation(
         results_dict = optimiser.optimal_results
 
         if np.isnan(results_dict[optimiser.fom_value]):
-            log.error(f"Energy optimisation failed for {optimiser.dims[0][0]}")
+            log.error("Energy optimisation failed for %s", optimiser.dims[0][0])
         out_results_list.append(results_dict)
 
     return out_param_dict, out_results_list
