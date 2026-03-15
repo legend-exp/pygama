@@ -1562,7 +1562,7 @@ class CalAoE:
                     "parameters": mu_pars.to_dict(),
                 },
                 f"_{classifier_param}_intermediate": {
-                    "expression": f"({corrected_param})-({self.mean_func.string_func(self.cal_energy_param)})",
+                    "expression": f"({aoe_param})-({self.mean_func.string_func(self.cal_energy_param)})",
                     "parameters": mu_pars.to_dict(),
                 },
                 classifier_param: {
