@@ -35,7 +35,6 @@ def build_tcm_index_array(
 
     # parse observables string. default to hit tier
     for idx_chan, channel in enumerate(rawids):
-
         # get the event indexes
         table_id = utils.get_tcm_id_by_pattern(
             datainfo._asdict()["dsp"].table_fmt,
@@ -187,7 +186,7 @@ def xtalk_correct_energy_impl(
     uncal_energy: ArrayLike,
     cal_energy: ArrayLike,
     xtalk_matrix: ArrayLike,
-    xtalk_threshold: float = None,
+    xtalk_threshold: float | None = None,
 ):
     r"""Function to perform the actual xtalk correction of energy.
 
@@ -238,13 +237,12 @@ def get_xtalk_correction(
     uncal_energy_expr: str,
     cal_energy_expr: str,
     rawids: list,
-    xtalk_threshold: float = None,
+    xtalk_threshold: float | None = None,
     xtalk_matrix_filename: str = "",
     xtalk_rawid_obj: str = "xtc/rawid_index",
     xtalk_matrix_obj: str = "xtc/xtalk_matrix_negative",
     positive_xtalk_matrix_obj: str = "xtc/xtalk_matrix_positive",
 ):
-
     # read lh5 files to numpy
     xtalk_matrix_rawids = lh5.read_as(xtalk_rawid_obj, xtalk_matrix_filename, "np")
     ordered_rawids = [rawid for rawid in xtalk_matrix_rawids if rawid in rawids]
@@ -275,10 +273,9 @@ def get_xtalk_correction(
     uncal_energy_array = gather_energy(uncal_energy_expr, tcm, datainfo, ordered_rawids)
     cal_energy_array = gather_energy(cal_energy_expr, tcm, datainfo, ordered_rawids)
 
-    energy_corr = xtalk_correct_energy_impl(
+    return xtalk_correct_energy_impl(
         uncal_energy_array, cal_energy_array, xtalk_matrix, xtalk_threshold
     )
-    return energy_corr
 
 
 def calibrate_energy(
@@ -287,9 +284,9 @@ def calibrate_energy(
     energy_corr: np.ndarray,
     xtalk_matrix_rawids: np.ndarray,
     par_files: str | list[str],
-    uncal_energy_var: str = None,
-    recal_energy_var: str = None,
-    channel_mapping: dict = None,
+    uncal_energy_var: str | None = None,
+    recal_energy_var: str | None = None,
+    channel_mapping: dict | None = None,
 ):
     """Function to recalibrate the energy after xtalk correction.
 
@@ -330,10 +327,11 @@ def calibrate_energy(
             else:
                 raise KeyError
             cfg, chan_inputs = _remove_uneeded_operations(
-                _reorder_table_operations(cfg), recal_energy_var.split(".")[-1]
+                _reorder_table_operations(cfg),
+                recal_energy_var.rsplit(".", maxsplit=1)[-1],
             )
 
-            chan_inputs.remove(uncal_energy_var.split(".")[-1])
+            chan_inputs.remove(uncal_energy_var.rsplit(".", maxsplit=1)[-1])
 
             # get the event indices
             table_id = utils.get_tcm_id_by_pattern(table_fmt, f"ch{chan}")
@@ -353,7 +351,7 @@ def calibrate_energy(
 
             # add the uncalibrated energy to the table
             outtbl_obj.add_column(
-                uncal_energy_var.split(".")[-1],
+                uncal_energy_var.rsplit(".", maxsplit=1)[-1],
                 types.Array(energy_corr[evt_ids_ch, i]),
             )
 
@@ -362,7 +360,9 @@ def calibrate_energy(
                     info["expression"], info.get("parameters", None)
                 )
                 outtbl_obj.add_column(outname, outcol)
-            out_arr[evt_ids_ch, i] = outtbl_obj[recal_energy_var.split(".")[-1]].nda
+            out_arr[evt_ids_ch, i] = outtbl_obj[
+                recal_energy_var.rsplit(".", maxsplit=1)[-1]
+            ].nda
         except KeyError:
             out_arr[:, i] = np.nan
 

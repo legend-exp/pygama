@@ -5,105 +5,85 @@ ci:
 
 exclude: ^(attic|src/pygama/flow/datagroup.py)
 repos:
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: "v6.0.0"
-  hooks:
-  - id: check-added-large-files
-  - id: check-case-conflict
-  - id: check-executables-have-shebangs
-  - id: check-merge-conflict
-  - id: check-symlinks
-  - id: check-yaml
-  - id: check-json
-  - id: check-toml
-  - id: check-docstring-first
-  - id: debug-statements
-  - id: end-of-file-fixer
-  - id: forbid-new-submodules
-  - id: mixed-line-ending
-  - id: requirements-txt-fixer
-  - id: trailing-whitespace
+  - repo: https://github.com/adamchainz/blacken-docs
+    rev: "1.19.1"
+    hooks:
+      - id: blacken-docs
+        additional_dependencies: [black==23.*]
 
-- repo: https://github.com/asottile/setup-cfg-fmt
-  rev: "v3.2.0"
-  hooks:
-  - id: setup-cfg-fmt
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v5.0.0"
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: forbid-new-submodules
+      - id: mixed-line-ending
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
 
-- repo: https://github.com/PyCQA/isort
-  rev: "7.0.0"
-  hooks:
-  - id: isort
+  - repo: https://github.com/kynan/nbstripout
+    rev: "0.8.1"
+    hooks:
+      - id: nbstripout
+        args:
+          [
+            "--drop-empty-cells",
+            "--extra-keys",
+            "metadata.kernelspec metadata.language_info",
+          ]
 
-- repo: https://github.com/asottile/pyupgrade
-  rev: "v3.21.2"
-  hooks:
-  - id: pyupgrade
-    args: ["--py38-plus"]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.11.4"
+    hooks:
+      - id: ruff
+        args: ["--fix", "--show-fixes"]
+      - id: ruff-format
 
-- repo: https://github.com/psf/black-pre-commit-mirror
-  rev: "25.12.0"
-  hooks:
-  - id: black-jupyter
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.4.1"
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli
 
-- repo: https://github.com/pre-commit/mirrors-mypy
-  rev: "v1.19.1"
-  hooks:
-  - id: mypy
-    files: src
-    stages: [manual]
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: "v0.10.0.1"
+    hooks:
+      - id: shellcheck
 
-- repo: https://github.com/hadialqattan/pycln
-  rev: "v2.6.0"
-  hooks:
-  - id: pycln
-    args: [--all]
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: "v1.10.0"
+    hooks:
+      - id: python-no-log-warn
+      - id: rst-backticks
+      - id: rst-directive-colons
+      - id: rst-inline-touching-normal
 
-- repo: https://github.com/PyCQA/flake8
-  rev: "7.3.0"
-  hooks:
-  - id: flake8
-    additional_dependencies: [
-      flake8-bugbear>=23.1.17,
-      flake8-print,
-      pep8-naming
-    ]
-    args: ["--extend-ignore", "E203,E501"]
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: "v3.5.1"
+    hooks:
+      - id: prettier
+        types_or: [yaml]
+      - id: prettier
+        types_or: [markdown, html, css, scss, javascript, json]
+        args: [--prose-wrap=always]
 
-- repo: https://github.com/kynan/nbstripout
-  rev: "0.8.2"
-  hooks:
-    - id: nbstripout
-      args: ["--drop-empty-cells",
-             "--extra-keys", "metadata.kernelspec metadata.language_info"]
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.24.1
+    hooks:
+      - id: validate-pyproject
 
-- repo: https://github.com/mgedmin/check-manifest
-  rev: "0.51"
-  hooks:
-  - id: check-manifest
-    stages: [manual]
-
-- repo: https://github.com/codespell-project/codespell
-  rev: "v2.4.1"
-  hooks:
-  - id: codespell
-    additional_dependencies:
-      - tomli
-
-- repo: https://github.com/shellcheck-py/shellcheck-py
-  rev: "v0.11.0.1"
-  hooks:
-  - id: shellcheck
-
-- repo: https://github.com/pre-commit/pygrep-hooks
-  rev: "v1.10.0"
-  hooks:
-  - id: python-no-log-warn
-  - id: rst-backticks
-  - id: rst-directive-colons
-  - id: rst-inline-touching-normal
-
-- repo: https://github.com/pre-commit/mirrors-prettier
-  rev: "v4.0.0-alpha.8"
-  hooks:
-    - id: prettier
-      types_or: [json]
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.32.1
+    hooks:
+      - id: check-dependabot
+      - id: check-github-workflows
+      - id: check-readthedocs

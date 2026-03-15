@@ -23,10 +23,10 @@ def gather_pulse_data(
     *,
     observable: str,
     pulse_mask: types.VectorOfVectors = None,
-    a_thr_pe: float = None,
-    t_loc_ns: float = None,
-    dt_range_ns: Sequence[float] = None,
-    t_loc_default_ns: float = None,
+    a_thr_pe: float | None = None,
+    t_loc_ns: float | None = None,
+    dt_range_ns: Sequence[float] | None = None,
+    t_loc_default_ns: float | None = None,
     out_layout: str = "sparse",
     energy_observable: str = "hit.energy_in_pe",
     t0_observable: str = "hit.trigger_pos",
@@ -133,7 +133,7 @@ def gather_pulse_data(
 
     # check if user wants to apply a mask
     if pulse_mask is None and any(
-        [kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)]
+        kwarg is not None for kwarg in (a_thr_pe, t_loc_ns, dt_range_ns)
     ):
         # generate the time/amplitude mask from parameters
         pulse_mask = make_pulse_data_mask(
@@ -338,7 +338,7 @@ def make_pulse_data_mask(
 
     # start with all-true mask
     pulse_t0_ns = pulse_t0.view_as("ak")
-    mask = pulse_t0_ns == pulse_t0_ns
+    mask = pulse_t0_ns == pulse_t0_ns  # noqa: PLR0124
 
     # apply p.e. threshold
     if a_thr_pe is not None:
@@ -346,7 +346,7 @@ def make_pulse_data_mask(
 
     # apply time windowing
     if t_loc_ns is not None and dt_range_ns is not None:
-        if not isinstance(dt_range_ns, (tuple, list)):
+        if not isinstance(dt_range_ns, tuple | list):
             msg = "dt_range_ns must be a tuple"
             raise ValueError(msg)
 
@@ -359,10 +359,10 @@ def make_pulse_data_mask(
 
 
 def geds_coincidence_classifier(
-    datainfo: utils.DataInfo,
-    tcm: utils.TCMData,
-    table_names: Sequence[str],
-    channel_mapping: dict,
+    datainfo: utils.DataInfo,  # noqa: ARG001
+    tcm: utils.TCMData,  # noqa: ARG001
+    table_names: Sequence[str],  # noqa: ARG001
+    channel_mapping: dict,  # noqa: ARG001
     *,
     spms_t0: types.VectorOfVectors,
     spms_amp: types.VectorOfVectors,

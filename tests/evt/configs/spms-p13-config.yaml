@@ -48,8 +48,6 @@ channels:
     - "ch1067203"
     - "ch1067204"
 
-
-
 outputs:
   - trigger___timestamp
   - spms___rawid

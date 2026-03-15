@@ -2,13 +2,13 @@
 pygama convenience functions for linearly fitting data
 """
 
-from typing import Optional, Union
+from __future__ import annotations
 
 import numpy as np
 
 
 def linear_fit_by_sums(
-    x: np.ndarray, y: np.ndarray, var: Optional[Union[float, np.ndarray]] = 1
+    x: np.ndarray, y: np.ndarray, var: float | np.ndarray | None = 1
 ) -> tuple[float, float]:
     """
     Fast computation of weighted linear least squares fit to a linear model
@@ -43,7 +43,7 @@ def linear_fit_by_sums(
 
 
 def fit_simple_scaling(
-    x: np.ndarray, y: np.ndarray, var: Optional[Union[float, np.ndarray]] = 1
+    x: np.ndarray, y: np.ndarray, var: float | np.ndarray | None = 1
 ) -> tuple[float, float]:
     """
     Fast computation of weighted linear least squares fit to a simple scaling

@@ -2,6 +2,8 @@
 Moyal distributions for pygama
 """
 
+from __future__ import annotations
+
 from math import erfc
 
 import numba as nb
@@ -127,7 +129,6 @@ def nb_moyal_scaled_cdf(
 
 
 class MoyalGen(PygamaContinuous):
-
     def __init__(self, *args, **kwargs):
         self.x_lo = -1 * np.inf
         self.x_hi = np.inf

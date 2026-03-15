@@ -25,6 +25,8 @@ gauss_on_linear
     An instance of SumDists and rv_continuous, has methods of pdf, cdf, etc.
 """
 
+from __future__ import annotations
+
 from pygama.math.functions.gauss import gaussian
 from pygama.math.functions.linear import linear
 from pygama.math.functions.sum_dists import SumDists

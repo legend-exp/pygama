@@ -135,10 +135,12 @@ def build_evt(
     if not isinstance(config, dict):
         config = load_dict(config)
 
-    if "channels" not in config.keys():
-        raise ValueError("channel field needs to be specified in the config")
-    if "operations" not in config.keys():
-        raise ValueError("operations field needs to be specified in the config")
+    if "channels" not in config:
+        msg = "channel field needs to be specified in the config"
+        raise ValueError(msg)
+    if "operations" not in config:
+        msg = "operations field needs to be specified in the config"
+        raise ValueError(msg)
 
     # convert into a nice named tuple
     if not isinstance(datainfo, utils.DataInfo):
@@ -148,9 +150,11 @@ def build_evt(
     chname_fmt = datainfo.hit.table_fmt
     pattern_check = re.findall(r"{([^}]*?)}", chname_fmt)
     if len(pattern_check) != 1:
-        raise ValueError("chname_fmt must have exactly one placeholder {}")
-    elif "{" in pattern_check[0] or "}" in pattern_check[0]:
-        raise ValueError(f"{chname_fmt=} has an invalid placeholder.")
+        msg = "chname_fmt must have exactly one placeholder {}"
+        raise ValueError(msg)
+    if "{" in pattern_check[0] or "}" in pattern_check[0]:
+        msg = f"{chname_fmt=} has an invalid placeholder."
+        raise ValueError(msg)
     hit_keys = [
         key
         for key in lh5.ls(datainfo.hit.file)
@@ -163,7 +167,8 @@ def build_evt(
         )
         != hit_keys[0]
     ):
-        raise ValueError(f"chname_fmt {chname_fmt} does not match keys in data!")
+        msg = f"chname_fmt {chname_fmt} does not match keys in data!"
+        raise ValueError(msg)
 
     # create channel list according to config
     # This can be either read from the meta data
@@ -175,18 +180,18 @@ def build_evt(
     for key, v in config["channels"].items():
         if isinstance(v, dict):
             # it is a meta module. module_name must exist
-            if "module" not in v.keys():
-                raise ValueError(
-                    "Need module_name to load channel via a meta data module"
-                )
+            if "module" not in v:
+                msg = "Need module_name to load channel via a meta data module"
+                raise ValueError(msg)
 
             attr = {}
             # the time_key argument is mandatory
-            if "time_key" not in v.keys():
-                raise RuntimeError("the 'time_key' configuration field is mandatory")
+            if "time_key" not in v:
+                msg = "the 'time_key' configuration field is mandatory"
+                raise RuntimeError(msg)
 
             # if "None" do None
-            elif "None" == v["time_key"]:
+            if v["time_key"] == "None":
                 attr["time_key"] = None
 
             # load module
@@ -198,9 +203,9 @@ def build_evt(
             channels[key] = [v]
 
         elif isinstance(v, list):
-            channels[key] = [e for e in v]
+            channels[key] = list(v)
 
-    if "channel_mapping" in config.keys():
+    if "channel_mapping" in config:
         channel_mapping = config["channel_mapping"]
         if isinstance(channel_mapping, str):
             channel_mapping = load_dict(channel_mapping)
@@ -212,6 +217,7 @@ def build_evt(
     )
     if datainfo.evt.file is None:
         return evt_tbl
+    return None
 
 
 def build_evt_cols(
@@ -220,7 +226,7 @@ def build_evt_cols(
     channels: list,
     wo_mode: str = "write_safe",
     buffer_len=10**4,
-    channel_mapping: dict = None,
+    channel_mapping: dict | None = None,
 ) -> None | Table:
     """
     Iterates through the TCM file and builds the event table according to the
@@ -264,9 +270,12 @@ def build_evt_cols(
         datainfo = utils.make_files_config(datainfo)
 
     evt_tables = []
-    if datainfo.evt.file is not None and wo_mode == "of":
-        if Path(datainfo.evt.file).exists():
-            Path(datainfo.evt.file).unlink()
+    if (
+        datainfo.evt.file is not None
+        and wo_mode == "of"
+        and Path(datainfo.evt.file).exists()
+    ):
+        Path(datainfo.evt.file).unlink()
 
     for tcm_lh5 in lh5.LH5Iterator(
         datainfo.tcm.file,
@@ -285,23 +294,23 @@ def build_evt_cols(
 
         # now loop over operations (columns in evt table)
         for field, v in config["operations"].items():
-            log.debug(f"processing field: '{field}'")
+            log.debug("processing field: '%s'", field)
 
             # if mode not defined in operation, it can only be an operation on the
             # evt level
-            if "aggregation_mode" not in v.keys():
+            if "aggregation_mode" not in v:
                 # compute and eventually get rid of evt. suffix
                 obj = table.eval(
                     v["expression"].replace("evt.", ""), v.get("parameters", {})
                 )
 
                 # add attributes if present
-                if "lgdo_attrs" in v.keys():
+                if "lgdo_attrs" in v:
                     obj.attrs |= v["lgdo_attrs"]
 
             # else we build the event entry
             else:
-                if "channels" not in v.keys():
+                if "channels" not in v:
                     channels_e = []
                 elif isinstance(v["channels"], str):
                     channels_e = channels[v["channels"]]
@@ -312,7 +321,7 @@ def build_evt_cols(
                         )
                     )
                 channels_skip = []
-                if "exclude_channels" in v.keys():
+                if "exclude_channels" in v:
                     if isinstance(v["exclude_channels"], str):
                         channels_skip = channels[v["exclude_channels"]]
                     elif isinstance(v["exclude_channels"], list):
@@ -345,7 +354,7 @@ def build_evt_cols(
                 )
 
                 # add attribute if present
-                if "lgdo_attrs" in v.keys():
+                if "lgdo_attrs" in v:
                     obj.attrs |= v["lgdo_attrs"]
 
             # cast to type, if required
@@ -362,7 +371,7 @@ def build_evt_cols(
 
                     fldata_ptr.nda = fldata_ptr.nda.astype(type_)
 
-            log.debug(f"new column {field!s} = {obj!r}")
+            log.debug("new column %s = %r", field, obj)
             table.add_field(field, obj)
 
         # might need to re-organize fields in subtables, create a new object for that
@@ -409,6 +418,7 @@ def build_evt_cols(
             evt_tables.append(nested_tbl)
     if datainfo.evt.file is None:
         return _concat_tables(evt_tables)
+    return None
 
 
 def evaluate_expression(
@@ -420,11 +430,11 @@ def evaluate_expression(
     expr: str,
     n_rows: int,
     table: Table = None,
-    parameters: Mapping[str, Any] = None,
-    query: str = None,
+    parameters: Mapping[str, Any] | None = None,
+    query: str | None = None,
     default_value: bool | int | float = np.nan,
-    sorter: str = None,
-    channel_mapping: dict = None,
+    sorter: str | None = None,
+    channel_mapping: dict | None = None,
 ) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
     """Evaluates the expression defined by the user across all channels
     according to the mode.
@@ -500,7 +510,7 @@ def evaluate_expression(
 
     if table is not None:
         pars_dict = {
-            k: v for k, v in table.items() if isinstance(v, (Array, VectorOfVectors))
+            k: v for k, v in table.items() if isinstance(v, Array | VectorOfVectors)
         }
 
     # ...or defined through the configuration
@@ -536,7 +546,7 @@ def evaluate_expression(
         package = subpackage.split(".")[0]
 
         # import function into current namespace
-        log.debug(f"importing module {subpackage}")
+        log.debug("importing module %s", subpackage)
         importlib.import_module(subpackage, package=__package__)
 
         # declare imported package as globals (see eval() call later)
@@ -554,142 +564,140 @@ def evaluate_expression(
 
         # evil eval() to avoid annoying args casting logic
         call_str = f"{func_call}({full_args_str})"
-        log.debug(f"evaluating {call_str}")
-        log.debug(f"...globals={globs}")
-        log.debug(f"...locals={locs}")
+        log.debug("evaluating %s", call_str)
+        log.debug("...globals=%s", globs)
+        log.debug("...locals=%s", locs)
 
         return eval(call_str, globs, locs)
 
-    else:
-        # find parameters in evt file or in parameters
-        field_list = re.findall(
-            rf"({'|'.join(datainfo._asdict().keys())}).([a-zA-Z_$][\w$]*)", expr
+    # find parameters in evt file or in parameters
+    field_list = re.findall(
+        rf"({'|'.join(datainfo._asdict().keys())}).([a-zA-Z_$][\w$]*)", expr
+    )
+
+    # check if query is either on channel basis or evt basis (and not a mix)
+    query_mask = query
+    if query is not None:
+        hit_tiers = [k for k in datainfo._asdict() if k != "evt"]
+        if "evt." in query and (any(t in query for t in hit_tiers)):
+            msg = f"Query can't be a mix of {datainfo.evt.group} tier and lower tiers."
+            raise ValueError(msg)
+
+        # if it is an evt query we can evaluate it directly here
+        if table and "evt." in query:
+            query_mask = eval(query.replace("evt.", ""), dict(table))
+
+    # switch through modes
+    if table and (mode.startswith(("keep_at_ch:", "keep_at_idx:"))):
+        if mode.startswith("keep_at_ch:"):
+            ch_comp = table[mode[11:].replace("evt.", "")]
+        else:
+            ch_comp = table[mode[12:].replace("evt.", "")]
+            if isinstance(ch_comp, Array):
+                ch_comp = Array(
+                    ak.flatten(tcm.table_key)[ch_comp.view_as("np")].to_numpy()
+                )
+            elif isinstance(ch_comp, VectorOfVectors):
+                ch_comp = ch_comp.view_as("ak")
+                ch_comp = VectorOfVectors(
+                    ak.unflatten(
+                        ak.flatten(tcm.table_key)[ak.flatten(ch_comp)].to_numpy(),
+                        ak.count(ch_comp, axis=-1),
+                    )
+                )
+            else:
+                raise NotImplementedError(
+                    type(ch_comp)
+                    + " not supported (only Array and VectorOfVectors are supported)"
+                )
+
+        if isinstance(ch_comp, Array):
+            return aggregators.evaluate_at_channel(
+                datainfo=datainfo,
+                tcm=tcm,
+                channels=channels,
+                channels_skip=channels_skip,
+                expr=expr,
+                field_list=field_list,
+                ch_comp=ch_comp,
+                pars_dict=pars_dict,
+                default_value=default_value,
+                channel_mapping=channel_mapping,
+            )
+
+        if isinstance(ch_comp, VectorOfVectors):
+            return aggregators.evaluate_at_channel_vov(
+                datainfo=datainfo,
+                tcm=tcm,
+                expr=expr,
+                field_list=field_list,
+                ch_comp=ch_comp,
+                channels=channels,
+                channels_skip=channels_skip,
+                pars_dict=pars_dict,
+                default_value=default_value,
+                channel_mapping=channel_mapping,
+            )
+
+        msg = (
+            f"{type(ch_comp).__name__} not supported "
+            "(only Array and VectorOfVectors are supported)"
+        )
+        raise NotImplementedError(msg)
+
+    if "first_at:" in mode or "last_at:" in mode:
+        sorter = tuple(
+            re.findall(
+                rf"({'|'.join(datainfo._asdict().keys())}).([a-zA-Z_$][\w$]*)",
+                mode.rsplit("first_at:", maxsplit=1)[-1],
+            )[0]
+        )
+        return aggregators.evaluate_to_first_or_last(
+            datainfo=datainfo,
+            tcm=tcm,
+            channels=channels,
+            channels_skip=channels_skip,
+            expr=expr,
+            field_list=field_list,
+            query=query_mask,
+            n_rows=n_rows,
+            sorter=sorter,
+            pars_dict=pars_dict,
+            default_value=default_value,
+            is_first="first_at:" in mode,
+            channel_mapping=channel_mapping,
         )
 
-        # check if query is either on channel basis or evt basis (and not a mix)
-        query_mask = query
-        if query is not None:
-            hit_tiers = [k for k in datainfo._asdict() if k != "evt"]
-            if "evt." in query and (any([t in query for t in hit_tiers])):
-                raise ValueError(
-                    f"Query can't be a mix of {datainfo.evt.group} tier and lower tiers."
-                )
+    if mode in ["sum", "any", "all"]:
+        return aggregators.evaluate_to_scalar(
+            datainfo=datainfo,
+            tcm=tcm,
+            mode=mode,
+            channels=channels,
+            channels_skip=channels_skip,
+            expr=expr,
+            field_list=field_list,
+            query=query_mask,
+            n_rows=n_rows,
+            pars_dict=pars_dict,
+            default_value=default_value,
+            channel_mapping=channel_mapping,
+        )
+    if mode == "gather":
+        return aggregators.evaluate_to_vector(
+            datainfo=datainfo,
+            tcm=tcm,
+            channels=channels,
+            channels_skip=channels_skip,
+            expr=expr,
+            field_list=field_list,
+            query=query_mask,
+            n_rows=n_rows,
+            pars_dict=pars_dict,
+            default_value=default_value,
+            sorter=sorter,
+            channel_mapping=channel_mapping,
+        )
 
-            # if it is an evt query we can evaluate it directly here
-            if table and "evt." in query:
-                query_mask = eval(query.replace("evt.", ""), dict(table))
-
-        # switch through modes
-        if table and (
-            mode.startswith("keep_at_ch:") or mode.startswith("keep_at_idx:")
-        ):
-            if mode.startswith("keep_at_ch:"):
-                ch_comp = table[mode[11:].replace("evt.", "")]
-            else:
-                ch_comp = table[mode[12:].replace("evt.", "")]
-                if isinstance(ch_comp, Array):
-                    ch_comp = Array(
-                        ak.flatten(tcm.table_key)[ch_comp.view_as("np")].to_numpy()
-                    )
-                elif isinstance(ch_comp, VectorOfVectors):
-                    ch_comp = ch_comp.view_as("ak")
-                    ch_comp = VectorOfVectors(
-                        ak.unflatten(
-                            ak.flatten(tcm.table_key)[ak.flatten(ch_comp)].to_numpy(),
-                            ak.count(ch_comp, axis=-1),
-                        )
-                    )
-                else:
-                    raise NotImplementedError(
-                        type(ch_comp)
-                        + " not supported (only Array and VectorOfVectors are supported)"
-                    )
-
-            if isinstance(ch_comp, Array):
-                return aggregators.evaluate_at_channel(
-                    datainfo=datainfo,
-                    tcm=tcm,
-                    channels=channels,
-                    channels_skip=channels_skip,
-                    expr=expr,
-                    field_list=field_list,
-                    ch_comp=ch_comp,
-                    pars_dict=pars_dict,
-                    default_value=default_value,
-                    channel_mapping=channel_mapping,
-                )
-
-            if isinstance(ch_comp, VectorOfVectors):
-                return aggregators.evaluate_at_channel_vov(
-                    datainfo=datainfo,
-                    tcm=tcm,
-                    expr=expr,
-                    field_list=field_list,
-                    ch_comp=ch_comp,
-                    channels=channels,
-                    channels_skip=channels_skip,
-                    pars_dict=pars_dict,
-                    default_value=default_value,
-                    channel_mapping=channel_mapping,
-                )
-
-            raise NotImplementedError(
-                "{type(ch_comp).__name__} not supported "
-                "(only Array and VectorOfVectors are supported)"
-            )
-
-        if "first_at:" in mode or "last_at:" in mode:
-            sorter = tuple(
-                re.findall(
-                    rf"({'|'.join(datainfo._asdict().keys())}).([a-zA-Z_$][\w$]*)",
-                    mode.split("first_at:")[-1],
-                )[0]
-            )
-            return aggregators.evaluate_to_first_or_last(
-                datainfo=datainfo,
-                tcm=tcm,
-                channels=channels,
-                channels_skip=channels_skip,
-                expr=expr,
-                field_list=field_list,
-                query=query_mask,
-                n_rows=n_rows,
-                sorter=sorter,
-                pars_dict=pars_dict,
-                default_value=default_value,
-                is_first=True if "first_at:" in mode else False,
-                channel_mapping=channel_mapping,
-            )
-
-        if mode in ["sum", "any", "all"]:
-            return aggregators.evaluate_to_scalar(
-                datainfo=datainfo,
-                tcm=tcm,
-                mode=mode,
-                channels=channels,
-                channels_skip=channels_skip,
-                expr=expr,
-                field_list=field_list,
-                query=query_mask,
-                n_rows=n_rows,
-                pars_dict=pars_dict,
-                default_value=default_value,
-                channel_mapping=channel_mapping,
-            )
-        if mode == "gather":
-            return aggregators.evaluate_to_vector(
-                datainfo=datainfo,
-                tcm=tcm,
-                channels=channels,
-                channels_skip=channels_skip,
-                expr=expr,
-                field_list=field_list,
-                query=query_mask,
-                n_rows=n_rows,
-                pars_dict=pars_dict,
-                default_value=default_value,
-                sorter=sorter,
-                channel_mapping=channel_mapping,
-            )
-
-        raise ValueError(f"'{mode}' is not a valid mode")
+    msg = f"'{mode}' is not a valid mode"
+    raise ValueError(msg)
