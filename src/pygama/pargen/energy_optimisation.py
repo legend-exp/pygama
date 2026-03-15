@@ -75,7 +75,7 @@ def simple_guess(energy, func, fit_range=None, bin_width=None):
                 init_sigma = np.nanstd(energy)
         bin_width = (init_sigma) * len(energy) ** (-1 / 3)
 
-    hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
+    hist, bins, _var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
     # make binning dynamic based on max, % of events/ n of events?
     hist, bins, _var = pgh.get_hist(energy, range=fit_range, dx=bin_width)
@@ -108,7 +108,7 @@ def simple_guess(energy, func, fit_range=None, bin_width=None):
             parguess["tau"] = tau
 
     else:
-        log.error(f"simple_guess not implemented for {func.__name__}")
+        log.error("simple_guess not implemented for %s", func.__name__)
         return return_nans(func)
 
     return convert_to_minuit(parguess, func).values
@@ -200,7 +200,7 @@ def get_peak_fwhm_with_dt_corr(
 
     lower_bound = (np.nanmin(ct_energy) // bin_width) * bin_width
     upper_bound = ((np.nanmax(ct_energy) // bin_width) + 1) * bin_width
-    hist, bins, var = pgh.get_hist(
+    hist, bins, _var = pgh.get_hist(
         ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
     )
     mu = bins[np.nanargmax(hist)]
@@ -323,7 +323,7 @@ def fom_fwhm_with_alpha_fit(
     Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
 
     Scans *nsteps* values of the charge-trapping coefficient alpha between
-    0 and 3.5×10⁻⁶, fitting the peak at each step via
+    0 and 3.5x10^-6, fitting the peak at each step via
     :func:`get_peak_fwhm_with_dt_corr`.  A degree-4 polynomial is fit to
     the valid FWHM/max-ratio values to locate the optimal alpha, and the
     peak is re-fit at that alpha to obtain the final FWHM in keV.  An early
@@ -415,7 +415,7 @@ def fom_fwhm_with_alpha_fit(
                 final_alphas = np.append(final_alphas, alpha)
                 fwhm_errs = np.append(fwhm_errs, fwhm_o_max_err)
                 best_fwhm = min(best_fwhm, fwhms[-1])
-            log.info(f"alpha: {alpha}, fwhm/max:{fwhm_o_max:.4f}+-{fwhm_o_max_err:.4f}")
+            log.info("alpha: %s, fwhm/max:%.4f+-%.4f", alpha, fwhm_o_max, fwhm_o_max_err)
 
             ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
                 fwhm_errs > 1e-10
@@ -501,7 +501,7 @@ def fom_fwhm_with_alpha_fit(
             display=display,
         )
         if np.isnan(final_fwhm) or np.isnan(final_err):
-            log.debug(f"final fit failed, alpha was {alpha}")
+            log.debug("final fit failed, alpha was %s", alpha)
             raise RuntimeError
         return {
             "fwhm": final_fwhm,
@@ -664,12 +664,12 @@ def fom_single_peak_alpha_sweep(data, kwarg_dict, display=0) -> dict:
     kwarg_dict
         Dictionary with keys:
 
-        * ``idx_list`` – list of event-index arrays, one per peak.  Only the
+        * ``idx_list`` - list of event-index arrays, one per peak.  Only the  # noqa: RUF002
           first entry (``idx_list[0]``) is used.
-        * ``ctc_param`` – name of the charge-trapping correction parameter.
-        * ``peak_dicts`` – list of per-peak fitting dictionaries.  Only the
+        * ``ctc_param`` - name of the charge-trapping correction parameter.  # noqa: RUF002
+        * ``peak_dicts`` - list of per-peak fitting dictionaries.  Only the  # noqa: RUF002
           first entry is used.
-        * ``frac_max`` *(optional, default 0.2)* – fraction of the peak
+        * ``frac_max`` *(optional, default 0.2)* - fraction of the peak  # noqa: RUF002
           maximum used to define the fit range.
     display
         Verbosity / plotting level passed through to the underlying fit.
@@ -715,16 +715,16 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     kwarg_dict
         Dictionary with keys:
 
-        * ``peaks_kev`` – list of peak energies in keV, ordered from low to
+        * ``peaks_kev`` - list of peak energies in keV, ordered from low to  # noqa: RUF002
           high.  The last entry is used for the alpha sweep.
-        * ``idx_list`` – list of event-index arrays, one per peak.
-        * ``ctc_param`` – name of the charge-trapping correction parameter.
-        * ``peak_dicts`` – list of per-peak fitting dictionaries.
-        * ``interp_energy`` *(optional, default ``{"Qbb": 2039}``)* – dict
+        * ``idx_list`` - list of event-index arrays, one per peak.  # noqa: RUF002
+        * ``ctc_param`` - name of the charge-trapping correction parameter.  # noqa: RUF002
+        * ``peak_dicts`` - list of per-peak fitting dictionaries.  # noqa: RUF002
+        * ``interp_energy`` *(optional, default ``{"Qbb": 2039}``)* - dict  # noqa: RUF002
           mapping energy label to keV value for interpolation.
-        * ``fwhm_func`` *(optional, default* ``pgc.FWHMLinear`` *)* – FWHM
+        * ``fwhm_func`` *(optional, default* ``pgc.FWHMLinear`` *)* - FWHM  # noqa: RUF002
           curve model used for the energy-resolution fit.
-        * ``frac_max`` *(optional, default 0.2)* – fraction of peak maximum
+        * ``frac_max`` *(optional, default 0.2)* - fraction of peak maximum  # noqa: RUF002
           used to define fit range.
     display
         Verbosity / plotting level passed through to the underlying fits.
@@ -779,7 +779,7 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     fwhm_errs.append(out_dict["fwhm_err"])
     n_sig.append(out_dict["n_sig"])
     n_sig_err.append(out_dict["n_sig_err"])
-    log.info(f"fwhms are {fwhms}keV +- {fwhm_errs}")
+    log.info("fwhms are %skeV +- %s", fwhms, fwhm_errs)
 
     fwhms = np.array(fwhms)
     fwhm_errs = np.array(fwhm_errs)
@@ -804,7 +804,7 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     if interp_res_err / interp_res > 0.1:
         interp_res_err = np.nan
 
-    log.info(f"{next(iter(interp_energy))} fwhm is {interp_res} keV +- {interp_res_err}")
+    log.info("%s fwhm is %s keV +- %s", next(iter(interp_energy)), interp_res, interp_res_err)
 
     return {
         f"{next(iter(interp_energy))}_fwhm": interp_res,
