@@ -210,8 +210,8 @@ def fail_pdf_gos(
     epsilon_bkg,
     mu,
     sigma,
-    hstep1,
-    hstep2,  # noqa: ARG001
+    hstep1,  # noqa: ARG001
+    hstep2,
 ):
     """
     Extended PDF for events *failing* a cut, using a Gaussian-on-step model.

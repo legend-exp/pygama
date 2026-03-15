@@ -1702,10 +1702,10 @@ class HPGeCalibration:
 
     def plot_cal_fit_with_errors(
         self,
-        data,
+        data,  # noqa: ARG002
         figsize=(10, 6),
         fontsize=12,
-        erange=(200, 2700),  # noqa: ARG002
+        erange=(200, 2700),
     ):
         """
         Plot the calibration curve with peak-fit uncertainties.

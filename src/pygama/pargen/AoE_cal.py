@@ -580,8 +580,8 @@ def unbinned_aoe_fit(
         plt.plot(xs, bkg * dx[0], label="Background")
         plt.plot(
             xs,
-            gaussian.pdf_ext(xs, *msig.values)[1] * dx[0],
-            label="Initial Gaussian",  # noqa: PD011
+            gaussian.pdf_ext(xs, *msig.values)[1] * dx[0],  # noqa: PD011
+            label="Initial Gaussian",
         )
         plt.plot(xs, exgauss.pdf_ext(xs, *mbkg.values)[1] * dx[0], label="Bkg guess")  # noqa: PD011
         plt.xlabel("A/E")

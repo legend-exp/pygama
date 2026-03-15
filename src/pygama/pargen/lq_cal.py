@@ -553,7 +553,7 @@ class LQCal:
         self,
         df: pd.DataFrame(),
         lq_param,
-        cal_energy_param: str,
+        cal_energy_param: str,  # noqa: ARG002
         display: int = 0,  # noqa: ARG002
     ):
         """
@@ -798,10 +798,10 @@ class LQCal:
 
 def plot_lq_mean_time(
     lq_class,
-    data,
-    lq_param="LQ_Timecorr",
+    data,  # noqa: ARG001
+    lq_param="LQ_Timecorr",  # noqa: ARG001
     figsize=(12, 8),
-    fontsize=12,  # noqa: ARG001
+    fontsize=12,
 ) -> plt.figure:
     """Plots the mean LQ value calculated for each given timestamp"""
 
@@ -969,9 +969,9 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
 
 def plot_survival_fraction_curves(
     lq_class,
-    data,
+    data,  # noqa: ARG001
     figsize=(12, 8),
-    fontsize=12,  # noqa: ARG001
+    fontsize=12,
 ) -> plt.figure:
     """Plots the survival fraction curves as a function of
     LQ cut values for every peak of interest"""
