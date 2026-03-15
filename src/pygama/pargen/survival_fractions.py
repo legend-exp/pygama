@@ -837,7 +837,7 @@ def compton_sf_sweep(
 
     for cut_val in cut_vals:
         ct_dict = compton_sf(cut_param, cut_val, mode=mode, data_mask=data_mask)
-        df = pd.DataFrame(
+        row_df = pd.DataFrame(
             [
                 {
                     "cut_val": ct_dict["low_cut"],
@@ -846,7 +846,7 @@ def compton_sf_sweep(
                 }
             ]
         )
-        out_df = pd.concat([out_df, df])
+        out_df = pd.concat([out_df, row_df])
     out_df = out_df.set_index("cut_val")
 
     sf_dict = compton_sf(cut_param, final_cut_value, mode=mode, data_mask=data_mask)

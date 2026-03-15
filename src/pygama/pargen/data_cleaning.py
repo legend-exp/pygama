@@ -542,7 +542,7 @@ def generate_cuts(
                 all_par_array[(~np.isnan(all_par_array)) & (~np.isinf(all_par_array))]
             )
 
-            if isinstance(num_sigmas, (int, float)):
+            if isinstance(num_sigmas, int | float):
                 num_sigmas_left = num_sigmas
                 num_sigmas_right = num_sigmas
             elif isinstance(num_sigmas, dict):
@@ -765,7 +765,7 @@ def generate_cut_classifiers(
             norm_par_array = (all_par_array - mean) / std
 
             if num_sigmas is not None:
-                if isinstance(num_sigmas, (int, float)):
+                if isinstance(num_sigmas, int | float):
                     cut_left = -num_sigmas
                     cut_right = num_sigmas
                 elif isinstance(num_sigmas, dict):
@@ -817,7 +817,7 @@ def generate_cut_classifiers(
                         msg = "unknown func"
                         raise ValueError(msg)
 
-                    if isinstance(percentile, (int, float)):
+                    if isinstance(percentile, int | float):
                         cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
                         cut_right = xs[np.argmin(np.abs(cdf - (percentile / 100)))]
 
@@ -833,7 +833,7 @@ def generate_cut_classifiers(
                         else:
                             cut_right = None
 
-                elif isinstance(percentile, (int, float)):
+                elif isinstance(percentile, int | float):
                     cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
                     cut_right = np.nanpercentile(norm_par_array, percentile)
 
@@ -850,7 +850,7 @@ def generate_cut_classifiers(
             if default is not None:
                 value = default["value"]
                 default_mode = default["mode"]
-                if isinstance(value, (int, float)):
+                if isinstance(value, int | float):
                     default_cut_left = -value
                     default_cut_right = value
                 else:

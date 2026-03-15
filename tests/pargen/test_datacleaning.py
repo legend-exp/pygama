@@ -38,16 +38,16 @@ def test_cuts(lgnd_test_data):
     assert pytest.approx(cut_dict["bl_pileup_cut"]["parameters"]["a"], 0.1) == 7
     assert pytest.approx(cut_dict["bl_pileup_cut"]["parameters"]["b"], 0.1) == 24
 
-    # check also works for df
-    df = lh5.read_as("ch1104000/dsp", data, "pd")
+    # check also works for data_df
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
 
-    df["baselineEmax"].to_numpy()
+    data_df["baselineEmax"].to_numpy()
 
-    cut_dict_df = dc.generate_cuts(df, cut_pars)
+    cut_dict_df = dc.generate_cuts(data_df, cut_pars)
 
     assert cut_dict_df == cut_dict
 
-    ids = dc.get_cut_indexes(df, cut_pars)
+    ids = dc.get_cut_indexes(data_df, cut_pars)
     ids_tbl = dc.get_cut_indexes(tbl, cut_pars)
 
     assert (ids == ids_tbl).all()
