@@ -107,7 +107,7 @@ def get_mode_stdev(par_array) -> tuple:
     Estimate the mode and standard deviation of a parameter distribution.
 
     Uses a histogram-based approach: the distribution is first clipped to the
-    1st–99th percentile range, the modal bin is located, and a Gaussian is fit
+    1st-99th percentile range, the modal bin is located, and a Gaussian is fit
     in the neighbourhood of that bin to refine the estimates.  Multiple
     fallback strategies are applied when the primary fit fails.
 
@@ -131,7 +131,7 @@ def get_mode_stdev(par_array) -> tuple:
     if bin_width == 0:
         bin_width = np.std(par_array) / 4
 
-    counts, start_bins, var = pgh.get_hist(
+    counts, start_bins, _ = pgh.get_hist(
         par_array,
         range=(np.nanmin(par_array), np.nanmax(par_array)),
         dx=bin_width,
@@ -159,7 +159,7 @@ def get_mode_stdev(par_array) -> tuple:
         dx = np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)
         if dx == 0:
             dx = bin_width
-        counts, bins, var = pgh.get_hist(
+        counts, bins, _ = pgh.get_hist(
             par_array,
             dx=dx,
             range=(lower_bound, upper_bound),
@@ -630,7 +630,7 @@ def get_cut_indexes(data, cut_parameters):
         all cuts.
     """
     cut_dict = generate_cuts(data, cut_dict=cut_parameters)
-    log.debug(f"Cuts are {cut_dict}")
+    log.debug("Cuts are %s", cut_dict)
 
     if isinstance(data, Table):
         ct_mask = np.full(len(data), True, dtype=bool)
@@ -661,7 +661,7 @@ def get_cut_indexes(data, cut_parameters):
 def generate_cut_classifiers(
     data: dict[str, np.ndarray],
     cut_dict: dict[str, int],
-    rounding: int = 4,
+    rounding: int = 4,  # noqa: ARG001
     display: int = 0,
 ) -> dict:
     """
@@ -979,8 +979,8 @@ def find_pulser_properties(df, energy="daqenergy"):
     peak_e_err = pt_pars[:, 1] * 4
 
     allowed_mask = np.ones(len(peak_energies), dtype=bool)
-    for i, e in enumerate(peak_energies[1:-1]):
-        i += 1
+    for j, e in enumerate(peak_energies[1:-1]):
+        i = j + 1
         if peak_e_err[i] > allowed_err:
             continue
         if i == 1 and (
@@ -1018,7 +1018,7 @@ def find_pulser_properties(df, energy="daqenergy"):
             df_peak = df[e_cut]
 
             time_since_last = (
-                df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
+                df_peak.timestamp.to_numpy()[1:] - df_peak.timestamp.to_numpy()[:-1]
             )
 
             tsl = time_since_last[
@@ -1151,7 +1151,7 @@ def tag_pulsers(df, chan_info, window=0.01) -> pd.DataFrame:
 
         time_since_last = np.zeros(len(df_pulser))
         time_since_last[1:] = (
-            df_pulser.timestamp.values[1:] - df_pulser.timestamp.values[:-1]
+            df_pulser.timestamp.to_numpy()[1:] - df_pulser.timestamp.to_numpy()[:-1]
         )
 
         mode_idxs = (time_since_last > period - window) & (
@@ -1164,7 +1164,7 @@ def tag_pulsers(df, chan_info, window=0.01) -> pd.DataFrame:
             return df
         df_pulser = df_pulser[mode_idxs]
 
-        ts = df_pulser.timestamp.values
+        ts = df_pulser.timestamp.to_numpy()
         diff_zero = np.zeros(len(ts))
         diff_zero[1:] = np.around(np.divide(np.subtract(ts[1:], ts[:-1]), period))
         diff_cum = np.cumsum(diff_zero)
