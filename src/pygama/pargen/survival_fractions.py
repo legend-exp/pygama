@@ -150,7 +150,17 @@ def get_bounds(func, parguess) -> dict:
 
 
 def pass_pdf_gos(
-    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2  # noqa: ARG001
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,
+    hstep2,  # noqa: ARG001
 ):
     """
     Extended PDF for events *passing* a cut, using a Gaussian-on-step model.
@@ -191,7 +201,17 @@ def pass_pdf_gos(
 
 
 def fail_pdf_gos(
-    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2  # noqa: ARG001
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,
+    hstep2,  # noqa: ARG001
 ):
     """
     Extended PDF for events *failing* a cut, using a Gaussian-on-step model.

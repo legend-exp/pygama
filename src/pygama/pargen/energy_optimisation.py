@@ -415,7 +415,9 @@ def fom_fwhm_with_alpha_fit(
                 final_alphas = np.append(final_alphas, alpha)
                 fwhm_errs = np.append(fwhm_errs, fwhm_o_max_err)
                 best_fwhm = min(best_fwhm, fwhms[-1])
-            log.info("alpha: %s, fwhm/max:%.4f+-%.4f", alpha, fwhm_o_max, fwhm_o_max_err)
+            log.info(
+                "alpha: %s, fwhm/max:%.4f+-%.4f", alpha, fwhm_o_max, fwhm_o_max_err
+            )
 
             ids = (fwhm_errs < 2 * np.nanpercentile(fwhm_errs, 50)) & (
                 fwhm_errs > 1e-10
@@ -804,7 +806,9 @@ def fom_interpolate_energy_res_with_single_peak_alpha_sweep(
     if interp_res_err / interp_res > 0.1:
         interp_res_err = np.nan
 
-    log.info("%s fwhm is %s keV +- %s", next(iter(interp_energy)), interp_res, interp_res_err)
+    log.info(
+        "%s fwhm is %s keV +- %s", next(iter(interp_energy)), interp_res, interp_res_err
+    )
 
     return {
         f"{next(iter(interp_energy))}_fwhm": interp_res,

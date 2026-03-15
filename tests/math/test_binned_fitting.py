@@ -7,10 +7,10 @@ import pygama.math.binned_fitting as pgbf
 
 
 def test_fit_binned_and_goodness_of_fit():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
-    from pygama.math.functions.gauss import nb_gauss_amp  # noqa: PLC0415
-    from pygama.math.histogram import get_hist  # noqa: PLC0415
+    from pygama.math.functions.gauss import nb_gauss_amp
+    from pygama.math.histogram import get_hist
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
@@ -44,9 +44,9 @@ def test_fit_binned_and_goodness_of_fit():
 
 
 def test_gauss_mode_width_max():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
-    from pygama.math.histogram import get_hist  # noqa: PLC0415
+    from pygama.math.histogram import get_hist
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
@@ -67,9 +67,9 @@ def test_gauss_mode_width_max():
 
 
 def test_taylor_mode_max():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
-    from pygama.math.histogram import get_hist  # noqa: PLC0415
+    from pygama.math.histogram import get_hist
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002

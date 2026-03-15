@@ -88,7 +88,7 @@ def test_range_slice():
 
 
 def test_get_fwfm():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
@@ -107,7 +107,7 @@ def test_get_fwfm():
 
 
 def test_get_fwhm():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
@@ -126,7 +126,7 @@ def test_get_fwhm():
 
 
 def test_get_gaussian_guess():
-    from numpy.random import normal  # noqa: PLC0415
+    from numpy.random import normal
 
     np.random.seed(42)  # noqa: NPY002
     hist, bins, _var = pgh.get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
@@ -143,7 +143,7 @@ def test_get_gaussian_guess():
 
 
 def test_get_bin_estimates():
-    from pygama.math.functions.gauss import nb_gauss  # noqa: PLC0415
+    from pygama.math.functions.gauss import nb_gauss
 
     par = np.array([1, 2])
     bins = np.arange(1, 10)

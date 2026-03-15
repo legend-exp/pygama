@@ -147,9 +147,7 @@ def test_triple_gauss_on_double_step_cdf():
         (x * (2 * norm.cdf(x, mu_2, sigma_2) - 1) / np.sqrt(2))
         + np.exp(-1 * x**2 / 2) / np.sqrt(np.pi)
         + x / np.sqrt(2)
-    ) * 2 / 18 / np.sqrt(
-        2
-    )
+    ) * 2 / 18 / np.sqrt(2)
     scipy_y_gauss = (
         n_sig1 * norm.cdf(x, mu_1, sigma_1)
         + n_sig2 * norm.cdf(x, mu_2, sigma_2)

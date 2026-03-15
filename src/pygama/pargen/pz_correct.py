@@ -291,8 +291,7 @@ def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.
             <= median_tp100 + tp100_window_width
         ):
             wf_win = wf[
-                tp100s[i]
-                - (median_tp100 - tp100_window_width) : wf_len
+                tp100s[i] - (median_tp100 - tp100_window_width) : wf_len
                 - (-1 * tp100s[i] + median_tp100 + tp100_window_width)
             ]
             time_aligned_wfs.append(wf_win)

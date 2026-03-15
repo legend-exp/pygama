@@ -99,51 +99,51 @@ def test_get_dpz_decay_constants():
     assert isinstance(tb_data["waveform"]["values"], ArrayOfEqualSizedArrays)
 
     dpz_opt_dsp_dict = {
-            "outputs": ["tau1", "tau2", "frac"],
-            "processors": {
-                "bl_mean , bl_std, bl_slope, bl_intercept": {
-                    "function": "linear_slope_fit",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform[0:200]",
-                        "bl_mean",
-                        "bl_std",
-                        "bl_slope",
-                        "bl_intercept",
-                    ],
-                    "unit": ["ADC", "ADC", "ADC", "ADC"],
-                },
-                "wf_bl": {
-                    "function": "bl_subtract",
-                    "module": "dspeed.processors",
-                    "args": ["waveform", "bl_mean", "wf_bl"],
-                    "unit": "ADC",
-                },
-                "tau1, tau2, frac": {
-                    "function": "optimize_2pz",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform",
-                        "bl_mean",
-                        "round(52*us/waveform.period)",
-                        "len(waveform)",
-                        "1*ms/waveform.period",
-                        "0.5",
-                        "db.pz.tau1",
-                        "db.pz.tau2",
-                        "db.pz.frac",
-                        "tau1",
-                        "tau2",
-                        "frac",
-                    ],
-                    "defaults": {
-                        "db.pz.tau1": 28000,
-                        "db.pz.tau2": 900,
-                        "db.pz.frac": 0.145,
-                    },
+        "outputs": ["tau1", "tau2", "frac"],
+        "processors": {
+            "bl_mean , bl_std, bl_slope, bl_intercept": {
+                "function": "linear_slope_fit",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform[0:200]",
+                    "bl_mean",
+                    "bl_std",
+                    "bl_slope",
+                    "bl_intercept",
+                ],
+                "unit": ["ADC", "ADC", "ADC", "ADC"],
+            },
+            "wf_bl": {
+                "function": "bl_subtract",
+                "module": "dspeed.processors",
+                "args": ["waveform", "bl_mean", "wf_bl"],
+                "unit": "ADC",
+            },
+            "tau1, tau2, frac": {
+                "function": "optimize_2pz",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform",
+                    "bl_mean",
+                    "round(52*us/waveform.period)",
+                    "len(waveform)",
+                    "1*ms/waveform.period",
+                    "0.5",
+                    "db.pz.tau1",
+                    "db.pz.tau2",
+                    "db.pz.frac",
+                    "tau1",
+                    "tau2",
+                    "frac",
+                ],
+                "defaults": {
+                    "db.pz.tau1": 28000,
+                    "db.pz.tau2": 900,
+                    "db.pz.frac": 0.145,
                 },
             },
-        }
+        },
+    }
 
     wf_field = "waveform"
     percent_tau1_fit = 0.1

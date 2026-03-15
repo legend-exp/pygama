@@ -8,7 +8,6 @@ from pygama.pargen import dsp_optimize
 
 
 def test_bayesian_opt():
-
     # Create optimizer
     optimizer = dsp_optimize.BayesianOptimizer(acq_func="ei", batch_size=1)
 
@@ -50,7 +49,6 @@ def test_bayesian_opt():
 
 
 def test_run_one_dsp(raw_test_file):
-
     tab = lh5.read("ch1057600/raw", raw_test_file)
 
     config = {
@@ -89,7 +87,6 @@ def test_run_one_dsp(raw_test_file):
 
 
 def test_optimise(raw_test_file):
-
     tab = lh5.read("ch1057600/raw", raw_test_file)
 
     config = {

@@ -73,7 +73,6 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     return (left_edge, right_edge)
 
 
-
 def get_lq_hist(
     df: pd.DataFrame(),
     lq_param: str,
@@ -551,7 +550,11 @@ class LQCal:
             )
 
     def drift_time_correction(
-        self, df: pd.DataFrame(), lq_param, cal_energy_param: str, display: int = 0  # noqa: ARG002
+        self,
+        df: pd.DataFrame(),
+        lq_param,
+        cal_energy_param: str,
+        display: int = 0,  # noqa: ARG002
     ):
         """
         Remove the linear drift-time dependence from the LQ distribution.
@@ -794,7 +797,11 @@ class LQCal:
 
 
 def plot_lq_mean_time(
-    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12  # noqa: ARG001
+    lq_class,
+    data,
+    lq_param="LQ_Timecorr",
+    figsize=(12, 8),
+    fontsize=12,  # noqa: ARG001
 ) -> plt.figure:
     """Plots the mean LQ value calculated for each given timestamp"""
 
@@ -961,7 +968,10 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
 
 
 def plot_survival_fraction_curves(
-    lq_class, data, figsize=(12, 8), fontsize=12  # noqa: ARG001
+    lq_class,
+    data,
+    figsize=(12, 8),
+    fontsize=12,  # noqa: ARG001
 ) -> plt.figure:
     """Plots the survival fraction curves as a function of
     LQ cut values for every peak of interest"""

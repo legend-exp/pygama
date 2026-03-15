@@ -579,7 +579,9 @@ def unbinned_aoe_fit(
         plt.plot(xs, sig * dx[0], label="Signal")
         plt.plot(xs, bkg * dx[0], label="Background")
         plt.plot(
-            xs, gaussian.pdf_ext(xs, *msig.values)[1] * dx[0], label="Initial Gaussian"  # noqa: PD011
+            xs,
+            gaussian.pdf_ext(xs, *msig.values)[1] * dx[0],
+            label="Initial Gaussian",  # noqa: PD011
         )
         plt.plot(xs, exgauss.pdf_ext(xs, *mbkg.values)[1] * dx[0], label="Bkg guess")  # noqa: PD011
         plt.xlabel("A/E")
@@ -967,11 +969,13 @@ class CalAoE:
                         }
 
                     elif mode == "full":
-                        time_dict = dict(zip(
+                        time_dict = dict(
+                            zip(
                                 np.array(self.timecorr_df.index),
                                 np.array(self.timecorr_df["mean"]),
                                 strict=False,
-                            ))
+                            )
+                        )
                         final_time_dict = {
                             tstamp: {
                                 output_name: {
@@ -1030,16 +1034,16 @@ class CalAoE:
                                 aoe_param,
                                 output_name,
                             )
-                            time_dict = dict(zip(
+                            time_dict = dict(
+                                zip(
                                     np.array(self.timecorr_df.index),
                                     np.array(self.timecorr_df["mean"]),
                                     strict=False,
-                                ))
+                                )
+                            )
                         else:
                             msg = "need timestamp column in dataframe for interpolation"
-                            raise ValueError(
-                                msg
-                            )
+                            raise ValueError(msg)
 
                     else:
                         msg = "unknown mode"
@@ -1667,8 +1671,8 @@ class CalAoE:
 
             data[output_cut_param] = data[aoe_param] > self.low_cut_val
             if self.dt_cut_param is not None:
-                data[output_cut_param] = data[output_cut_param] & (
-                    data[self.dt_cut_param]
+                data[output_cut_param] = (
+                    data[output_cut_param] & (data[self.dt_cut_param])
                 )
         except BaseException as e:
             if isinstance(e, KeyboardInterrupt) or self.debug_mode:
@@ -1902,7 +1906,9 @@ class CalAoE:
                         pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
-                log.error("A/E survival fraction determination failed for %s peak", peak)
+                log.error(
+                    "A/E survival fraction determination failed for %s peak", peak
+                )
         return sfs.set_index("peak")
 
     def calibrate(

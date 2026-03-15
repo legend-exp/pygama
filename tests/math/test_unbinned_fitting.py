@@ -17,7 +17,7 @@ def test_fit_unbinned():
     xdata = xdata[(xr[0] < xdata) & (xdata < xr[1])]
 
     _n, _xe = np.histogram(xdata, bins=50, range=xr)
-    from pygama.math.functions.gauss import gaussian  # noqa: PLC0415
+    from pygama.math.functions.gauss import gaussian
 
     fit, _fit_error, _fit_cov = pgubf.fit_unbinned(
         gaussian.get_pdf, xdata, guess=[0, 0.9], cost_func="LL", extended=False

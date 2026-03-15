@@ -1273,7 +1273,7 @@ class HPGeCalibration:
                 "p_val": p_val,
             }
 
-            log.info("FWHM fit: %s", results['parameters'].to_dict())
+            log.info("FWHM fit: %s", results["parameters"].to_dict())
             log.info("FWHM fit values:")
             log.info("\t   Energy   | FWHM (kev)  | Predicted (kev)")
             for i, (peak, fwhm, fwhme) in enumerate(
@@ -1285,7 +1285,7 @@ class HPGeCalibration:
                     str(peak).ljust(9),
                     fwhm,
                     fwhme,
-                    fwhm_func.func(peak, *results['parameters']),
+                    fwhm_func.func(peak, *results["parameters"]),
                 )
         except RuntimeError:
             pars, errs, cov = return_nans(fwhm_func.func)
@@ -1339,9 +1339,7 @@ class HPGeCalibration:
                 try:
                     if energy > np.nanmax(fwhm_peaks) or energy < np.nanmin(fwhm_peaks):
                         msg = "Interpolating energy out of range of fitted peaks"
-                        raise RuntimeError(
-                            msg
-                        )
+                        raise RuntimeError(msg)
                     rng = np.random.default_rng(1)
                     pars_b = rng.multivariate_normal(
                         fwhm_results["parameters"], fwhm_results["cov"], size=1000
@@ -1703,7 +1701,11 @@ class HPGeCalibration:
         return fig
 
     def plot_cal_fit_with_errors(
-        self, data, figsize=(10, 6), fontsize=12, erange=(200, 2700)  # noqa: ARG002
+        self,
+        data,
+        figsize=(10, 6),
+        fontsize=12,
+        erange=(200, 2700),  # noqa: ARG002
     ):
         """
         Plot the calibration curve with peak-fit uncertainties.
@@ -1793,7 +1795,13 @@ class HPGeCalibration:
         return fig
 
     def plot_fits(
-        self, energies, figsize=(12, 8), fontsize=12, ncols=3, nrows=3, binning_kev=5  # noqa: ARG002
+        self,
+        energies,
+        figsize=(12, 8),
+        fontsize=12,
+        ncols=3,
+        nrows=3,
+        binning_kev=5,  # noqa: ARG002
     ):
         """
         Plot the peak-shape fits for all fitted calibration peaks.
@@ -1870,9 +1878,9 @@ class HPGeCalibration:
                     plt.xlim([mu - range_adu, mu + range_adu])
                     locs, _labels = plt.xticks()
 
-                    def get_peak_labels(
-                        labels: list[str], pars: list[float]
-                    ) -> tuple(list[float], list[float]):
+                    def get_peak_labels(labels: list[str], pars: list[float]) -> tuple(
+                        list[float], list[float]
+                    ):
                         out = []
                         out_labels = []
                         for i, label in enumerate(labels):
@@ -1934,7 +1942,9 @@ class HPGeCalibration:
 
         for peak, pk_dict in pk_parameters.items():
             if (
-                peak in {2103.53, 1592.53, 511.0} or pk_dict["validity"] is False or np.isnan(pk_dict["fwhm_err_in_kev"])
+                peak in {2103.53, 1592.53, 511.0}
+                or pk_dict["validity"] is False
+                or np.isnan(pk_dict["fwhm_err_in_kev"])
             ):
                 pass
             else:
@@ -2220,8 +2230,11 @@ def get_hpge_energy_peak_par_guess(
 
     hist, bins, var = pgh.get_hist(energy, dx=bin_width, range=fit_range)
 
-    if (
-        func in (pgf.gauss_on_step, pgf.hpge_peak, pgf.gauss_on_uniform, pgf.gauss_on_linear)
+    if func in (
+        pgf.gauss_on_step,
+        pgf.hpge_peak,
+        pgf.gauss_on_uniform,
+        pgf.gauss_on_linear,
     ):
         # get mu and height from a gauss fit, also sigma as fallback
         pars, _cov = pgb.gauss_mode_width_max(
@@ -2337,7 +2350,9 @@ def get_hpge_energy_peak_par_guess(
                 parguess[name] = 0
 
     else:
-        log.error("get_hpge_energy_peak_par_guess not implemented for %s", func.__name__)
+        log.error(
+            "get_hpge_energy_peak_par_guess not implemented for %s", func.__name__
+        )
         return return_nans(func)
 
     return convert_to_minuit(parguess, func).values
@@ -2360,8 +2375,11 @@ def get_hpge_energy_fixed(func):
         Boolean array; ``True`` for free parameters, ``False`` for fixed ones.
     """
 
-    if (
-        func in (pgf.gauss_on_step, pgf.hpge_peak, pgf.gauss_on_uniform, pgf.gauss_on_linear)
+    if func in (
+        pgf.gauss_on_step,
+        pgf.hpge_peak,
+        pgf.gauss_on_uniform,
+        pgf.gauss_on_linear,
     ):
         # pars are: n_sig, mu, sigma, n_bkg, hstep, components
         fixed = ["x_lo", "x_hi"]

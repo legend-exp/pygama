@@ -26,7 +26,6 @@ def files_config(lgnd_test_data, tmp_dir):
 
 
 def test_xtalk_corrected_energy(lgnd_test_data, files_config):  # noqa: ARG001
-
     energy = np.array([[1, 2, 3], [4, 5, 6], [2, 0, 1], [0, 1, 0]])
     matrix = np.array([[0, 0, 1], [1, 0, 2], [0, 2, 0]])
     energy_corrected_zero_threshold = xtalk.xtalk_correct_energy_impl(
