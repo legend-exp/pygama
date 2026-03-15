@@ -566,7 +566,7 @@ def signal_selection(dsp_cal, dplms_dict, coeff_values) -> dict:
 
     centroid_lim = dplms_dict["centroid_lim"]
     perc = coeff_values["rt"] if "rt" in coeff_values else dplms_dict["dp_def"]["rt"]
-    thr = coeff_values["pt"] if "pt" in coeff_values else dplms_dict["dp_def"]["rt"]
+    thr = coeff_values["pt"] if "pt" in coeff_values else dplms_dict["dp_def"]["pt"]
 
     idxs_ct, ct_ll, ct_hh = is_valid_centroid(centroid, centroid_lim, wsize, bsize)
     log.info("... %s signals after alignment", len(peak_pos[idxs_ct, :]))
