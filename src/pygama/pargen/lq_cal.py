@@ -56,7 +56,7 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     fit_range
         ``(left_edge, right_edge)`` tuple defining the ±2.5σ window
         around the estimated peak centroid.
-    """
+    """  # noqa: RUF002
 
     # Get an initial guess of mu and sigma, use these values to determine our final fit range
     left_guess = np.nanpercentile(lq, 1)
@@ -157,7 +157,7 @@ def binned_lq_fit(
     lq_param: str,
     cal_energy_param: str,
     peak: float,
-    cdf=gaussian,
+    _cdf=gaussian,
     sidebands: bool = True,
 ):
     """Function for fitting a distribution of LQ values within a specified
@@ -206,7 +206,7 @@ def binned_lq_fit(
     m1.simplex().migrad()
     m1.hesse()
 
-    return m1.values, m1.errors, hist, bins
+    return m1.values, m1.errors, hist, bins  # noqa: PD011
 
 
 def calculate_time_means(
@@ -214,7 +214,7 @@ def calculate_time_means(
     lq_param: str,
     cal_energy_param: str,
     peak: float,
-    sidebands: bool = True,
+    sidebands: bool = True,  # noqa: ARG001
 ):
     """
     Compute the arithmetic mean and standard deviation of LQ at a peak.
@@ -244,7 +244,7 @@ def calculate_time_means(
     errors
         Dictionary ``{"mu": mean_err, "sigma": sigma_err}`` of the
         statistical uncertainties.
-    """
+    """  # noqa: RUF002
 
     df_peak = df.query(
         f"{cal_energy_param} < ({peak} + 5) & {cal_energy_param} > ({peak} - 8)"
@@ -380,7 +380,7 @@ class LQCal:
         else:
             self.cal_dicts.update(update_dict)
 
-    def lq_timecorr(self, df, lq_param, output_name="LQ_Timecorr", display=0):
+    def lq_timecorr(self, df, lq_param, output_name="LQ_Timecorr", display=0):  # noqa: ARG002
         """
         Normalise LQ by the time-varying DEP mean.
 
@@ -438,7 +438,7 @@ class LQCal:
                             ]
                         )
                     except BaseException as e:
-                        if e == KeyboardInterrupt or self.debug_mode:
+                        if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                             raise (e)
 
                         self.timecorr_df = pd.concat(
@@ -509,7 +509,7 @@ class LQCal:
                         ]
                     )
                 except BaseException as e:
-                    if e == KeyboardInterrupt or self.debug_mode:
+                    if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                         raise (e)
                     self.timecorr_df = pd.concat(
                         [
@@ -538,7 +538,7 @@ class LQCal:
                 )
                 log.info("LQ time correction finished")
         except BaseException as e:
-            if e == KeyboardInterrupt or self.debug_mode:
+            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                 raise (e)
             log.error("LQ time correction failed")
             self.update_cal_dicts(
@@ -551,7 +551,7 @@ class LQCal:
             )
 
     def drift_time_correction(
-        self, df: pd.DataFrame(), lq_param, cal_energy_param: str, display: int = 0
+        self, df: pd.DataFrame(), lq_param, cal_energy_param: str, display: int = 0  # noqa: ARG002
     ):
         """
         Remove the linear drift-time dependence from the LQ distribution.
@@ -612,7 +612,7 @@ class LQCal:
             )
 
         except BaseException as e:
-            if e == KeyboardInterrupt or self.debug_mode:
+            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                 raise (e)
             log.error("LQ drift time correction failed")
             self.dt_fit_pars = (np.nan, np.nan)
@@ -645,7 +645,7 @@ class LQCal:
             Name of the (drift-time-corrected) LQ parameter column.
         cal_energy_param
             Name of the calibrated energy column.
-        """
+        """  # noqa: RUF002
 
         log.info("Starting LQ Cut calculation")
         try:
@@ -662,13 +662,13 @@ class LQCal:
             df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
 
         except BaseException as e:
-            if e == KeyboardInterrupt or self.debug_mode:
+            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                 raise (e)
             log.error("LQ cut determination failed")
             self.cut_val = np.nan
             c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
             m = Minuit(c, np.full(2, np.nan))
-            self.cut_fit_pars = pars = m.values
+            self.cut_fit_pars = pars = m.values  # noqa: PD011
 
         self.update_cal_dicts(
             {
@@ -779,9 +779,9 @@ class LQCal:
                         ]
                     )
                     self.low_side_peak_dfs[peak] = cut_df
-                log.info(f"{peak}keV: {sf:2.1f} +/- {sf_err:2.1f} %")
+                log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
             except BaseException as e:
-                if e == KeyboardInterrupt or self.debug_mode:
+                if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                     raise (e)
                 self.low_side_sf = pd.concat(
                     [
@@ -789,12 +789,12 @@ class LQCal:
                         pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
-                log.error(f"LQ Survival fraction determination failed for {peak} peak")
+                log.error("LQ Survival fraction determination failed for %s peak", peak)
         self.low_side_sf = self.low_side_sf.set_index("peak")
 
 
 def plot_lq_mean_time(
-    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12
+    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12  # noqa: ARG001
 ) -> plt.figure:
     """Plots the mean LQ value calculated for each given timestamp"""
 
@@ -906,7 +906,7 @@ def plot_drift_time_correction(
     return fig
 
 
-def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
+def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:  # noqa: ARG001
     """Plots the final histogram of LQ values for events in the
     DEP, and the fit results used for determining the cut
     value"""
@@ -961,7 +961,7 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
 
 
 def plot_survival_fraction_curves(
-    lq_class, data, figsize=(12, 8), fontsize=12
+    lq_class, data, figsize=(12, 8), fontsize=12  # noqa: ARG001
 ) -> plt.figure:
     """Plots the survival fraction curves as a function of
     LQ cut values for every peak of interest"""
