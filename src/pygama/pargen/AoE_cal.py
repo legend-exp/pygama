@@ -760,7 +760,7 @@ class CalAoE:
         dt_corr: bool = False,
         dep_correct: bool = False,
         dt_cut: dict | None = None,
-        _dt_param: str = "dt_eff",
+        dt_param: str = "dt_eff",
         high_cut_val: float = 3,
         mean_func: Callable = Pol1,
         sigma_func: Callable = SigmaFit,
@@ -814,7 +814,7 @@ class CalAoE:
         self.pdf = pdf
         self.selection_string = selection_string
         self.dt_corr = dt_corr
-        self.dt_param = "dt_eff"
+        self.dt_param = dt_param
         self.dep_correct = dep_correct
         self.dt_cut = dt_cut
         if self.dt_cut is not None:
