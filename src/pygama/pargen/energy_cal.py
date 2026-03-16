@@ -362,20 +362,36 @@ class HPGeCalibration:
         matched_energies = peaks_kev[
             [np.argmin(abs(peaks_kev - i)) for i in got_peak_energies]
         ]
-        while not all(list(matched_energies).count(x) == 1 for x in matched_energies):
-            for i in range(len(matched_energies)):
-                if matched_energies[i + 1] == matched_energies[i]:
-                    # remove duplicates
-                    if np.argmin(
-                        abs(got_peak_energies[i : i + 2] - matched_energies[i])
-                    ):  # i+1 is best match
-                        got_peak_locations = np.delete(got_peak_locations, i)
-                        got_peak_energies = np.delete(got_peak_energies, i)
-                    else:  # i is best match
-                        got_peak_locations = np.delete(got_peak_locations, i + 1)
-                        got_peak_energies = np.delete(got_peak_energies, i + 1)
-                    matched_energies = np.delete(matched_energies, i)
-                    break
+        # Remove duplicates in matched_energies by keeping, for each peak energy,
+        # the got_peak_energies entry that is closest to that energy.
+        while True:
+            if len(matched_energies) == 0:
+                break
+
+            # Find energies that appear more than once
+            unique_vals, inverse = np.unique(matched_energies, return_inverse=True)
+            counts = np.bincount(inverse)
+            dup_mask = counts > 1
+            if not np.any(dup_mask):
+                break
+
+            # Handle one duplicated energy per loop iteration to keep logic simple
+            dup_energy = unique_vals[dup_mask][0]
+            dup_indices = np.where(matched_energies == dup_energy)[0]
+
+            # Among all duplicates for this energy, keep the one with the closest
+            # got_peak_energies value to the matched energy and remove the rest.
+            rel_best = np.argmin(np.abs(got_peak_energies[dup_indices] - dup_energy))
+            best_index = dup_indices[rel_best]
+            remove_indices = dup_indices[dup_indices != best_index]
+
+            if remove_indices.size == 0:
+                # Should not happen, but guard against no-op to avoid infinite loops
+                break
+
+            got_peak_locations = np.delete(got_peak_locations, remove_indices)
+            got_peak_energies = np.delete(got_peak_energies, remove_indices)
+            matched_energies = np.delete(matched_energies, remove_indices)
 
         input_peaks = peaks_kev.copy()
 
