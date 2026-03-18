@@ -237,6 +237,7 @@ def gauss_mode_width_max(
     cost_func: str = "Least Squares",
     inflate_errors: bool | None = False,
     gof_method: str = "var",
+    sigma_limit: float| None = None,
 ) -> tuple[np.ndarray, ...]:
     r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
@@ -280,6 +281,8 @@ def gauss_mode_width_max(
         if it is greater than 1
     gof_method
         method flag for goodness_of_fit
+    sigma_limit
+        upper bound on sigma
 
     Returns
     -------
@@ -334,8 +337,7 @@ def gauss_mode_width_max(
         },
         simplex=True,
     )
-    if pars[1] < 0:
-        pars[1] = -pars[1]
+
     if inflate_errors:
         chi2, dof = goodness_of_fit(
             hist, bins, var, nb_gauss_amp, pars, method=gof_method
