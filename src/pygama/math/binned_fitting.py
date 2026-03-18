@@ -237,6 +237,7 @@ def gauss_mode_width_max(
     cost_func: str = "Least Squares",
     inflate_errors: bool | None = False,
     gof_method: str = "var",
+    sigma_limit: float | None = None,
 ) -> tuple[np.ndarray, ...]:
     r"""
     Get the max, mode, and width of a peak based on gauss fit near the max
@@ -280,6 +281,8 @@ def gauss_mode_width_max(
         if it is greater than 1
     gof_method
         method flag for goodness_of_fit
+    sigma_limit
+        upper bound on sigma
 
     Returns
     -------
@@ -301,11 +304,21 @@ def gauss_mode_width_max(
     else:
         i_0 = np.argmax(hist)
         mode_guess = bin_centers[i_0]
+    # Ensure the initial bin index is within the valid histogram range
+    if i_0 < 0 or i_0 >= len(hist):
+        msg = (
+            f"Initial bin index i_0={i_0} is outside histogram bounds "
+            f"[0, {len(hist) - 1}] for mode_guess={mode_guess}"
+        )
+        raise ValueError(msg)
+    if i_0 < int(np.floor(n_bins / 2)):
+        msg = f"Fit range exceeds histogram bounds: i_0={i_0}"
+        raise ValueError(msg)
     amp_guess = hist[i_0]
     i_0 -= int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
-    if i_0 < 0 or i_n >= len(hist):
-        msg = f"Fit range exceeds histogram bounds: i_0={i_0}, i_n={i_n}, hist_len={len(hist)}"
+    if i_n >= len(hist):
+        msg = f"Fit range exceeds histogram bounds: i_n={i_n}, hist length: {len(hist)}"
         raise ValueError(msg)
     width_guess = bin_centers[i_n] - bin_centers[i_0]
     vv = None if var is None else var[i_0:i_n]
@@ -318,13 +331,13 @@ def gauss_mode_width_max(
         guess=guess,
         cost_func=cost_func,
         bounds={
-            "mu": (bins[i_0], bins[i_n + 1]),
-            "sigma": (0, None),
+            "mu": (bins[i_0], bins[i_n]),
+            "sigma": (0, sigma_limit),
             "a": (0, None),
         },
+        simplex=True,
     )
-    if pars[1] < 0:
-        pars[1] = -pars[1]
+
     if inflate_errors:
         chi2, dof = goodness_of_fit(
             hist, bins, var, nb_gauss_amp, pars, method=gof_method
