@@ -328,7 +328,7 @@ def gauss_mode_width_max(
         guess=guess,
         cost_func=cost_func,
         bounds={
-            "mu": (bins[i_0], bins[i_n + 1]),
+            "mu": (bins[i_0], bins[i_n]),
             "sigma": (0, None),
             "a": (0, None),
         },
