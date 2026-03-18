@@ -301,6 +301,13 @@ def gauss_mode_width_max(
     else:
         i_0 = np.argmax(hist)
         mode_guess = bin_centers[i_0]
+    # Ensure the initial bin index is within the valid histogram range
+    if i_0 < 0 or i_0 >= len(hist):
+        msg = (
+            f"Initial bin index i_0={i_0} is outside histogram bounds "
+            f"[0, {len(hist) - 1}] for mode_guess={mode_guess}"
+        )
+        raise ValueError(msg)
     if i_0 < int(np.floor(n_bins / 2)):
         msg = f"Fit range exceeds histogram bounds: i_0={i_0}"
         raise ValueError(msg)
