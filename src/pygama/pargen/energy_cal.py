@@ -550,8 +550,8 @@ class HPGeCalibration:
                     mode_guess=mode_guess,
                 )
 
-                euc_min = x0["mu"] - n_sigmas * x0["sigma"]
-                euc_max = x0["mu"] + n_sigmas * x0["sigma"]
+                euc_min = max(x0["mu"] - n_sigmas * x0["sigma"], euc_min)
+                euc_max = min(x0["mu"] + n_sigmas * x0["sigma"], euc_max)
 
                 bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
                 n_bins_i = int((euc_max - euc_min) / bin_width)

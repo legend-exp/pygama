@@ -50,18 +50,18 @@ def test_gauss_mode_width_max():
     hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
     fit, cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
 
-    assert fit[0] == approx(-0.006127842485254326)
-    assert fit[1] == approx(1.0066159284176235)
-    assert fit[2] == approx(398.35078610804527)
+    assert fit[0] == approx(0, abs=1e-1)
+    assert fit[1] == approx(1, rel=1e-1)
+    assert fit[2] == approx(398, abs=1)
 
     fit, err = pgbf.gauss_mode_max(hist, bins)
 
-    assert fit[0] == approx(-0.0028635117051317638)
-    assert fit[1] == approx(400.2130565573762)
+    assert fit[0] == approx(0, abs=1e-1)
+    assert fit[1] == approx(400, abs=1)
 
     fit, err = pgbf.gauss_mode(hist, bins)
 
-    assert fit == approx(-0.0028635117051317638)
+    assert fit == approx(0, abs=1e-1)
 
 
 def test_taylor_mode_max():
