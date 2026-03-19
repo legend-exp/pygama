@@ -515,7 +515,7 @@ class HPGeCalibration:
                 loc = (Polynomial(self.pars) - peak).roots()[0]
 
             # Need to do initial fit
-            pt_pars, _ = hpge_fit_energy_peak_tops(hist, bins, var, [loc], n_to_fit=7)
+            pt_pars, _ = hpge_fit_energy_peak_tops(hist, bins, var, [loc], n_to_fit=5)
             # Drop failed fits
             if pt_pars[0] is not None:
                 range_uncal = (float(pt_pars[0][1]) * 20, float(pt_pars[0][1]) * 20)
@@ -549,9 +549,6 @@ class HPGeCalibration:
                     bin_width=binw_1,
                     mode_guess=mode_guess,
                 )
-
-                euc_min = x0["mu"] - n_sigmas * x0["sigma"]
-                euc_max = x0["mu"] + n_sigmas * x0["sigma"]
 
                 bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
                 n_bins_i = int((euc_max - euc_min) / bin_width)
