@@ -72,9 +72,7 @@ def test_gauss_mode_width_max_edge_cases():
 
     np.random.seed(42)
     # histogram over range [-5, 5] with 100 bins, bin width = 0.1
-    hist, bins, var = get_hist(
-        np.random.normal(size=10000), bins=100, range=(-5, 5)
-    )
+    hist, bins, var = get_hist(np.random.normal(size=10000), bins=100, range=(-5, 5))
 
     # mode_guess near the lower edge: find_bin returns a small index
     # so i_0 < floor(n_bins/2) triggers ValueError
