@@ -447,7 +447,7 @@ class HPGeCalibration:
     def hpge_cal_energy_peak_tops(
         self,
         e_uncal,
-        n_sigmas=1.2,
+        n_sigmas=1.2,  # noqa: ARG002
         peaks_kev=None,
         default_n_bins=50,
         n_events=None,

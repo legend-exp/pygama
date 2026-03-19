@@ -164,6 +164,6 @@ ignore = [
 isort.required-imports = ["from __future__ import annotations"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["T20"]
+"tests/**" = ["T20", "PLC0415"]
 "noxfile.py" = ["T20"]
 "docs/source/notebooks/*" = ["T201", "E402"]

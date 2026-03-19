@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from pytest import approx
 
 import pygama.math.binned_fitting as pgbf
 
@@ -53,26 +52,26 @@ def test_gauss_mode_width_max():
     hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
     fit, _cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
 
-    assert fit[0] == approx(0, abs=1e-1)
-    assert fit[1] == approx(1, rel=1e-1)
-    assert fit[2] == approx(398, abs=1)
+    assert fit[0] == pytest.approx(0, abs=1e-1)
+    assert fit[1] == pytest.approx(1, rel=1e-1)
+    assert fit[2] == pytest.approx(398, abs=1)
 
     fit, _ = pgbf.gauss_mode_max(hist, bins)
 
-    assert fit[0] == approx(0, abs=1e-1)
-    assert fit[1] == approx(400, abs=1)
+    assert fit[0] == pytest.approx(0, abs=1e-1)
+    assert fit[1] == pytest.approx(400, abs=1)
 
     fit, _err = pgbf.gauss_mode(hist, bins)
 
-    assert fit == approx(0, abs=1e-1)
+    assert fit == pytest.approx(0, abs=1e-1)
 
 
 def test_gauss_mode_width_max_edge_cases():
     from pygama.math.histogram import get_hist
 
-    np.random.seed(42)
+    np.random.seed(42)  # noqa: NPY002
     # histogram over range [-5, 5] with 100 bins, bin width = 0.1
-    hist, bins, var = get_hist(np.random.normal(size=10000), bins=100, range=(-5, 5))
+    hist, bins, _var = get_hist(np.random.normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
     # mode_guess near the lower edge: find_bin returns a small index
     # so i_0 < floor(n_bins/2) triggers ValueError
