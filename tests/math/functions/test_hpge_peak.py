@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from scipy.stats import exponnorm, norm
 
@@ -163,12 +165,12 @@ def test_hpge_get_fwfm_non_hpge_peak_fallback():
     result_half_cov, err_half_cov = hpge_get_fwfm(
         gaussian, pars, frac_max=frac_max_half, cov=cov
     )
-    result_tenth_cov, err_tenth_cov = hpge_get_fwfm(
+    result_tenth_cov, _err_tenth_cov = hpge_get_fwfm(
         gaussian, pars, frac_max=frac_max_tenth, cov=cov
     )
     sigma_idx = np.where(np.array(gaussian.required_args()) == "sigma")[0][0]
-    expected_err = np.sqrt(cov[sigma_idx][sigma_idx]) * 2 * np.sqrt(
-        -2 * np.log(frac_max_half)
+    expected_err = (
+        np.sqrt(cov[sigma_idx][sigma_idx]) * 2 * np.sqrt(-2 * np.log(frac_max_half))
     )
 
     assert np.isclose(result_half_cov, expected_half)

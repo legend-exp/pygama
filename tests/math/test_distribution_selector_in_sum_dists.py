@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
-from pytest import approx
+import pytest
 
 from pygama.math.functions.hpge_peak import hpge_peak
 
@@ -27,12 +29,12 @@ def test_get_mu():
 def test_get_fwhm():
     fwhm, dfwhm = hpge_peak.get_fwhm(pars, cov)
 
-    assert fwhm == approx(2.3548, rel=1e-5)
-    assert dfwhm == approx(2.3548e-1, rel=1e-5)
+    assert fwhm == pytest.approx(2.3548, rel=1e-5)
+    assert dfwhm == pytest.approx(2.3548e-1, rel=1e-5)
 
 
 def test_get_total_events():
     total_events, total_event_err = hpge_peak.get_total_events(pars, cov)
 
     assert total_events == 1
-    assert total_event_err == approx(np.sqrt(2 * 1e-32))
+    assert total_event_err == pytest.approx(np.sqrt(2 * 1e-32))

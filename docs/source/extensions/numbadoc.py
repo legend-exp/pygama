@@ -6,8 +6,10 @@ functions. It it inspired by the design of Celery's sphinx extension
 Adapted from https://github.com/numba/numba/issues/5755#issuecomment-646587651
 """
 
+from __future__ import annotations
+
+from collections.abc import Iterator
 from copy import copy
-from typing import Iterator, List
 
 from docutils import nodes
 from numba.core.dispatcher import Dispatcher
@@ -45,7 +47,7 @@ class NumbaFunctionDocumenter(FunctionDocumenter):
                 success = False
         return success
 
-    def process_doc(self, docstrings: List[List[str]]) -> Iterator[str]:
+    def process_doc(self, docstrings: list[list[str]]) -> Iterator[str]:
         """Let the user process the docstrings before adding them."""
         # Essentially copied from FunctionDocumenter
         for docstringlines in docstrings:
@@ -90,9 +92,11 @@ class NumbaFunctionDocumenter(FunctionDocumenter):
                     extra_lines.insert(0, "- *Options:* " + line)
 
             if extra_lines:
-                docstringlines = extra_lines + [""] + docstringlines
+                lines = [*extra_lines, "", *docstringlines]
+            else:
+                lines = docstringlines
 
-            yield from docstringlines
+            yield from lines
 
 
 class JitDocumenter(NumbaFunctionDocumenter):
@@ -101,7 +105,7 @@ class JitDocumenter(NumbaFunctionDocumenter):
     objtype = "jitfun"
 
     @classmethod
-    def can_document_member(cls, member, membername, isattr, parent):
+    def can_document_member(cls, member, _membername, _isattr, _parent):
         return isinstance(member, Dispatcher) and hasattr(member, "py_func")
 
 
@@ -111,7 +115,7 @@ class VectorizeDocumenter(NumbaFunctionDocumenter):
     objtype = "vecfun"
 
     @classmethod
-    def can_document_member(cls, member, membername, isattr, parent):
+    def can_document_member(cls, member, _membername, _isattr, _parent):
         return (
             isinstance(member, DUFunc)
             and hasattr(member, "_dispatcher")
@@ -125,7 +129,7 @@ class GUVectorizeDocumenter(NumbaFunctionDocumenter):
     objtype = "guvecfun"
 
     @classmethod
-    def can_document_member(cls, member, membername, isattr, parent):
+    def can_document_member(cls, member, _membername, _isattr, _parent):
         return (
             isinstance(member, GUFunc)
             and hasattr(member, "gufunc_builder")
@@ -136,21 +140,21 @@ class GUVectorizeDocumenter(NumbaFunctionDocumenter):
 class JitDirective(PyFunction):
     """Sphinx jitfun directive."""
 
-    def get_signature_prefix(self, sig):
+    def get_signature_prefix(self, _sig):
         return [nodes.Text("@numba.jit ")]
 
 
 class VectorizeDirective(PyFunction):
     """Sphinx vecfun directive."""
 
-    def get_signature_prefix(self, sig):
+    def get_signature_prefix(self, _sig):
         return [nodes.Text("@numba.vectorize ")]
 
 
 class GUVectorizeDirective(PyFunction):
     """Sphinx guvecfun directive."""
 
-    def get_signature_prefix(self, sig):
+    def get_signature_prefix(self, _sig):
         return [nodes.Text("@numba.guvectorize ")]
 
 

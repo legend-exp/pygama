@@ -1,6 +1,8 @@
-import lgdo.lh5 as lh5
+from __future__ import annotations
+
 import numpy as np
-from pytest import approx
+import pytest
+from lgdo import lh5
 
 from pygama.math.distributions import hpge_peak
 from pygama.pargen import energy_cal
@@ -19,7 +21,7 @@ def test_peak_match():
         5795.8213,
         8470.816,
     ]
-    pars, best_ixtup, best_iytup = energy_cal.poly_match(
+    _pars, best_ixtup, _best_iytup = energy_cal.poly_match(
         peaks_adu, expected_peaks_kev, deg=0, atol=10
     )
     assert np.array_equal(best_ixtup, [5, 7])
@@ -66,32 +68,36 @@ def test_hpge_cal(lgnd_test_data):
     cal.hpge_find_energy_peaks(energy, update_cal_pars=False)
 
     assert (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 1) == 0.15
+    assert pytest.approx(cal.pars[1], 1) == 0.15
     assert cal.pars[0] == 0.0
 
     cal.hpge_find_energy_peaks(energy)
 
-    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert len(cal.peaks_kev) == len(glines)
+    assert (cal.peaks_kev == glines).all()
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
     cal.hpge_get_energy_peaks(energy)
 
-    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert len(cal.peaks_kev) == len(glines)
+    assert (cal.peaks_kev == glines).all()
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
     locs = cal.peak_locs.copy()
     cal.hpge_cal_energy_peak_tops(energy)
 
-    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert len(cal.peaks_kev) == len(glines)
+    assert (cal.peaks_kev == glines).all()
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
     cal.peak_locs = locs
     cal.hpge_fit_energy_peaks(energy, peak_pars=pk_pars)
 
-    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert len(cal.peaks_kev) == len(glines)
+    assert (cal.peaks_kev == glines).all()
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
     cal.get_energy_res_curve(
@@ -100,7 +106,7 @@ def test_hpge_cal(lgnd_test_data):
     )
 
     assert (
-        approx(
+        pytest.approx(
             cal.results["hpge_fit_energy_peaks"]["FWHMLinear"]["Qbb_fwhm_in_kev"], 0.1
         )
         == 2.3
@@ -134,8 +140,9 @@ def test_hpge_cal_full_calibration(lgnd_test_data):
 
     cal.full_calibration(energy, peak_pars=pk_pars)
 
-    assert len(cal.peaks_kev) == len(glines) and (cal.peaks_kev == glines).all()
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert len(cal.peaks_kev) == len(glines)
+    assert (cal.peaks_kev == glines).all()
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
 
@@ -166,5 +173,6 @@ def test_hpge_cal_prominent_peak(lgnd_test_data):
     )
 
     cal.calibrate_prominent_peak(energy, 2614.5, pk_pars)
-    assert cal.peaks_kev[0] == 2614.5 and len(cal.peaks_kev) == 1
-    assert approx(cal.pars[1], 0.1) == 0.15
+    assert cal.peaks_kev[0] == 2614.5
+    assert len(cal.peaks_kev) == 1
+    assert pytest.approx(cal.pars[1], 0.1) == 0.15

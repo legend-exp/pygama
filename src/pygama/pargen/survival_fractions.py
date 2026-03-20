@@ -19,7 +19,7 @@ from pygama.math.distributions import gauss_on_step, hpge_peak
 log = logging.getLogger(__name__)
 
 
-def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=None):
+def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=None):  # noqa: ARG001
     """
     Generate an initial parameter guess for a peak fit.
 
@@ -53,7 +53,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=No
     """
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
-    if func_i == hpge_peak or func_i == gauss_on_step:
+    if func_i in (hpge_peak, gauss_on_step):
         parguess = pgc.get_hpge_energy_peak_par_guess(
             energy, func_i, fit_range=fit_range
         )
@@ -69,7 +69,7 @@ def energy_guess(energy, func_i, fit_range=None, bin_width=1, peak=None, eres=No
                 parguess[i] = 0
 
     else:
-        log.error(f"energy_guess not implemented for {func_i}")
+        log.error("energy_guess not implemented for %s", func_i)
         return None
     return parguess
 
@@ -108,7 +108,7 @@ def fix_all_but_nevents(func) -> tuple:
         fixed = ["x_lo", "x_hi", "mu", "sigma", "htail", "tau", "hstep"]
 
     else:
-        log.error(f"get_hpge_E_fixed not implemented for {func}")
+        log.error("get_hpge_E_fixed not implemented for %s", func)
         return None, None
     mask = ~np.isin(func.required_args(), fixed)
     return fixed, mask
@@ -136,7 +136,7 @@ def get_bounds(func, parguess) -> dict:
         Dictionary mapping parameter names to ``(low, high)`` bound tuples,
         or ``None`` if *func* is not supported.
     """
-    if func == hpge_peak or func == gauss_on_step:
+    if func in (hpge_peak, gauss_on_step):
         bounds = pgc.get_hpge_energy_bounds(func, parguess)
 
         bounds["mu"] = (parguess["mu"] - 1, parguess["mu"] + 1)
@@ -144,13 +144,23 @@ def get_bounds(func, parguess) -> dict:
         bounds["n_bkg"] = (0, 2 * (parguess["n_sig"] + parguess["n_bkg"]))
 
     else:
-        log.error(f"get_bounds not implemented for {func}")
+        log.error("get_bounds not implemented for %s", func)
         return None
     return bounds
 
 
 def pass_pdf_gos(
-    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,
+    hstep2,  # noqa: ARG001
 ):
     """
     Extended PDF for events *passing* a cut, using a Gaussian-on-step model.
@@ -191,7 +201,17 @@ def pass_pdf_gos(
 
 
 def fail_pdf_gos(
-    x, x_lo, x_hi, n_sig, epsilon_sig, n_bkg, epsilon_bkg, mu, sigma, hstep1, hstep2
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,  # noqa: ARG001
+    hstep2,
 ):
     """
     Extended PDF for events *failing* a cut, using a Gaussian-on-step model.
@@ -253,7 +273,7 @@ def pass_pdf_hpge(
     htail,
     tau,
     hstep1,
-    hstep2,
+    hstep2,  # noqa: ARG001
 ):
     """
     Extended PDF for events *passing* a cut, using a HPGe peak model.
@@ -318,7 +338,7 @@ def fail_pdf_hpge(
     sigma,
     htail,
     tau,
-    hstep1,
+    hstep1,  # noqa: ARG001
     hstep2,
 ):
     """
@@ -379,7 +399,7 @@ def update_guess(func, parguess, energies):
     Update the signal and background event-count guesses from data.
 
     Refines the ``n_sig`` and ``n_bkg`` entries in *parguess* by counting
-    events in a ±2σ window around the peak centroid and subtracting a
+    events in a ±2*sigma* window around the peak centroid and subtracting a
     sideband estimate for the background contribution.
 
     Parameters
@@ -398,7 +418,7 @@ def update_guess(func, parguess, energies):
     parguess
         The input dictionary with updated ``n_sig`` and ``n_bkg`` values.
     """
-    if func == gauss_on_step or func == hpge_peak:
+    if func in (gauss_on_step, hpge_peak):
         total_events = len(energies)
         parguess["n_sig"] = len(
             energies[
@@ -421,7 +441,7 @@ def update_guess(func, parguess, energies):
         parguess["n_bkg"] = total_events - parguess["n_sig"]
         return parguess
 
-    log.error(f"update_guess not implemented for {func}")
+    log.error("update_guess not implemented for %s", func)
     return parguess
 
 
@@ -431,8 +451,8 @@ def get_survival_fraction(
     cut_val: float,
     peak: float,
     eres_pars: float,
-    fit_range: tuple = None,
-    high_cut: float = None,
+    fit_range: tuple | None = None,
+    high_cut: float | None = None,
     pars: ValueView = None,
     data_mask: np.ndarray = None,
     mode: str = "greater",
@@ -512,10 +532,11 @@ def get_survival_fraction(
     elif mode == "less":
         idxs = (cut_param < cut_val) & data_mask
     else:
-        raise ValueError("mode not recognised")
+        msg = "mode not recognised"
+        raise ValueError(msg)
 
     if pars is None:
-        (pars, errs, cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
+        (pars, _errs, _cov, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
             energy,
             func,
             guess_func=energy_guess,
@@ -564,7 +585,8 @@ def get_survival_fraction(
         ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (~idxs)], fail_pdf_gos)
 
     else:
-        raise ValueError("Unknown func")
+        msg = "Unknown func"
+        raise ValueError(msg)
 
     m = Minuit(lh, **parguess)
     fixed = ["x_lo", "x_hi", "n_sig", "n_bkg", "mu", "sigma"]  # "hstep"
@@ -580,34 +602,34 @@ def get_survival_fraction(
     m.simplex().migrad()
     m.hesse()
 
-    sf = m.values["epsilon_sig"] * 100
+    sf = m.values["epsilon_sig"] * 100  # noqa: PD011
     err = m.errors["epsilon_sig"] * 100
 
     if display > 1:
-        fig, (ax1, ax2) = plt.subplots(1, 2)
+        _fig, (ax1, ax2) = plt.subplots(1, 2)
         bins = np.arange(1552, 1612, 1)
         ax1.hist(energy[(~nan_idxs) & (idxs)], bins=bins, histtype="step")
 
         ax2.hist(energy[(~nan_idxs) & (~idxs)], bins=bins, histtype="step")
 
         if func == hpge_peak:
-            ax1.plot(bins, pass_pdf_hpge(bins, **m.values.to_dict())[1])
-            ax2.plot(bins, fail_pdf_hpge(bins, **m.values.to_dict())[1])
+            ax1.plot(bins, pass_pdf_hpge(bins, **m.values.to_dict())[1])  # noqa: PD011
+            ax2.plot(bins, fail_pdf_hpge(bins, **m.values.to_dict())[1])  # noqa: PD011
         elif func == gauss_on_step:
-            ax1.plot(bins, pass_pdf_gos(bins, **m.values.to_dict())[1])
-            ax2.plot(bins, fail_pdf_gos(bins, **m.values.to_dict())[1])
+            ax1.plot(bins, pass_pdf_gos(bins, **m.values.to_dict())[1])  # noqa: PD011
+            ax2.plot(bins, fail_pdf_gos(bins, **m.values.to_dict())[1])  # noqa: PD011
 
         plt.show()
 
-    return sf, err, m.values, m.errors
+    return sf, err, m.values, m.errors  # noqa: PD011
 
 
 def get_sf_sweep(
     energy: np.array,
     cut_param: np.array,
-    final_cut_value: float = None,
+    final_cut_value: float | None = None,
     peak: float = 1592.5,
-    eres_pars: list = None,
+    eres_pars: list | None = None,
     data_mask=None,
     cut_range=(-5, 5),
     n_samples=26,
@@ -670,7 +692,7 @@ def get_sf_sweep(
     cut_vals = np.linspace(cut_range[0], cut_range[1], n_samples)
     out_df = pd.DataFrame()
 
-    (pars, errs, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
+    (pars, _errs, _, _, func, _, _, _) = pgc.unbinned_staged_energy_fit(
         energy,
         hpge_peak,
         guess_func=energy_guess,
@@ -697,9 +719,9 @@ def get_sf_sweep(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
             )
         except BaseException as e:
-            if e == KeyboardInterrupt or debug_mode:
+            if isinstance(e, KeyboardInterrupt) or debug_mode:
                 raise (e)
-    out_df.set_index("cut_val", inplace=True)
+    out_df = out_df.set_index("cut_val")
     if final_cut_value is not None:
         sf, sf_err, _, _ = get_survival_fraction(
             energy,
@@ -766,7 +788,8 @@ def compton_sf(
     elif mode == "less":
         mask = (cut_param < low_cut_val) & data_mask
     else:
-        raise ValueError("mode not recognised")
+        msg = "mode not recognised"
+        raise ValueError(msg)
 
     sf = len(cut_param[mask]) / len(cut_param)
     err = 100 * np.sqrt((sf * (1 - sf)) / len(cut_param))
@@ -834,7 +857,7 @@ def compton_sf_sweep(
 
     for cut_val in cut_vals:
         ct_dict = compton_sf(cut_param, cut_val, mode=mode, data_mask=data_mask)
-        df = pd.DataFrame(
+        row_df = pd.DataFrame(
             [
                 {
                     "cut_val": ct_dict["low_cut"],
@@ -843,8 +866,8 @@ def compton_sf_sweep(
                 }
             ]
         )
-        out_df = pd.concat([out_df, df])
-    out_df.set_index("cut_val", inplace=True)
+        out_df = pd.concat([out_df, row_df])
+    out_df = out_df.set_index("cut_val")
 
     sf_dict = compton_sf(cut_param, final_cut_value, mode=mode, data_mask=data_mask)
 

@@ -291,8 +291,7 @@ def tp100_align(wfs: np.array, tp100_window_width: int, tp100s: np.array) -> np.
             <= median_tp100 + tp100_window_width
         ):
             wf_win = wf[
-                tp100s[i]
-                - (median_tp100 - tp100_window_width) : wf_len
+                tp100s[i] - (median_tp100 - tp100_window_width) : wf_len
                 - (-1 * tp100s[i] + median_tp100 + tp100_window_width)
             ]
             time_aligned_wfs.append(wf_win)
@@ -334,7 +333,7 @@ class PZCorrect:
 
         Runs the DSP chain on *tb_data*, extracts the *slope_param* column,
         estimates the mode and standard deviation of the slope distribution,
-        and converts the modal value to a time constant τ = −1/mode.  The
+        and converts the modal value to a time constant tau = -1/mode.  The  # noqa: RUF002
         result is stored in :attr:`output_dict` under the ``"pz"`` key.
 
         Parameters
@@ -377,8 +376,7 @@ class PZCorrect:
 
         if display <= 0:
             return None
-        out_plot_dict = {}
-        return out_plot_dict
+        return {}
 
     def get_dpz_decay_constants(
         self,
@@ -469,7 +467,7 @@ class PZCorrect:
             "tau2": f"{tau2s_fit * sampling_rate}*{units}",
             "frac": f2s_fit,
         }.items():
-            log.debug(f"{item}: {value}")
+            log.debug("%s: %s", item, value)
 
         self.results_dict.update(
             {
@@ -483,9 +481,7 @@ class PZCorrect:
         dpz_opt_tb_out = opt.run_one_dsp(
             tb_data,
             self.dsp_config,
-            db_dict=dict(
-                {"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}}
-            ),
+            db_dict={"pz": {"tau1": tau1s_fit, "tau2": tau2s_fit, "frac": f2s_fit}},
         )
 
         # Update tau_dict with the dpz constants
@@ -593,7 +589,7 @@ class PZCorrect:
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
-        wf_idxs = np.random.choice(len(wfs), n_waveforms)
+        wf_idxs = np.random.choice(len(wfs), n_waveforms)  # noqa: NPY002
         if norm_param is not None:
             means = tb_out[norm_param].nda[wf_idxs]
             wfs = np.divide(wfs[wf_idxs], np.reshape(means, (len(wf_idxs), 1)))
@@ -674,7 +670,7 @@ class PZCorrect:
             np.nanpercentile(slopes, 99),
             np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
         )
-        counts, bins, bars = ax.hist(slopes, bins=bins, histtype="step")
+        _counts, bins, _bars = ax.hist(slopes, bins=bins, histtype="step")
         plt.xlabel("Slope")
         plt.ylabel("Counts")
         if "single_decay_constant" in self.results_dict:
@@ -692,10 +688,7 @@ class PZCorrect:
             axins.axvline(high_bin, color="red")
             axins.set_xlim(in_min, in_max)
             ax.set_xlim(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99))
-        if with_correction:
-            out_plot_dict = {"corrected_slope": fig}
-        else:
-            out_plot_dict = {"slope": fig}
+        out_plot_dict = {"corrected_slope": fig} if with_correction else {"slope": fig}
         if display > 1:
             plt.show()
         else:

@@ -1,5 +1,7 @@
-import lgdo.lh5 as lh5
+from __future__ import annotations
+
 import numpy as np
+from lgdo import lh5
 
 import pygama.pargen.lq_cal as lq
 from pygama.math.distributions import gaussian
@@ -15,9 +17,9 @@ def test_lq_cal(lgnd_test_data):
         "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
     )
 
-    df = lh5.read_as("ch1104000/dsp", data, "pd")
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
 
-    df["cuspEmax_cal"] = df["cuspEmax"] * 0.155
+    data_df["cuspEmax_cal"] = data_df["cuspEmax"] * 0.155
 
     cal_dict = {
         "LQ_Ecorr": {
@@ -36,9 +38,9 @@ def test_lq_cal(lgnd_test_data):
         debug_mode=True,
     )
 
-    df["LQ_Ecorr"] = np.divide(df["lq80"], df["cuspEmax"])
+    data_df["LQ_Ecorr"] = np.divide(data_df["lq80"], data_df["cuspEmax"])
 
-    lqcal.calibrate(df, "LQ_Ecorr")
+    lqcal.calibrate(data_df, "LQ_Ecorr")
     assert (lqcal.cut_val > 0) & (~np.isnan(lqcal.cut_val))
     assert (~np.isnan(lqcal.low_side_sf.loc[1592.50]["sf"])) & (
         lqcal.low_side_sf.loc[1592.50]["sf"] > 95
