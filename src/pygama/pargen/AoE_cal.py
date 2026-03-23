@@ -1919,6 +1919,7 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
+        override_dict = None
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -1952,31 +1953,57 @@ class CalAoE:
         if fit_widths is None:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
-        self.time_correction(
-            df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
-        )
+        if override_dict is None or "AoE_Timecorr" not in override_dict:
+            self.time_correction(
+                df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
+            )
+        else:
+            self.update_cal_dicts(
+                {"AoE_Timecorr": override_dict["AoE_Timecorr"]}
+            )
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
-            self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            if override_dict is None or "AoE_DTcorr" not in override_dict:
+                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            else:
+                self.update_cal_dicts(
+                {"AoE_DTcorr": override_dict["AoE_DTcorr"]}
+            )
         else:
             aoe_param = "AoE_Timecorr"
 
-        self.energy_correction(
-            df,
-            aoe_param,
-            corrected_param="AoE_Corrected",
-            classifier_param="AoE_Classifier",
-        )
+        if override_dict is None or ("AoE_Corrected" not in override_dict and "AoE_Classifier" not in override_dict):
+            self.energy_correction(
+                df,
+                aoe_param,
+                corrected_param="AoE_Corrected",
+                classifier_param="AoE_Classifier",
+            )
+        else:
+            self.update_cal_dicts(
+                {"AoE_Corrected": override_dict["AoE_Corrected"]}
+            )
+            self.update_cal_dicts(
+                {"_AoE_Classifier_intermediate": override_dict["_AoE_Classifier_intermediate"]}
+            )
+            self.update_cal_dicts(
+                {"AoE_Classifier": override_dict["AoE_Classifier"]}
+            )
 
-        self.get_aoe_cut_fit(
-            df,
-            "AoE_Classifier",
-            peaks_of_interest[cut_peak_idx],
-            fit_widths[cut_peak_idx],
-            dep_acc,
-            output_cut_param="AoE_Low_Cut",
-        )
+        if override_dict is None or ("AoE_Low_Cut" not in override_dict):
+            self.get_aoe_cut_fit(
+                df,
+                "AoE_Classifier",
+                peaks_of_interest[cut_peak_idx],
+                fit_widths[cut_peak_idx],
+                dep_acc,
+                output_cut_param="AoE_Low_Cut",
+            )
+        else:
+            self.update_cal_dicts(
+                {"AoE_Low_Cut": override_dict["AoE_Low_Cut"]}
+            )
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
