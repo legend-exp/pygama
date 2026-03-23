@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -10,8 +12,8 @@ from pygama.flow import FileDB
 config_dir = Path(__file__).parent / "configs"
 
 
-def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmp_dir):
-    with open(config_dir / "filedb-config.json") as f:
+def test_chain_filedbs(lgnd_test_data, test_filedb_full, tmp_dir):  # noqa: ARG001
+    with (config_dir / "filedb-config.json").open() as f:
         config = json.load(f)
 
     config["data_dir"] = lgnd_test_data.get_path("lh5/prod-ref-l200/generated/tier")
@@ -96,7 +98,7 @@ def test_filedb_basics(test_filedb):
         "file_status",
     ]
 
-    assert db.df.values.tolist() == [
+    assert db.df.to_numpy().tolist() == [
         [
             "l200",
             "p03",

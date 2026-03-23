@@ -107,7 +107,7 @@ def get_mode_stdev(par_array) -> tuple:
     Estimate the mode and standard deviation of a parameter distribution.
 
     Uses a histogram-based approach: the distribution is first clipped to the
-    1st–99th percentile range, the modal bin is located, and a Gaussian is fit
+    1st-99th percentile range, the modal bin is located, and a Gaussian is fit
     in the neighbourhood of that bin to refine the estimates.  Multiple
     fallback strategies are applied when the primary fit fails.
 
@@ -131,7 +131,7 @@ def get_mode_stdev(par_array) -> tuple:
     if bin_width == 0:
         bin_width = np.std(par_array) / 4
 
-    counts, start_bins, var = pgh.get_hist(
+    counts, start_bins, _ = pgh.get_hist(
         par_array,
         range=(np.nanmin(par_array), np.nanmax(par_array)),
         dx=bin_width,
@@ -159,7 +159,7 @@ def get_mode_stdev(par_array) -> tuple:
         dx = np.nanpercentile(par_array, 52) - np.nanpercentile(par_array, 50)
         if dx == 0:
             dx = bin_width
-        counts, bins, var = pgh.get_hist(
+        counts, bins, _ = pgh.get_hist(
             par_array,
             dx=dx,
             range=(lower_bound, upper_bound),
@@ -169,7 +169,7 @@ def get_mode_stdev(par_array) -> tuple:
 
         fwhm = pgh.get_fwhm(counts, bins)[0]
         mean = float(bin_centres[np.argmax(counts)])
-        pars, cov = pgf.gauss_mode_width_max(
+        pars, _cov = pgf.gauss_mode_width_max(
             counts,
             bins,
             mode_guess=mean,
@@ -202,7 +202,7 @@ def get_mode_stdev(par_array) -> tuple:
             if dx == 0:
                 dx = bin_width
 
-            counts, bins, var = pgh.get_hist(
+            counts, bins, _var = pgh.get_hist(
                 par_array,
                 dx=dx,
                 range=(lower_bound, upper_bound),
@@ -429,10 +429,7 @@ def fit_distributions(x_lo, x_hi, norm_par_array, display=0) -> tuple:
         double_exgauss_csqr[0],
     ]
 
-    if (pvals == 0).all():
-        idx = np.nanargmin(csqrs)
-    else:
-        idx = np.nanargmax(pvals)
+    idx = np.nanargmin(csqrs) if (pvals == 0).all() else np.nanargmax(pvals)
     func = funcs[idx]
     pars = pars[idx]
     return func, pars
@@ -538,13 +535,14 @@ def generate_cuts(
             bad_entries = (~np.isnan(all_par_array)) & (~np.isinf(all_par_array))
 
             if len(np.where(bad_entries)[0]) == 0:
-                raise RuntimeError(f"no valid entries for {par}")
+                msg = f"no valid entries for {par}"
+                raise RuntimeError(msg)
 
             mean, std = get_mode_stdev(
                 all_par_array[(~np.isnan(all_par_array)) & (~np.isinf(all_par_array))]
             )
 
-            if isinstance(num_sigmas, (int, float)):
+            if isinstance(num_sigmas, int | float):
                 num_sigmas_left = num_sigmas
                 num_sigmas_right = num_sigmas
             elif isinstance(num_sigmas, dict):
@@ -632,7 +630,7 @@ def get_cut_indexes(data, cut_parameters):
         all cuts.
     """
     cut_dict = generate_cuts(data, cut_dict=cut_parameters)
-    log.debug(f"Cuts are {cut_dict}")
+    log.debug("Cuts are %s", cut_dict)
 
     if isinstance(data, Table):
         ct_mask = np.full(len(data), True, dtype=bool)
@@ -654,7 +652,8 @@ def get_cut_indexes(data, cut_parameters):
             data[outname] = data.eval(exp, local_dict=info.get("parameters", None))
             ct_mask = ct_mask & data[outname]
     else:
-        raise ValueError("Data must be a Table or DataFrame")
+        msg = "Data must be a Table or DataFrame"
+        raise ValueError(msg)
 
     return ct_mask
 
@@ -662,7 +661,7 @@ def get_cut_indexes(data, cut_parameters):
 def generate_cut_classifiers(
     data: dict[str, np.ndarray],
     cut_dict: dict[str, int],
-    rounding: int = 4,
+    rounding: int = 4,  # noqa: ARG001
     display: int = 0,
 ) -> dict:
     """
@@ -766,7 +765,7 @@ def generate_cut_classifiers(
             norm_par_array = (all_par_array - mean) / std
 
             if num_sigmas is not None:
-                if isinstance(num_sigmas, (int, float)):
+                if isinstance(num_sigmas, int | float):
                     cut_left = -num_sigmas
                     cut_right = num_sigmas
                 elif isinstance(num_sigmas, dict):
@@ -810,14 +809,15 @@ def generate_cut_classifiers(
                             pars["mu"],
                             pars["sigma"],
                         )
-                    elif func == gauss_on_exgauss_areas or func == double_exgauss:
+                    elif func in (gauss_on_exgauss_areas, double_exgauss):
                         cdf = func.cdf_norm(xs, range_low, range_high, *pars[2:])
                     elif func == skewed_fit:
                         cdf = skewnorm.cdf(xs, pars["alpha"], pars["mu"], pars["sigma"])
                     else:
-                        raise ValueError("unknown func")
+                        msg = "unknown func"
+                        raise ValueError(msg)
 
-                    if isinstance(percentile, (int, float)):
+                    if isinstance(percentile, int | float):
                         cut_left = xs[np.argmin(np.abs(cdf - (1 - (percentile / 100))))]
                         cut_right = xs[np.argmin(np.abs(cdf - (percentile / 100)))]
 
@@ -833,7 +833,7 @@ def generate_cut_classifiers(
                         else:
                             cut_right = None
 
-                elif isinstance(percentile, (int, float)):
+                elif isinstance(percentile, int | float):
                     cut_left = np.nanpercentile(norm_par_array, 100 - percentile)
                     cut_right = np.nanpercentile(norm_par_array, percentile)
 
@@ -850,7 +850,7 @@ def generate_cut_classifiers(
             if default is not None:
                 value = default["value"]
                 default_mode = default["mode"]
-                if isinstance(value, (int, float)):
+                if isinstance(value, int | float):
                     default_cut_left = -value
                     default_cut_right = value
                 else:
@@ -874,7 +874,8 @@ def generate_cut_classifiers(
                     if cut_right is not None:
                         cut_right = max(cut_right, default_cut_right)
                 else:
-                    raise ValueError("unknown mode")
+                    msg = "unknown mode"
+                    raise ValueError(msg)
 
             if mode == "inclusive":
                 if cut_right is not None and cut_left is not None:
@@ -907,7 +908,7 @@ def generate_cut_classifiers(
                 fig = plt.figure()
                 low = -10 if cut_left is None or cut_left > -10 else cut_left
                 hi = 10 if cut_right is None or cut_right < 10 else cut_right
-                hist, _, _ = plt.hist(
+                _hist, _, _ = plt.hist(
                     norm_par_array,
                     bins=np.arange(low, hi, 0.1),
                     histtype="step",
@@ -972,32 +973,31 @@ def find_pulser_properties(df, energy="daqenergy"):
         var[np.where(var == 0)] = 1
     imaxes = pgc.get_i_local_maxima(hist / np.sqrt(var), 3)
     peak_energies = pgh.get_bin_centers(bins)[imaxes]
-    pt_pars, pt_covs = pgc.hpge_fit_E_peak_tops(
+    pt_pars, _pt_covs = pgc.hpge_fit_E_peak_tops(
         hist, bins, var, peak_energies, n_to_fit=10
     )
     peak_e_err = pt_pars[:, 1] * 4
 
     allowed_mask = np.ones(len(peak_energies), dtype=bool)
-    for i, e in enumerate(peak_energies[1:-1]):
-        i += 1
+    for j, e in enumerate(peak_energies[1:-1]):
+        i = j + 1
         if peak_e_err[i] > allowed_err:
             continue
-        if i == 1:
-            if (
-                e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
-                and peak_e_err[i - 1] < allowed_err
-            ):
-                overlap = (
-                    peak_energies[i - 1]
-                    + peak_e_err[i - 1]
-                    - (peak_energies[i] - peak_e_err[i])
-                )
-                peak_e_err[i] -= overlap * (
-                    peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
-                peak_e_err[i - 1] -= overlap * (
-                    peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
-                )
+        if i == 1 and (
+            e - peak_e_err[i] < peak_energies[i - 1] + peak_e_err[i - 1]
+            and peak_e_err[i - 1] < allowed_err
+        ):
+            overlap = (
+                peak_energies[i - 1]
+                + peak_e_err[i - 1]
+                - (peak_energies[i] - peak_e_err[i])
+            )
+            peak_e_err[i] -= overlap * (
+                peak_e_err[i] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
+            peak_e_err[i - 1] -= overlap * (
+                peak_e_err[i - 1] / (peak_e_err[i] + peak_e_err[i - 1])
+            )
 
         if (
             e + peak_e_err[i] > peak_energies[i + 1] - peak_e_err[i + 1]
@@ -1018,7 +1018,7 @@ def find_pulser_properties(df, energy="daqenergy"):
             df_peak = df[e_cut]
 
             time_since_last = (
-                df_peak.timestamp.values[1:] - df_peak.timestamp.values[:-1]
+                df_peak.timestamp.to_numpy()[1:] - df_peak.timestamp.to_numpy()[:-1]
             )
 
             tsl = time_since_last[
@@ -1086,10 +1086,7 @@ def get_tcm_pulser_ids(tcm_file, channel, multiplicity_threshold) -> tuple:
         Boolean mask of the same length as the channel event list.
     """
     if isinstance(channel, str):
-        if channel[:2] == "ch":
-            chan = int(channel[2:])
-        else:
-            chan = int(channel)
+        chan = int(channel[2:]) if channel[:2] == "ch" else int(channel)
     else:
         chan = channel
     if isinstance(tcm_file, list):
@@ -1154,7 +1151,7 @@ def tag_pulsers(df, chan_info, window=0.01) -> pd.DataFrame:
 
         time_since_last = np.zeros(len(df_pulser))
         time_since_last[1:] = (
-            df_pulser.timestamp.values[1:] - df_pulser.timestamp.values[:-1]
+            df_pulser.timestamp.to_numpy()[1:] - df_pulser.timestamp.to_numpy()[:-1]
         )
 
         mode_idxs = (time_since_last > period - window) & (
@@ -1167,7 +1164,7 @@ def tag_pulsers(df, chan_info, window=0.01) -> pd.DataFrame:
             return df
         df_pulser = df_pulser[mode_idxs]
 
-        ts = df_pulser.timestamp.values
+        ts = df_pulser.timestamp.to_numpy()
         diff_zero = np.zeros(len(ts))
         diff_zero[1:] = np.around(np.divide(np.subtract(ts[1:], ts[:-1]), period))
         diff_cum = np.cumsum(diff_zero)

@@ -40,11 +40,7 @@ def convert_to_minuit(pars, func) -> Minuit:
         c = cost.UnbinnedNLL(np.array([0]), func.pdf_ext)
     except AttributeError:
         c = cost.UnbinnedNLL(np.array([0]), func)
-    if isinstance(pars, dict):
-        m = Minuit(c, **pars)
-    else:
-        m = Minuit(c, *pars)
-    return m
+    return Minuit(c, **pars) if isinstance(pars, dict) else Minuit(c, *pars)
 
 
 def return_nans(input) -> tuple:
@@ -72,10 +68,10 @@ def return_nans(input) -> tuple:
     if isinstance(input, FunctionType):
         args = input.__code__.co_varnames[: input.__code__.co_argcount][1:]
         m = convert_to_minuit(np.full(len(args), np.nan), input)
-        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
+        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)  # noqa: PD011
     args = input.required_args()
     m = convert_to_minuit(np.full(len(args), np.nan), input)
-    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
+    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)  # noqa: PD011
 
 
 def load_data(
@@ -132,7 +128,7 @@ def load_data(
 
     if isinstance(files, dict):
         # Go through each tstamp and recursively load_data on file lists
-        df = []
+        data_df = []
         masks = []
         for tstamp, tfiles in files.items():
             file_df = load_data(
@@ -149,13 +145,13 @@ def load_data(
                 file_df[0]["run_timestamp"] = np.full(
                     len(file_df[0]), tstamp, dtype=object
                 )
-                df.append(file_df[0])
+                data_df.append(file_df[0])
                 masks.append(file_df[1])
             else:
                 file_df["run_timestamp"] = np.full(len(file_df), tstamp, dtype=object)
-                df.append(file_df)
+                data_df.append(file_df)
 
-        df = pd.concat(df)
+        data_df = pd.concat(data_df)
         if return_selection_mask:
             masks = np.concatenate(masks)
 
@@ -182,9 +178,10 @@ def load_data(
         df_fields = params & (fields | set(cal_dict))
         if df_fields != params:
             log.debug(
-                f"load_data(): params not found in data files or cal_dict: {params - df_fields}"
+                "load_data(): params not found in data files or cal_dict: %s",
+                params - df_fields,
             )
-        df = pd.DataFrame(columns=list(df_fields))
+        data_df = pd.DataFrame(columns=list(df_fields))
 
         for table in lh5_it:
             # Evaluate all provided expressions and add to table
@@ -196,21 +193,21 @@ def load_data(
             n_rows = len(table)
 
             # Copy params in table into dataframe
-            for par in df:
+            for par in data_df:
                 # First set of entries: allocate enough memory for all entries
                 if entry == 0:
-                    df[par] = np.resize(table[par], len(lh5_it))
+                    data_df[par] = np.resize(table[par], len(lh5_it))
                 else:
-                    df.loc[entry : entry + n_rows - 1, par] = table[par][:n_rows]
+                    data_df.loc[entry : entry + n_rows - 1, par] = table[par][:n_rows]
 
         # Evaluate threshold mask and drop events below threshold
         if threshold is not None:
-            masks = df[cal_energy_param] > threshold
-            df.drop(np.where(~masks)[0], inplace=True)
+            masks = data_df[cal_energy_param] > threshold
+            data_df = data_df.drop(np.where(~masks)[0])
         else:
-            masks = np.ones(len(df), dtype=bool)
+            masks = np.ones(len(data_df), dtype=bool)
 
     log.debug("data loaded")
     if return_selection_mask:
-        return df, masks
-    return df
+        return data_df, masks
+    return data_df

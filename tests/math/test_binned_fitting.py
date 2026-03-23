@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
-from pytest import approx
 
 import pygama.math.binned_fitting as pgbf
 
@@ -11,19 +12,19 @@ def test_fit_binned_and_goodness_of_fit():
     from pygama.math.functions.gauss import nb_gauss_amp
     from pygama.math.histogram import get_hist
 
-    np.random.seed(42)
-    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
     fit, fit_error, fit_cov = pgbf.fit_binned(
         nb_gauss_amp, hist, bins, guess=(0, 0.9, 400), cost_func="Least Squares"
     )
 
-    assert fit["mu"] == approx(-0.003933521046091256)
-    assert fit["sigma"] == approx(0.9971419629418575)
-    assert fit["a"] == approx(398.28437169188095)
+    assert fit["mu"] == pytest.approx(-0.003933521046091256)
+    assert fit["sigma"] == pytest.approx(0.9971419629418575)
+    assert fit["a"] == pytest.approx(398.28437169188095)
 
-    assert fit_error["mu"] == approx(0.010033194971234135)
-    assert fit_error["sigma"] == approx(0.007291498082977738)
-    assert fit_error["a"] == approx(4.930383892845187)
+    assert fit_error["mu"] == pytest.approx(0.010033194971234135)
+    assert fit_error["sigma"] == pytest.approx(0.007291498082977738)
+    assert fit_error["a"] == pytest.approx(4.930383892845187)
 
     assert np.allclose(
         fit_cov[0],
@@ -34,12 +35,12 @@ def test_fit_binned_and_goodness_of_fit():
     chi, dof = pgbf.goodness_of_fit(
         hist, bins, var, nb_gauss_amp, fit, method="Pearson", scale_bins=True
     )
-    assert chi == approx(82236.02419624529)
-    assert dof == approx(97)
+    assert chi == pytest.approx(82236.02419624529)
+    assert dof == pytest.approx(97)
 
     poisson = pgbf.poisson_gof(fit, nb_gauss_amp, hist, bins, is_integral=False)
 
-    assert poisson == approx(68204.56472918994)
+    assert poisson == pytest.approx(68204.56472918994)
 
 
 def test_gauss_mode_width_max():
@@ -47,32 +48,30 @@ def test_gauss_mode_width_max():
 
     from pygama.math.histogram import get_hist
 
-    np.random.seed(42)
-    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
-    fit, cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
+    fit, _cov = pgbf.gauss_mode_width_max(hist, bins, n_bins=20)
 
-    assert fit[0] == approx(0, abs=1e-1)
-    assert fit[1] == approx(1, rel=1e-1)
-    assert fit[2] == approx(398, abs=1)
+    assert fit[0] == pytest.approx(0, abs=1e-1)
+    assert fit[1] == pytest.approx(1, rel=1e-1)
+    assert fit[2] == pytest.approx(398, abs=1)
 
-    fit, err = pgbf.gauss_mode_max(hist, bins)
+    fit, _ = pgbf.gauss_mode_max(hist, bins)
 
-    assert fit[0] == approx(0, abs=1e-1)
-    assert fit[1] == approx(400, abs=1)
+    assert fit[0] == pytest.approx(0, abs=1e-1)
+    assert fit[1] == pytest.approx(400, abs=1)
 
-    fit, err = pgbf.gauss_mode(hist, bins)
+    fit, _err = pgbf.gauss_mode(hist, bins)
 
-    assert fit == approx(0, abs=1e-1)
+    assert fit == pytest.approx(0, abs=1e-1)
 
 
 def test_gauss_mode_width_max_edge_cases():
     from pygama.math.histogram import get_hist
 
-    np.random.seed(42)
+    np.random.seed(42)  # noqa: NPY002
     # histogram over range [-5, 5] with 100 bins, bin width = 0.1
-    hist, bins, var = get_hist(
-        np.random.normal(size=10000), bins=100, range=(-5, 5)
-    )
+    hist, bins, _var = get_hist(np.random.normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
     # mode_guess near the lower edge: find_bin returns a small index
     # so i_0 < floor(n_bins/2) triggers ValueError
@@ -89,9 +88,9 @@ def test_taylor_mode_max():
 
     from pygama.math.histogram import get_hist
 
-    np.random.seed(42)
-    hist, bins, var = get_hist(normal(size=10000), bins=100, range=(-5, 5))
-    fit, err = pgbf.taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5)
+    np.random.seed(42)  # noqa: NPY002
+    hist, bins, _var = get_hist(normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
+    fit, _err = pgbf.taylor_mode_max(hist, bins, var=None, mode_guess=None, n_bins=5)
 
-    assert fit[0] == approx(-0.005714285714285219)
-    assert fit[1] == approx(400.4864285714285)
+    assert fit[0] == pytest.approx(-0.005714285714285219)
+    assert fit[1] == pytest.approx(400.4864285714285)

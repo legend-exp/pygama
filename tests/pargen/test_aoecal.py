@@ -1,5 +1,7 @@
-import lgdo.lh5 as lh5
+from __future__ import annotations
+
 import numpy as np
+from lgdo import lh5
 
 import pygama.pargen.AoE_cal as Coe
 
@@ -10,11 +12,11 @@ def test_aoe_cal(lgnd_test_data):
         "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
     )
 
-    df = lh5.read_as("ch1104000/dsp", data, "pd")
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
 
-    df["AoE_Uncorr"] = df["A_max"] / df["cuspEmax"]
+    data_df["AoE_Uncorr"] = data_df["A_max"] / data_df["cuspEmax"]
 
-    df["cuspEmax_cal"] = df["cuspEmax"] * 0.155
+    data_df["cuspEmax_cal"] = data_df["cuspEmax"] * 0.155
 
     cal_dict = {
         "AoE_Uncorr": {
@@ -30,7 +32,7 @@ def test_aoe_cal(lgnd_test_data):
         selection_string="index==index",
         debug_mode=True,
     )
-    aoe.calibrate(df, "AoE_Uncorr")
+    aoe.calibrate(data_df, "AoE_Uncorr")
     assert (
         (aoe.low_cut_val < -1.0) & (aoe.low_cut_val > -3) & (~np.isnan(aoe.low_cut_val))
     )

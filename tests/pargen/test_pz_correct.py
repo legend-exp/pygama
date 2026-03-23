@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 import pytest
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, WaveformTable
@@ -9,8 +11,8 @@ def test_tp100_align():
     """
     Generate synthetic waveforms with random tp100s, then ensure that this function aligns all tp100s at the same sample
     """
-    np.random.seed(42)
-    tp100_known = np.random.randint(3000, 3200, 1000)
+    np.random.seed(42)  # noqa: NPY002
+    tp100_known = np.random.randint(3000, 3200, 1000)  # noqa: NPY002
 
     tau = 30000
     wf_len = 8192
@@ -45,7 +47,7 @@ def test_dpz_model_fit():
     xs = np.arange(0, wf_len - tp0)
     ys = pz_correct.dpz_model(xs, 1000, tau1, tau2, frac)
     test_wf = np.insert(ys, 0, np.zeros(tp0))
-    tau1_fit, tau2_fit, frac_fit, plot_dict_out = pz_correct.dpz_model_fit(
+    tau1_fit, tau2_fit, frac_fit, _plot_dict_out = pz_correct.dpz_model_fit(
         test_wf, percent_tau1_fit=0.1, percent_tau2_fit=0.2, idx_shift=2, plot=0
     )
 
@@ -59,7 +61,7 @@ def test_get_dpz_decay_constants():
     """
     First, generate a fake HPGe energy spectrum and associated waveforms. Then extract the time constants from the waveforms associated with the 2615 peak
     """
-    np.random.seed(42)
+    np.random.seed(42)  # noqa: NPY002
     tau1 = 30000
     tau2 = 1100
     frac = 0.02
@@ -73,7 +75,7 @@ def test_get_dpz_decay_constants():
     # for peak in peaks:
     #     daq_energies.extend(np.random.normal(peak, 10, num_wfs_per_peak).astype(int))
 
-    daq_energies = np.random.normal(2614.553, 10, num_wfs).astype(int)
+    daq_energies = np.random.normal(2614.553, 10, num_wfs).astype(int)  # noqa: NPY002
 
     wfs = []
     for amplitude in daq_energies:
@@ -96,54 +98,52 @@ def test_get_dpz_decay_constants():
 
     assert isinstance(tb_data["waveform"]["values"], ArrayOfEqualSizedArrays)
 
-    dpz_opt_dsp_dict = dict(
-        {
-            "outputs": ["tau1", "tau2", "frac"],
-            "processors": {
-                "bl_mean , bl_std, bl_slope, bl_intercept": {
-                    "function": "linear_slope_fit",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform[0:200]",
-                        "bl_mean",
-                        "bl_std",
-                        "bl_slope",
-                        "bl_intercept",
-                    ],
-                    "unit": ["ADC", "ADC", "ADC", "ADC"],
-                },
-                "wf_bl": {
-                    "function": "bl_subtract",
-                    "module": "dspeed.processors",
-                    "args": ["waveform", "bl_mean", "wf_bl"],
-                    "unit": "ADC",
-                },
-                "tau1, tau2, frac": {
-                    "function": "optimize_2pz",
-                    "module": "dspeed.processors",
-                    "args": [
-                        "waveform",
-                        "bl_mean",
-                        "round(52*us/waveform.period)",
-                        "len(waveform)",
-                        "1*ms/waveform.period",
-                        "0.5",
-                        "db.pz.tau1",
-                        "db.pz.tau2",
-                        "db.pz.frac",
-                        "tau1",
-                        "tau2",
-                        "frac",
-                    ],
-                    "defaults": {
-                        "db.pz.tau1": 28000,
-                        "db.pz.tau2": 900,
-                        "db.pz.frac": 0.145,
-                    },
+    dpz_opt_dsp_dict = {
+        "outputs": ["tau1", "tau2", "frac"],
+        "processors": {
+            "bl_mean , bl_std, bl_slope, bl_intercept": {
+                "function": "linear_slope_fit",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform[0:200]",
+                    "bl_mean",
+                    "bl_std",
+                    "bl_slope",
+                    "bl_intercept",
+                ],
+                "unit": ["ADC", "ADC", "ADC", "ADC"],
+            },
+            "wf_bl": {
+                "function": "bl_subtract",
+                "module": "dspeed.processors",
+                "args": ["waveform", "bl_mean", "wf_bl"],
+                "unit": "ADC",
+            },
+            "tau1, tau2, frac": {
+                "function": "optimize_2pz",
+                "module": "dspeed.processors",
+                "args": [
+                    "waveform",
+                    "bl_mean",
+                    "round(52*us/waveform.period)",
+                    "len(waveform)",
+                    "1*ms/waveform.period",
+                    "0.5",
+                    "db.pz.tau1",
+                    "db.pz.tau2",
+                    "db.pz.frac",
+                    "tau1",
+                    "tau2",
+                    "frac",
+                ],
+                "defaults": {
+                    "db.pz.tau1": 28000,
+                    "db.pz.tau2": 900,
+                    "db.pz.frac": 0.145,
                 },
             },
-        }
-    )
+        },
+    }
 
     wf_field = "waveform"
     percent_tau1_fit = 0.1

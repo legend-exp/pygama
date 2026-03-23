@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
-from pytest import approx
+import pytest
 
 import pygama.math.hpge_peak_fitting as pgb
 
@@ -16,10 +18,10 @@ def test_mostly_gauss_fwhm():
         [0, 0, 0, 0, 0, 1e-16, 0],  # dbg02
         [0, 0, 0, 0, 0, 0, 1e-16],  # dhstep2
     ]
-    amp, mu, sig, htail, tau, bg0, hstep = pars
+    _amp, _mu, sig, htail, tau, _bg0, _hstep = pars
     fwhm, dfwhm = pgb.hpge_peak_fwhm(sig, htail, tau, cov)
-    assert fwhm == approx(2.3548, rel=1e-5)
-    assert dfwhm == approx(2.3548e-1, rel=1e-5)
+    assert fwhm == pytest.approx(2.3548, rel=1e-5)
+    assert dfwhm == pytest.approx(2.3548e-1, rel=1e-5)
 
 
 def test_mostly_exp_fwhm():
@@ -35,7 +37,7 @@ def test_mostly_exp_fwhm():
         [0, 0, 0, 0, 0, 0, 1e-16],  # dhs2
     ]
 
-    amp, mu, sig, htail, tau, bg0, hstep = pars
+    _amp, _mu, sig, htail, tau, _bg0, _hstep = pars
     fwhm, dfwhm = pgb.hpge_peak_fwhm(sig, htail, tau, cov)
-    assert fwhm == approx(np.log(2), rel=1e-5)
-    assert dfwhm == approx(np.log(2) / 10, rel=1e-5)
+    assert fwhm == pytest.approx(np.log(2), rel=1e-5)
+    assert dfwhm == pytest.approx(np.log(2) / 10, rel=1e-5)

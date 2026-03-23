@@ -1,5 +1,7 @@
-import lgdo.lh5 as lh5
-from pytest import approx
+from __future__ import annotations
+
+import pytest
+from lgdo import lh5
 
 import pygama.pargen.data_cleaning as dc
 
@@ -28,24 +30,24 @@ def test_cuts(lgnd_test_data):
 
     assert cut_dict["dt_eff_cut"] == cut_pars["dt_eff_cut"]
     assert cut_dict["bl_std_cut"]["expression"] == "(bl_std>a) & (bl_std<b)"
-    assert approx(cut_dict["bl_std_cut"]["parameters"]["a"], 0.1) == 10
-    assert approx(cut_dict["bl_std_cut"]["parameters"]["b"], 0.1) == 15
+    assert pytest.approx(cut_dict["bl_std_cut"]["parameters"]["a"], 0.1) == 10
+    assert pytest.approx(cut_dict["bl_std_cut"]["parameters"]["b"], 0.1) == 15
     assert (
         cut_dict["bl_pileup_cut"]["expression"] == "(baselineEmax<a) | (baselineEmax>b)"
     )
-    assert approx(cut_dict["bl_pileup_cut"]["parameters"]["a"], 0.1) == 7
-    assert approx(cut_dict["bl_pileup_cut"]["parameters"]["b"], 0.1) == 24
+    assert pytest.approx(cut_dict["bl_pileup_cut"]["parameters"]["a"], 0.1) == 7
+    assert pytest.approx(cut_dict["bl_pileup_cut"]["parameters"]["b"], 0.1) == 24
 
-    # check also works for df
-    df = lh5.read_as("ch1104000/dsp", data, "pd")
+    # check also works for data_df
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
 
-    df["baselineEmax"].to_numpy()
+    data_df["baselineEmax"].to_numpy()
 
-    cut_dict_df = dc.generate_cuts(df, cut_pars)
+    cut_dict_df = dc.generate_cuts(data_df, cut_pars)
 
     assert cut_dict_df == cut_dict
 
-    ids = dc.get_cut_indexes(df, cut_pars)
+    ids = dc.get_cut_indexes(data_df, cut_pars)
     ids_tbl = dc.get_cut_indexes(tbl, cut_pars)
 
     assert (ids == ids_tbl).all()

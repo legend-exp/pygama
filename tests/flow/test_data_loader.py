@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import lgdo
@@ -10,7 +12,7 @@ from pygama.flow import DataLoader
 config_dir = Path(__file__).parent / "configs"
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def test_dl(test_filedb):
     return DataLoader(f"{config_dir}/data-loader-config.json", test_filedb)
 
