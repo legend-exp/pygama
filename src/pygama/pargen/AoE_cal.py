@@ -725,14 +725,14 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
             out_dict[tstamp] = {
                 output_name: {
                     "expression": f"{aoe_param}/a",
-                    "local_dict": {"a": means[i]},
+                    "parameters": {"a": means[i]},
                 }
             }
         else:
             out_dict[tstamp] = {
                 output_name: {
                     "expression": f"{aoe_param} / ((timestamp - a ) * b + c) ",
-                    "local_dict": {
+                    "parameters": {
                         "a": times[i],
                         "b": (means[i + 1] - means[i]) / (times[i + 1] - times[i]),
                         "c": means[i],
@@ -963,7 +963,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "local_dict": {"a": t_dict},
+                                    "parameters": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -981,7 +981,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "local_dict": {"a": t_dict},
+                                    "parameters": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -996,7 +996,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "local_dict": {"a": t_dict},
+                                    "parameters": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -1011,7 +1011,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "local_dict": {"a": t_dict},
+                                    "parameters": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -1062,7 +1062,7 @@ class CalAoE:
                         {
                             output_name: {
                                 "expression": f"{aoe_param}/a",
-                                "local_dict": {
+                                "parameters": {
                                     "a": np.array(self.timecorr_df["mean"])[0]
                                 },
                             }
@@ -1127,7 +1127,7 @@ class CalAoE:
                     {
                         output_name: {
                             "expression": f"{aoe_param}/a",
-                            "local_dict": {"a": pars["mu"]},
+                            "parameters": {"a": pars["mu"]},
                         }
                     }
                 )
@@ -1141,7 +1141,7 @@ class CalAoE:
                 {
                     output_name: {
                         "expression": f"{aoe_param}/a",
-                        "local_dict": {"a": np.nan},
+                        "parameters": {"a": np.nan},
                     }
                 }
             )
@@ -1284,7 +1284,7 @@ class CalAoE:
             {
                 out_param: {
                     "expression": f"{aoe_param}*(1+a*{self.dt_param})",
-                    "local_dict": {"a": self.alpha},
+                    "parameters": {"a": self.alpha},
                 }
             }
         )
@@ -1561,15 +1561,15 @@ class CalAoE:
             {
                 corrected_param: {
                     "expression": f"{aoe_param}/({self.mean_func.string_func(self.cal_energy_param)})",
-                    "local_dict": mu_pars.to_dict(),
+                    "parameters": mu_pars.to_dict(),
                 },
                 f"_{classifier_param}_intermediate": {
                     "expression": f"({aoe_param})-({self.mean_func.string_func(self.cal_energy_param)})",
-                    "local_dict": mu_pars.to_dict(),
+                    "parameters": mu_pars.to_dict(),
                 },
                 classifier_param: {
                     "expression": f"(_{classifier_param}_intermediate)/({self.sigma_func.string_func(self.cal_energy_param)})",
-                    "local_dict": sig_pars.to_dict(),
+                    "parameters": sig_pars.to_dict(),
                 },
             }
         )
@@ -1686,7 +1686,7 @@ class CalAoE:
             {
                 output_cut_param: {
                     "expression": f"({aoe_param}>a)",
-                    "local_dict": {"a": self.low_cut_val},
+                    "parameters": {"a": self.low_cut_val},
                 }
             }
         )
@@ -1966,7 +1966,7 @@ class CalAoE:
             df["AoE_Timecorr"] = ne.evaluate(
                 override_dict["AoE_Timecorr"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Timecorr"]["local_dict"],
+                | override_dict["AoE_Timecorr"]["parameters"],
             ).view_as("np")
 
         if self.dt_corr is True:
@@ -1978,7 +1978,7 @@ class CalAoE:
                 df["AoE_DTcorr"] = ne.evaluate(
                     override_dict["AoE_DTcorr"]["expression"],
                     local_dict={col: df[col].to_numpy() for col in df.columns}
-                    | override_dict["AoE_DTcorr"]["local_dict"],
+                    | override_dict["AoE_DTcorr"]["parameters"],
                 ).view_as("np")
         else:
             aoe_param = "AoE_Timecorr"
@@ -2006,17 +2006,17 @@ class CalAoE:
             df["AoE_Corrected"] = ne.evaluate(
                 override_dict["AoE_Corrected"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Corrected"]["local_dict"],
+                | override_dict["AoE_Corrected"]["parameters"],
             ).view_as("np")
             df["_AoE_Classifier_intermediate"] = ne.evaluate(
                 override_dict["_AoE_Classifier_intermediate"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["_AoE_Classifier_intermediate"]["local_dict"],
+                | override_dict["_AoE_Classifier_intermediate"]["parameters"],
             ).view_as("np")
             df["AoE_Classifier"] = ne.evaluate(
                 override_dict["AoE_Classifier"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Classifier"]["local_dict"],
+                | override_dict["AoE_Classifier"]["parameters"],
             ).view_as("np")
 
         if override_dict is None or ("AoE_Low_Cut" not in override_dict):
@@ -2033,7 +2033,7 @@ class CalAoE:
             df["AoE_Low_Cut"] = ne.evaluate(
                 override_dict["AoE_Low_Cut"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Low_Cut"]["local_dict"],
+                | override_dict["AoE_Low_Cut"]["parameters"],
             ).view_as("np")
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
@@ -2044,7 +2044,7 @@ class CalAoE:
             {
                 "AoE_High_Side_Cut": {
                     "expression": "(a>AoE_Classifier)",
-                    "local_dict": {"a": self.high_cut_val},
+                    "parameters": {"a": self.high_cut_val},
                 }
             }
         )
@@ -2053,7 +2053,7 @@ class CalAoE:
             {
                 "AoE_Double_Sided_Cut": {
                     "expression": "(AoE_High_Side_Cut) & (AoE_Low_Cut)",
-                    "local_dict": {},
+                    "parameters": {},
                 }
             }
         )
@@ -2124,7 +2124,7 @@ def plot_aoe_mean_time(
         )
 
         grouped_means = [
-            cal_dict[time_param]["local_dict"]["a"]
+            cal_dict[time_param]["parameters"]["a"]
             for tstamp, cal_dict in aoe_class.cal_dicts.items()
         ]
         ax.step(
