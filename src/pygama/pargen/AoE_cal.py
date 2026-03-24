@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost
+from lgdo.types import Table
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
 
@@ -1922,7 +1923,7 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
-        override_dict = None
+        override_dict=None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -1961,8 +1962,10 @@ class CalAoE:
                 df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
             )
         else:
-            self.update_cal_dicts(
-                {"AoE_Timecorr": override_dict["AoE_Timecorr"]}
+            self.update_cal_dicts({"AoE_Timecorr": override_dict["AoE_Timecorr"]})
+            df["AoE_Timecorr"] = Table(df).eval(
+                override_dict["AoE_Timecorr"]["expression"],
+                parameters=override_dict["AoE_Timecorr"]["parameters"],
             )
 
         if self.dt_corr is True:
@@ -1970,13 +1973,18 @@ class CalAoE:
             if override_dict is None or "AoE_DTcorr" not in override_dict:
                 self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
             else:
-                self.update_cal_dicts(
-                {"AoE_DTcorr": override_dict["AoE_DTcorr"]}
-            )
+                self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
+                df["AoE_DTcorr"] = Table(df).eval(
+                    override_dict["AoE_DTcorr"]["expression"],
+                    parameters=override_dict["AoE_DTcorr"]["parameters"],
+                )
         else:
             aoe_param = "AoE_Timecorr"
 
-        if override_dict is None or ("AoE_Corrected" not in override_dict and "AoE_Classifier" not in override_dict):
+        if override_dict is None or (
+            "AoE_Corrected" not in override_dict
+            and "AoE_Classifier" not in override_dict
+        ):
             self.energy_correction(
                 df,
                 aoe_param,
@@ -1984,14 +1992,26 @@ class CalAoE:
                 classifier_param="AoE_Classifier",
             )
         else:
+            self.update_cal_dicts({"AoE_Corrected": override_dict["AoE_Corrected"]})
             self.update_cal_dicts(
-                {"AoE_Corrected": override_dict["AoE_Corrected"]}
+                {
+                    "_AoE_Classifier_intermediate": override_dict[
+                        "_AoE_Classifier_intermediate"
+                    ]
+                }
             )
-            self.update_cal_dicts(
-                {"_AoE_Classifier_intermediate": override_dict["_AoE_Classifier_intermediate"]}
+            self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
+            df["AoE_Corrected"] = Table(df).eval(
+                override_dict["AoE_Corrected"]["expression"],
+                parameters=override_dict["AoE_Corrected"]["parameters"],
             )
-            self.update_cal_dicts(
-                {"AoE_Classifier": override_dict["AoE_Classifier"]}
+            df["_AoE_Classifier_intermediate"] = Table(df).eval(
+                override_dict["_AoE_Classifier_intermediate"]["expression"],
+                parameters=override_dict["_AoE_Classifier_intermediate"]["parameters"],
+            )
+            df["AoE_Classifier"] = Table(df).eval(
+                override_dict["AoE_Classifier"]["expression"],
+                parameters=override_dict["AoE_Classifier"]["parameters"],
             )
 
         if override_dict is None or ("AoE_Low_Cut" not in override_dict):
@@ -2004,8 +2024,10 @@ class CalAoE:
                 output_cut_param="AoE_Low_Cut",
             )
         else:
-            self.update_cal_dicts(
-                {"AoE_Low_Cut": override_dict["AoE_Low_Cut"]}
+            self.update_cal_dicts({"AoE_Low_Cut": override_dict["AoE_Low_Cut"]})
+            df["AoE_Low_Cut"] = Table(df).eval(
+                override_dict["AoE_Low_Cut"]["expression"],
+                parameters=override_dict["AoE_Low_Cut"]["parameters"],
             )
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
