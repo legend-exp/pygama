@@ -1967,7 +1967,7 @@ class CalAoE:
                 override_dict["AoE_Timecorr"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["AoE_Timecorr"]["parameters"],
-            ).view_as("np")
+            )
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
@@ -1979,7 +1979,7 @@ class CalAoE:
                     override_dict["AoE_DTcorr"]["expression"],
                     local_dict={col: df[col].to_numpy() for col in df.columns}
                     | override_dict["AoE_DTcorr"]["parameters"],
-                ).view_as("np")
+                )
         else:
             aoe_param = "AoE_Timecorr"
 
@@ -2007,17 +2007,17 @@ class CalAoE:
                 override_dict["AoE_Corrected"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["AoE_Corrected"]["parameters"],
-            ).view_as("np")
+            )
             df["_AoE_Classifier_intermediate"] = ne.evaluate(
                 override_dict["_AoE_Classifier_intermediate"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["_AoE_Classifier_intermediate"]["parameters"],
-            ).view_as("np")
+            )
             df["AoE_Classifier"] = ne.evaluate(
                 override_dict["AoE_Classifier"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["AoE_Classifier"]["parameters"],
-            ).view_as("np")
+            )
 
         if override_dict is None or ("AoE_Low_Cut" not in override_dict):
             self.get_aoe_cut_fit(
@@ -2034,7 +2034,7 @@ class CalAoE:
                 override_dict["AoE_Low_Cut"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["AoE_Low_Cut"]["parameters"],
-            ).view_as("np")
+            )
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
