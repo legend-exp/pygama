@@ -12,10 +12,10 @@ from datetime import datetime
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numexpr as ne
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost
-from lgdo.types import Table
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
 
@@ -84,10 +84,10 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     :func:`~pygama.pargen.utils.convert_to_minuit` so they can be passed
     directly to :class:`~iminuit.Minuit`.
 
-    Parameters
+    local_dict
     ----------
     func
-        PDF to guess parameters for; one of ``aoe_peak``,
+        PDF to guess local_dict for; one of ``aoe_peak``,
         ``aoe_peak_with_high_tail``, ``exgauss``, or ``gaussian``.
     hist
         Histogram counts.
@@ -192,7 +192,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
     """
     Build parameter bounds for an A/E peak fit.
 
-    Parameters
+    local_dict
     ----------
     func
         PDF to bound; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -262,9 +262,9 @@ def aoe_peak_bounds(func, guess, **kwargs):
 
 def aoe_peak_fixed(func, **_kwargs):
     """
-    Return the fixed parameters and free-parameter mask for an A/E peak fit.
+    Return the fixed local_dict and free-parameter mask for an A/E peak fit.
 
-    Parameters
+    local_dict
     ----------
     func
         PDF to query; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -279,7 +279,7 @@ def aoe_peak_fixed(func, **_kwargs):
         boundaries ``x_lo`` and ``x_hi``).
     mask
         Boolean array aligned with ``func.required_args()``; ``True`` for
-        free parameters, ``False`` for fixed ones.
+        free local_dict, ``False`` for fixed ones.
     """
     if func in (aoe_peak, aoe_peak_with_high_tail):
         fixed = ["x_lo", "x_hi"]
@@ -356,7 +356,7 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    Parameters
+    local_dict
     ----------
     aoe
         A/E values.
@@ -611,7 +611,7 @@ def fit_time_means(tstamps, means, sigmas):
     """
     Fit the time dependence of the means of the A/E distribution
 
-    Parameters
+    local_dict
     ----------
     tstamps
         Timestamps of the data.
@@ -676,7 +676,7 @@ def average_consecutive(tstamps, means):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    Parameters
+    local_dict
     ----------
     tstamps
         Timestamps of the data.
@@ -701,7 +701,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    Parameters
+    local_dict
     ----------
     tstamps
         Timestamps of the data.
@@ -725,14 +725,14 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
             out_dict[tstamp] = {
                 output_name: {
                     "expression": f"{aoe_param}/a",
-                    "parameters": {"a": means[i]},
+                    "local_dict": {"a": means[i]},
                 }
             }
         else:
             out_dict[tstamp] = {
                 output_name: {
                     "expression": f"{aoe_param} / ((timestamp - a ) * b + c) ",
-                    "parameters": {
+                    "local_dict": {
                         "a": times[i],
                         "b": (means[i + 1] - means[i]) / (times[i + 1] - times[i]),
                         "c": means[i],
@@ -769,11 +769,11 @@ class CalAoE:
         debug_mode: bool = False,
     ):
         """
-        Parameters
+        local_dict
         ----------
 
         cal_dicts
-            Dictionary of calibration parameters; can be empty/None for a single run, or keyed by
+            Dictionary of calibration local_dict; can be empty/None for a single run, or keyed by
             timestamp in the format ``YYYYMMDDTHHMMSSZ`` for multiple runs.
         cal_energy_param
             Calibrated energy parameter to use for A/E calibrations and for determining peak events.
@@ -788,7 +788,7 @@ class CalAoE:
         dep_correct
             Whether to correct the double escape peak into the single-site band before cut determination.
         dt_cut
-            Dictionary of the drift time cut parameters in the form::
+            Dictionary of the drift time cut local_dict in the form::
 
                 {"out_param": "dt_cut", "hard": False}
 
@@ -841,7 +841,7 @@ class CalAoE:
         fallback when a timestamp is absent.  Otherwise *update_dict* is
         merged directly.
 
-        Parameters
+        local_dict
         ----------
         update_dict
             Dictionary of new calibration entries to merge.
@@ -871,7 +871,7 @@ class CalAoE:
         just perform a shift of the A/E parameter to 1 using the centroid otherwise for multiple
         runs the shift will be determined on the mode given in.
 
-        Parameters
+        local_dict
         ----------
 
         df
@@ -963,7 +963,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "parameters": {"a": t_dict},
+                                    "local_dict": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -981,7 +981,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "parameters": {"a": t_dict},
+                                    "local_dict": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -996,7 +996,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "parameters": {"a": t_dict},
+                                    "local_dict": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -1011,7 +1011,7 @@ class CalAoE:
                             tstamp: {
                                 output_name: {
                                     "expression": f"{aoe_param}/a",
-                                    "parameters": {"a": t_dict},
+                                    "local_dict": {"a": t_dict},
                                 }
                             }
                             for tstamp, t_dict in time_dict.items()
@@ -1062,7 +1062,7 @@ class CalAoE:
                         {
                             output_name: {
                                 "expression": f"{aoe_param}/a",
-                                "parameters": {
+                                "local_dict": {
                                     "a": np.array(self.timecorr_df["mean"])[0]
                                 },
                             }
@@ -1127,7 +1127,7 @@ class CalAoE:
                     {
                         output_name: {
                             "expression": f"{aoe_param}/a",
-                            "parameters": {"a": pars["mu"]},
+                            "local_dict": {"a": pars["mu"]},
                         }
                     }
                 )
@@ -1141,7 +1141,7 @@ class CalAoE:
                 {
                     output_name: {
                         "expression": f"{aoe_param}/a",
-                        "parameters": {"a": np.nan},
+                        "local_dict": {"a": np.nan},
                     }
                 }
             )
@@ -1159,7 +1159,7 @@ class CalAoE:
         fitting the A/E peaks in each of these regions. A simple linear correction is then applied
         to align these regions.
 
-        Parameters
+        local_dict
         ----------
 
         data
@@ -1284,7 +1284,7 @@ class CalAoE:
             {
                 out_param: {
                     "expression": f"{aoe_param}*(1+a*{self.dt_param})",
-                    "parameters": {"a": self.alpha},
+                    "local_dict": {"a": self.alpha},
                 }
             }
         )
@@ -1302,7 +1302,7 @@ class CalAoE:
         Does this by fitting the compton continuum in slices and then applies fits
         to the centroid and variance.
 
-        Parameters
+        local_dict
         ----------
 
         data
@@ -1561,15 +1561,15 @@ class CalAoE:
             {
                 corrected_param: {
                     "expression": f"{aoe_param}/({self.mean_func.string_func(self.cal_energy_param)})",
-                    "parameters": mu_pars.to_dict(),
+                    "local_dict": mu_pars.to_dict(),
                 },
                 f"_{classifier_param}_intermediate": {
                     "expression": f"({aoe_param})-({self.mean_func.string_func(self.cal_energy_param)})",
-                    "parameters": mu_pars.to_dict(),
+                    "local_dict": mu_pars.to_dict(),
                 },
                 classifier_param: {
                     "expression": f"(_{classifier_param}_intermediate)/({self.sigma_func.string_func(self.cal_energy_param)})",
-                    "parameters": sig_pars.to_dict(),
+                    "local_dict": sig_pars.to_dict(),
                 },
             }
         )
@@ -1590,7 +1590,7 @@ class CalAoE:
         Fits the resulting distribution and
         interpolates to get cut value at desired DEP survival fraction (typically 90%)
 
-        Parameters
+        local_dict
         ----------
 
         data
@@ -1686,7 +1686,7 @@ class CalAoE:
             {
                 output_cut_param: {
                     "expression": f"({aoe_param}>a)",
-                    "parameters": {"a": self.low_cut_val},
+                    "local_dict": {"a": self.low_cut_val},
                 }
             }
         )
@@ -1705,7 +1705,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks by sweeping through values
         of the A/E cut to show how this varies
 
-        Parameters
+        local_dict
         ----------
 
         data
@@ -1824,7 +1824,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks for the final
         A/E cut value
 
-        Parameters
+        local_dict
         ----------
 
         data
@@ -1929,7 +1929,7 @@ class CalAoE:
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
         energy correction, A/E cut determination and survival fraction calculation
 
-        Parameters
+        local_dict
         ----------
 
         df
@@ -1963,10 +1963,11 @@ class CalAoE:
             )
         else:
             self.update_cal_dicts({"AoE_Timecorr": override_dict["AoE_Timecorr"]})
-            df["AoE_Timecorr"] = Table(df).eval(
+            df["AoE_Timecorr"] = ne.evaluate(
                 override_dict["AoE_Timecorr"]["expression"],
-                parameters=override_dict["AoE_Timecorr"]["parameters"],
-            )
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Timecorr"]["local_dict"],
+            ).view_as("np")
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
@@ -1974,10 +1975,11 @@ class CalAoE:
                 self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
             else:
                 self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
-                df["AoE_DTcorr"] = Table(df).eval(
+                df["AoE_DTcorr"] = ne.evaluate(
                     override_dict["AoE_DTcorr"]["expression"],
-                    parameters=override_dict["AoE_DTcorr"]["parameters"],
-                )
+                    local_dict={col: df[col].to_numpy() for col in df.columns}
+                    | override_dict["AoE_DTcorr"]["local_dict"],
+                ).view_as("np")
         else:
             aoe_param = "AoE_Timecorr"
 
@@ -2001,18 +2003,21 @@ class CalAoE:
                 }
             )
             self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
-            df["AoE_Corrected"] = Table(df).eval(
+            df["AoE_Corrected"] = ne.evaluate(
                 override_dict["AoE_Corrected"]["expression"],
-                parameters=override_dict["AoE_Corrected"]["parameters"],
-            )
-            df["_AoE_Classifier_intermediate"] = Table(df).eval(
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Corrected"]["local_dict"],
+            ).view_as("np")
+            df["_AoE_Classifier_intermediate"] = ne.evaluate(
                 override_dict["_AoE_Classifier_intermediate"]["expression"],
-                parameters=override_dict["_AoE_Classifier_intermediate"]["parameters"],
-            )
-            df["AoE_Classifier"] = Table(df).eval(
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["_AoE_Classifier_intermediate"]["local_dict"],
+            ).view_as("np")
+            df["AoE_Classifier"] = ne.evaluate(
                 override_dict["AoE_Classifier"]["expression"],
-                parameters=override_dict["AoE_Classifier"]["parameters"],
-            )
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Classifier"]["local_dict"],
+            ).view_as("np")
 
         if override_dict is None or ("AoE_Low_Cut" not in override_dict):
             self.get_aoe_cut_fit(
@@ -2025,10 +2030,11 @@ class CalAoE:
             )
         else:
             self.update_cal_dicts({"AoE_Low_Cut": override_dict["AoE_Low_Cut"]})
-            df["AoE_Low_Cut"] = Table(df).eval(
+            df["AoE_Low_Cut"] = ne.evaluate(
                 override_dict["AoE_Low_Cut"]["expression"],
-                parameters=override_dict["AoE_Low_Cut"]["parameters"],
-            )
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Low_Cut"]["local_dict"],
+            ).view_as("np")
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
@@ -2038,7 +2044,7 @@ class CalAoE:
             {
                 "AoE_High_Side_Cut": {
                     "expression": "(a>AoE_Classifier)",
-                    "parameters": {"a": self.high_cut_val},
+                    "local_dict": {"a": self.high_cut_val},
                 }
             }
         )
@@ -2047,7 +2053,7 @@ class CalAoE:
             {
                 "AoE_Double_Sided_Cut": {
                     "expression": "(AoE_High_Side_Cut) & (AoE_Low_Cut)",
-                    "parameters": {},
+                    "local_dict": {},
                 }
             }
         )
@@ -2118,7 +2124,7 @@ def plot_aoe_mean_time(
         )
 
         grouped_means = [
-            cal_dict[time_param]["parameters"]["a"]
+            cal_dict[time_param]["local_dict"]["a"]
             for tstamp, cal_dict in aoe_class.cal_dicts.items()
         ]
         ax.step(
