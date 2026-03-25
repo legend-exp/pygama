@@ -48,15 +48,16 @@ calibration workflow.  The central class is :class:`~pygama.pargen.energy_cal.HP
 
 **Workflow:**
 
-1. ``find_peaks`` — searches the uncalibrated energy spectrum for local
-   maxima and matches them to the known gamma-ray lines supplied by the user,
-   using the ratio of peak spacings as a fingerprint.
-2. ``get_peaks`` — refines the peak positions around the initial guesses.
-3. ``fit_peaks`` — fits each peak with the
+1. ``hpge_find_energy_peaks`` — searches the uncalibrated energy spectrum
+   for local maxima and matches them to the known gamma-ray lines supplied
+   by the user, using the ratio of peak spacings as a fingerprint.
+2. ``hpge_get_energy_peaks`` — refines the peak positions around the initial
+   guesses.
+3. ``hpge_fit_energy_peaks`` — fits each peak with the
    :class:`~pygama.math.functions.hpge_peak.hpge_peak` model, returning
    the centroid, resolution, and peak shape parameters together with their
    uncertainties.
-4. ``calibrate`` — fits a polynomial (default degree 1) through the
+4. The calibration method fits a polynomial (default degree 1) through the
    ``(ADC centroid, keV energy)`` pairs to obtain the calibration function.
    The polynomial coefficients are stored in :attr:`~pygama.pargen.energy_cal.HPGeCalibration.results`.
 
