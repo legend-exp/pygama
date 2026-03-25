@@ -17,6 +17,7 @@ import pandas as pd
 from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import chi2
+from sklearn.covariance import MinCovDet
 
 import pygama.math.binned_fitting as pgf
 import pygama.math.histogram as pgh
@@ -1276,6 +1277,122 @@ class CalAoE:
             if isinstance(e, KeyboardInterrupt) or self.debug_mode:
                 raise (e)
             log.error("Drift time correction failed")
+            self.alpha = 0
+
+        data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
+        self.update_cal_dicts(
+            {
+                out_param: {
+                    "expression": f"{aoe_param}*(1+a*{self.dt_param})",
+                    "parameters": {"a": self.alpha},
+                }
+            }
+        )
+
+    def MCDrift(
+        self,
+        data: pd.DataFrame,
+        aoe_param,
+        out_param="AoE_DTcorr",
+    ):
+        """
+        Calculates the drift time correction for the A/E parameter using the
+        Minimum Covariance Determinant (MCD) method and PCA on the (AoE, dt_eff) distribution.
+
+        Parameters
+        ----------
+        data
+            DataFrame containing the data.
+        aoe_param
+            Name of the A/E parameter to use as starting point.
+        out_param
+            Name of the output parameter for the drift-time-corrected A/E.
+        """
+        log.info("Starting A/E drift time correction (MCD method)")
+        self.dt_res_dict = {}
+        try:
+            CC_events = data.query(
+                f"{self.fit_selection}&{self.cal_energy_param}=={self.cal_energy_param}&{aoe_param}=={aoe_param}"
+            )
+
+            peaks = np.array(
+                [1080, 1094, 1459, 1512, 1552, 1620, 1650, 1670, 1830, 2105]
+            )
+
+            CC_selection = (CC_events[self.cal_energy_param] >= 1000) & (
+                CC_events[self.cal_energy_param] <= 2400
+            )
+            for peak in peaks:
+                CC_selection &= ~(
+                    (CC_events[self.cal_energy_param] >= peak - 5)
+                    & (CC_events[self.cal_energy_param] <= peak + 5)
+                )
+            CC_events = CC_events[CC_selection]
+            aoe_vals = CC_events[aoe_param].to_numpy()
+            dt_vals = (
+                CC_events[self.dt_param].to_numpy() / 1000.0
+            )  # Compute alpha in us for more stability
+            mcd_data = np.column_stack([aoe_vals, dt_vals])
+
+            # --- find AoE range ---
+            classifier = mcd_data[:, 0]
+            xrange = (0.9, 1.1)
+            bin_width_x = (
+                0.5
+                * (np.nanpercentile(classifier, 75) - np.nanpercentile(classifier, 25))
+                * len(classifier) ** (-1 / 3)
+            )
+            xbins = int((xrange[1] - xrange[0]) / bin_width_x)
+            counts, bin_edges = np.histogram(
+                classifier, bins=xbins, range=xrange, density=True
+            )
+            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+            peak_position = bin_centers[np.argmax(counts)]
+            half_max = np.max(counts) / 2.0
+            indices_above_half = np.where(counts >= half_max)[0]
+            bw = bin_centers[1] - bin_centers[0]
+            fwhm = (
+                bin_centers[indices_above_half[-1]]
+                - bin_centers[indices_above_half[0]]
+                + bw
+            )
+            x_low = peak_position - 2 * fwhm
+            x_high = peak_position + 3 * fwhm
+
+            # --- MCD fit ---
+            in_x = (mcd_data[:, 0] >= x_low) & (mcd_data[:, 0] <= x_high)
+            in_y = (mcd_data[:, 1] >= 0) & (
+                mcd_data[:, 1] <= np.quantile(mcd_data[:, 1], 0.999)
+            )
+            subset = mcd_data[in_x & in_y]
+            mcd = MinCovDet().fit(subset)
+
+            # --- PCA slope ---
+            _, eigvecs = np.linalg.eigh(mcd.covariance_)
+            principal = eigvecs[:, -1]
+            if abs(principal[0]) > abs(principal[1]):
+                log.warning(
+                    "Principal eigenvector not aligned with AoE axis (|v_aoe|=%.4f > |v_dt|=%.4f), "
+                    "switching to minor eigenvector",
+                    abs(principal[0]),
+                    abs(principal[1]),
+                )
+                principal = eigvecs[:, -2]
+
+            if abs(principal[1]) < 1e-10:
+                msg = "Eigenvector has near-zero dt component, alpha set to 0"
+                raise ValueError(msg)
+
+            slope_us = principal[0] / principal[1]
+
+            self.alpha = -slope_us / 1000.0
+            self.dt_res_dict["alpha"] = self.alpha
+            log.info("dtcorr (MCD) successful alpha: %s", self.alpha)
+
+        except BaseException as e:
+            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
+                raise e
+            log.error("Drift time correction (MCD) failed")
             self.alpha = 0
 
         data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
