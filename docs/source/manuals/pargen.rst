@@ -162,7 +162,7 @@ Key functions:
 
 * :func:`~pygama.pargen.dsp_optimize.run_one_dsp` — run a single DSP
   iteration on a data table and compute the FOM.
-* :func:`~pygama.pargen.dsp_optimize.optimise_energy_filter` — Bayesian
+* :func:`~pygama.pargen.dsp_optimize.run_bayesian_optimisation` — Bayesian
   optimisation loop over the DSP parameter space.
 
 .. automodule:: pygama.pargen.dsp_optimize
