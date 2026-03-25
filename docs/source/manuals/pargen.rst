@@ -77,7 +77,7 @@ AoE_cal
 parameter used to discriminate single-site events (e.g. double-beta decay
 signal) from multi-site Compton-scatter backgrounds.
 
-The central class is :class:`~pygama.pargen.AoE_cal.AoECalibration`.
+The central class is :class:`~pygama.pargen.AoE_cal.CalAoE`.
 
 **Key steps:**
 
