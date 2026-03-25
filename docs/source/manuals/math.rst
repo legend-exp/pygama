@@ -90,21 +90,21 @@ most commonly used in HPGe peak fitting:
 
    * - Distribution
      - Description
-   * - :class:`~pygama.math.functions.hpge_peak.hpge_peak`
+   * - :obj:`~pygama.math.functions.hpge_peak.hpge_peak`
      - Full HPGe peak model: a Gaussian signal component convolved with a
        low-energy tail (exGaussian), sitting on a step-function background
        with a linear slope.  The standard model for fitting calibration peaks.
-   * - :class:`~pygama.math.functions.gauss_on_step.gauss_on_step`
+   * - :obj:`~pygama.math.functions.gauss_on_step.gauss_on_step`
      - Gaussian signal on a step-function background.
-   * - :class:`~pygama.math.functions.gauss_on_linear.gauss_on_linear`
+   * - :obj:`~pygama.math.functions.gauss_on_linear.gauss_on_linear`
      - Gaussian signal on a linear background.
-   * - :class:`~pygama.math.functions.gauss_on_exponential.gauss_on_exponential`
+   * - :obj:`~pygama.math.functions.gauss_on_exponential.gauss_on_exponential`
      - Gaussian signal on an exponential background.
-   * - :class:`~pygama.math.functions.gauss_on_exgauss.gauss_on_exgauss`
+   * - :obj:`~pygama.math.functions.gauss_on_exgauss.gauss_on_exgauss`
      - Gaussian signal on an exGaussian background.
-   * - :class:`~pygama.math.functions.gauss_on_uniform.gauss_on_uniform`
+   * - :obj:`~pygama.math.functions.gauss_on_uniform.gauss_on_uniform`
      - Gaussian signal on a uniform background.
-   * - :class:`~pygama.math.functions.triple_gauss_on_double_step.triple_gauss_on_double_step`
+   * - :obj:`~pygama.math.functions.triple_gauss_on_double_step.triple_gauss_on_double_step`
      - Three Gaussian components on a double step background; used for
        complex multi-peak regions.
 
@@ -116,25 +116,25 @@ Primitive distributions:
 
    * - Distribution
      - Description
-   * - :class:`~pygama.math.functions.gauss.gaussian`
+   * - :obj:`~pygama.math.functions.gauss.gaussian`
      - Normal (Gaussian) distribution.
-   * - :class:`~pygama.math.functions.exgauss.exgauss`
+   * - :obj:`~pygama.math.functions.exgauss.exgauss`
      - Exponentially modified Gaussian (exGaussian); models the low-energy
        tail of HPGe peaks due to incomplete charge collection.
-   * - :class:`~pygama.math.functions.crystal_ball.crystal_ball`
+   * - :obj:`~pygama.math.functions.crystal_ball.crystal_ball`
      - Crystal Ball function; a Gaussian with a power-law low-energy tail.
-   * - :class:`~pygama.math.functions.step.step`
+   * - :obj:`~pygama.math.functions.step.step`
      - Step (Heaviside-convolved-with-Gaussian) background.
-   * - :class:`~pygama.math.functions.exponential.exponential`
+   * - :obj:`~pygama.math.functions.exponential.exponential`
      - Exponential background.
-   * - :class:`~pygama.math.functions.linear.linear`
+   * - :obj:`~pygama.math.functions.linear.linear`
      - Linear background.
-   * - :class:`~pygama.math.functions.uniform.uniform`
+   * - :obj:`~pygama.math.functions.uniform.uniform`
      - Uniform (flat) distribution.
-   * - :class:`~pygama.math.functions.moyal.moyal`
+   * - :obj:`~pygama.math.functions.moyal.moyal`
      - Moyal distribution; approximates the Landau distribution for
        energy-loss processes.
-   * - :class:`~pygama.math.functions.polynomial.nb_poly`
+   * - :obj:`~pygama.math.functions.polynomial.nb_poly`
      - Polynomial of arbitrary degree.
 
 .. automodule:: pygama.math.distributions
@@ -200,7 +200,7 @@ hpge_peak_fitting
 
 :mod:`pygama.math.hpge_peak_fitting` contains higher-level routines that
 combine the distribution and fitting machinery to fit the standard HPGe peak
-model (:class:`~pygama.math.functions.hpge_peak.hpge_peak`) to data, with
+model (:obj:`~pygama.math.functions.hpge_peak.hpge_peak`) to data, with
 automatic initial-parameter estimation.
 
 .. automodule:: pygama.math.hpge_peak_fitting
