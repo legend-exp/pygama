@@ -54,7 +54,7 @@ calibration workflow.  The central class is :class:`~pygama.pargen.energy_cal.HP
 2. ``hpge_get_energy_peaks`` — refines the peak positions around the initial
    guesses.
 3. ``hpge_fit_energy_peaks`` — fits each peak with the
-   :class:`~pygama.math.functions.hpge_peak.hpge_peak` model, returning
+   :obj:`~pygama.math.functions.hpge_peak.hpge_peak` model, returning
    the centroid, resolution, and peak shape parameters together with their
    uncertainties.
 4. The calibration method fits a polynomial (default degree 1) through the
