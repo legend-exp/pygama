@@ -54,8 +54,9 @@ mandatory keys:
         ``numexpr``, and references to columns in the input table.
 
     ``parameters`` *(optional)*
-        A mapping of parameter name to value (as a string).  These are
-        substituted into the expression before evaluation, allowing
+        A mapping of parameter name to scalar value (e.g. numbers or strings)
+        supported by :meth:`~lgdo.types.table.Table.eval`.  These are made
+        available to the expression under their given names, allowing
         calibration constants to be stored alongside the expression without
         hard-coding them.
 
