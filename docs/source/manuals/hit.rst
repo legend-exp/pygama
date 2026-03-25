@@ -88,8 +88,11 @@ ratio ``AoE``:
     }
 
 Note that ``AoE`` references ``calE``, which is itself a derived column.
-Operations are evaluated in the order they are defined, so forward references
-are supported.
+Within a single table, :func:`build_hit` automatically orders operations based
+on their expression dependencies, so columns are evaluated in a
+dependency-respecting order rather than strictly in JSON insertion order.
+This dependency-based reordering is what allows forward references like this
+to be supported.
 
 Per-table configuration
 ^^^^^^^^^^^^^^^^^^^^^^^
