@@ -1329,9 +1329,9 @@ class CalAoE:
                     & (CC_events[self.cal_energy_param] <= peak + 5)
                 )
             CC_events = CC_events[CC_selection]
-            aoe_vals = CC_events[aoe_param].values
+            aoe_vals = CC_events[aoe_param].to_numpy()
             dt_vals = (
-                CC_events[self.dt_param].values / 1000.0
+                CC_events[self.dt_param].to_numpy() / 1000.0
             )  # Compute alpha in us for more stability
             mcd_data = np.column_stack([aoe_vals, dt_vals])
 
@@ -1381,9 +1381,8 @@ class CalAoE:
                 principal = eigvecs[:, -2]
 
             if abs(principal[1]) < 1e-10:
-                raise ValueError(
-                    "Eigenvector has near-zero dt component, alpha set to 0"
-                )
+                msg = "Eigenvector has near-zero dt component, alpha set to 0"
+                raise ValueError(msg)
 
             slope_us = principal[0] / principal[1]
 
