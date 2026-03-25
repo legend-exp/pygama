@@ -113,3 +113,4 @@ build_hit
 .. automodule:: pygama.hit.build_hit
    :members:
    :undoc-members:
+   :no-index:

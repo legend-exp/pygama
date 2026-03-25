@@ -45,6 +45,7 @@ build_tcm
 .. automodule:: pygama.evt.build_tcm
    :members:
    :undoc-members:
+   :no-index:
 
 build_evt
 ^^^^^^^^^
@@ -52,6 +53,7 @@ build_evt
 .. automodule:: pygama.evt.build_evt
    :members:
    :undoc-members:
+   :no-index:
 
 tcm
 ^^^
@@ -59,6 +61,7 @@ tcm
 .. automodule:: pygama.evt.tcm
    :members:
    :undoc-members:
+   :no-index:
 
 aggregators
 ^^^^^^^^^^^
@@ -88,6 +91,7 @@ Available aggregators:
 .. automodule:: pygama.evt.aggregators
    :members:
    :undoc-members:
+   :no-index:
 
 utils
 ^^^^^
@@ -95,6 +99,7 @@ utils
 .. automodule:: pygama.evt.utils
    :members:
    :undoc-members:
+   :no-index:
 
 .. _evt-modules:
 
@@ -139,6 +144,7 @@ geds
 .. automodule:: pygama.evt.modules.geds
    :members:
    :undoc-members:
+   :no-index:
 
 spms
 """"
@@ -154,6 +160,7 @@ spms
 .. automodule:: pygama.evt.modules.spms
    :members:
    :undoc-members:
+   :no-index:
 
 larveto
 """""""
@@ -169,6 +176,7 @@ for the LEGEND-200 liquid-argon veto.
 .. automodule:: pygama.evt.modules.larveto
    :members:
    :undoc-members:
+   :no-index:
 
 legend
 """"""
@@ -180,6 +188,7 @@ configuration.
 .. automodule:: pygama.evt.modules.legend
    :members:
    :undoc-members:
+   :no-index:
 
 xtalk
 """""
@@ -190,6 +199,7 @@ used by :mod:`~pygama.evt.modules.geds`.
 .. automodule:: pygama.evt.modules.xtalk
    :members:
    :undoc-members:
+   :no-index:
 
 .. _evt-config:
 

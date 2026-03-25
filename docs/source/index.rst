@@ -46,6 +46,16 @@ If you plan to develop *pygama*, refer to the :doc:`developer's guide
 Next steps
 ----------
 
+Start with the :doc:`package overview <overview>` for a high-level description
+of *pygama*'s data tiers and main sub-packages.  Then dive into the
+:doc:`module guides <manuals/index>` for detailed documentation of each
+sub-package:
+
+* :doc:`manuals/hit` — hit-tier production from DSP parameters
+* :doc:`manuals/evt` — TCM and event-tier building
+* :doc:`manuals/math` — statistical distributions and fitting utilities
+* :doc:`manuals/pargen` — detector calibration and parameter generation
+
 .. toctree::
    :maxdepth: 1
 

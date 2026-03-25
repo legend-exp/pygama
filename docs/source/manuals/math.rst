@@ -70,6 +70,7 @@ Key functions:
 .. automodule:: pygama.math.histogram
    :members:
    :undoc-members:
+   :no-index:
 
 distributions
 ^^^^^^^^^^^^^
@@ -139,6 +140,7 @@ Primitive distributions:
 .. automodule:: pygama.math.distributions
    :members:
    :undoc-members:
+   :no-index:
 
 functions
 ^^^^^^^^^
@@ -149,6 +151,7 @@ implementations.  Each sub-module defines one distribution.
 .. automodule:: pygama.math.functions
    :members:
    :undoc-members:
+   :no-index:
 
 binned_fitting
 ^^^^^^^^^^^^^^
@@ -172,6 +175,7 @@ Additional helpers:
 .. automodule:: pygama.math.binned_fitting
    :members:
    :undoc-members:
+   :no-index:
 
 unbinned_fitting
 ^^^^^^^^^^^^^^^^
@@ -189,6 +193,7 @@ result.
 .. automodule:: pygama.math.unbinned_fitting
    :members:
    :undoc-members:
+   :no-index:
 
 hpge_peak_fitting
 ^^^^^^^^^^^^^^^^^
@@ -201,6 +206,7 @@ automatic initial-parameter estimation.
 .. automodule:: pygama.math.hpge_peak_fitting
    :members:
    :undoc-members:
+   :no-index:
 
 least_squares
 ^^^^^^^^^^^^^
@@ -211,6 +217,7 @@ used internally by :mod:`pygama.pargen.energy_cal`.
 .. automodule:: pygama.math.least_squares
    :members:
    :undoc-members:
+   :no-index:
 
 units
 ^^^^^
@@ -221,6 +228,7 @@ units
 .. automodule:: pygama.math.units
    :members:
    :undoc-members:
+   :no-index:
 
 utils
 ^^^^^
@@ -228,3 +236,4 @@ utils
 .. automodule:: pygama.math.utils
    :members:
    :undoc-members:
+   :no-index:

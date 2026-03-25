@@ -67,6 +67,7 @@ file.
 .. automodule:: pygama.pargen.energy_cal
    :members:
    :undoc-members:
+   :no-index:
 
 AoE_cal
 ^^^^^^^
@@ -94,6 +95,7 @@ The central class is :class:`~pygama.pargen.AoE_cal.AoECalibration`.
 .. automodule:: pygama.pargen.AoE_cal
    :members:
    :undoc-members:
+   :no-index:
 
 lq_cal
 ^^^^^^
@@ -117,6 +119,7 @@ The central class is :class:`~pygama.pargen.lq_cal.LQCal`.
 .. automodule:: pygama.pargen.lq_cal
    :members:
    :undoc-members:
+   :no-index:
 
 data_cleaning
 ^^^^^^^^^^^^^
@@ -139,6 +142,7 @@ Key functions:
 .. automodule:: pygama.pargen.data_cleaning
    :members:
    :undoc-members:
+   :no-index:
 
 dsp_optimize
 ^^^^^^^^^^^^
@@ -163,6 +167,7 @@ Key functions:
 .. automodule:: pygama.pargen.dsp_optimize
    :members:
    :undoc-members:
+   :no-index:
 
 noise_optimization
 ^^^^^^^^^^^^^^^^^^
@@ -179,6 +184,7 @@ then fitted to the grid to locate the global minimum.
 .. automodule:: pygama.pargen.noise_optimization
    :members:
    :undoc-members:
+   :no-index:
 
 energy_optimisation
 ^^^^^^^^^^^^^^^^^^^
@@ -189,6 +195,7 @@ energy-resolution optimisation that complement :mod:`~pygama.pargen.dsp_optimize
 .. automodule:: pygama.pargen.energy_optimisation
    :members:
    :undoc-members:
+   :no-index:
 
 survival_fractions
 ^^^^^^^^^^^^^^^^^^
@@ -209,6 +216,7 @@ Key functions:
 .. automodule:: pygama.pargen.survival_fractions
    :members:
    :undoc-members:
+   :no-index:
 
 pz_correct
 ^^^^^^^^^^
@@ -220,6 +228,7 @@ filters.
 .. automodule:: pygama.pargen.pz_correct
    :members:
    :undoc-members:
+   :no-index:
 
 dplms_ge_dict
 ^^^^^^^^^^^^^
@@ -231,6 +240,7 @@ Filter) DSP processor for germanium detectors.
 .. automodule:: pygama.pargen.dplms_ge_dict
    :members:
    :undoc-members:
+   :no-index:
 
 utils
 ^^^^^
@@ -238,3 +248,4 @@ utils
 .. automodule:: pygama.pargen.utils
    :members:
    :undoc-members:
+   :no-index:
