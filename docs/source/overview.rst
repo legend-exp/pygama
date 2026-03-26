@@ -55,7 +55,7 @@ of the processing chain.
 
 Applies user-defined columnar transformations to ``dsp``-tier tables to
 produce the ``hit`` tier.  Expressions are given as strings (evaluated via
-:meth:`~lgdo.types.table.Table.eval`) and configured through a JSON
+:meth:`~lgdo.types.table.Table.eval`) and configured through a JSON/YAML
 dictionary, making the tier highly configurable without writing Python code.
 See :doc:`manuals/hit` for a detailed description.
 
@@ -65,7 +65,7 @@ Groups hit-level data from multiple channels and multiple detector types into
 physics events using a Time Coincidence Map (TCM).  The main entry points are
 :func:`~pygama.evt.build_tcm`, which builds the TCM from coincident hits, and
 :func:`~pygama.evt.build_evt`, which evaluates per-event quantities by
-aggregating across channels according to a JSON configuration.  Detector-
+aggregating across channels according to a JSON/YAML configuration.  Detector-
 specific processors for HPGe, SiPM and LAr veto subsystems live in the
 :mod:`pygama.evt.modules` sub-package.
 See :doc:`manuals/evt` for a detailed description.
@@ -85,7 +85,7 @@ See :doc:`manuals/math` for a detailed description.
 Routines for calibrating detector parameters from data: HPGe energy
 calibration, amplitude-over-energy (A/E) multi-site-event discrimination,
 late-charge (LQ) cut calibration, DSP-filter optimisation, and data-quality
-cuts.  Results are typically stored as JSON parameter files that are then
+cuts.  Results are typically stored as JSON/YAML parameter files that are then
 consumed by :mod:`pygama.hit`.
 See :doc:`manuals/pargen` for a detailed description.
 
@@ -100,21 +100,15 @@ overall processing chain::
     legend-daq2lh5          dspeed               pygama
     ┌─────────────┐       ┌──────────┐     ┌─────────────────────────────────┐
     │  raw tier   │──────▶│ dsp tier │────▶│  hit tier   (pygama.hit)        │
-    │  (decoded)  │       │ (wvf     │     │  (calibrated quantities)        │
-    └─────────────┘       │  params) │     └────────────────┬────────────────┘
-                          └──────────┘                      │
-                                                            │ pygama.evt.build_tcm
-                                                            ▼
-                                                    ┌───────────────┐
-                                                    │   tcm tier    │
-                                                    │ (coincidences)│
-                                                    └───────┬───────┘
-                                                            │ pygama.evt.build_evt
-                                                            ▼
-                                                    ┌───────────────┐
-                                                    │   evt tier    │
-                                                    │ (event-level) │
-                                                    └───────────────┘
+    │  (decoded)  │─┐     │ (wvf     │     │  (calibrated quantities)        │
+    └─────────────┘ │     │  params) │     └────────────────┬────────────────┘
+                    │     └──────────┘                      │
+                    │ pygama.evt.build_tcm                   │ pygama.evt.build_evt
+                    ▼                                        ▼
+            ┌───────────────┐                      ┌────────────────┐
+            │   tcm tier    │─────────────────────▶│   evt tier     │
+            │ (coincidences)│                      │  (event-level) │
+            └───────────────┘                      └────────────────┘
 
     pygama.math and pygama.pargen support all stages above.
 
