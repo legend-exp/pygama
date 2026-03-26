@@ -447,12 +447,13 @@ class HPGeCalibration:
     def hpge_cal_energy_peak_tops(
         self,
         e_uncal,
-        n_sigmas=1.2,  # noqa: ARG002
+        n_sigmas=20,
         peaks_kev=None,
         default_n_bins=50,
         n_events=None,
         allowed_p_val=0.01,
         update_cal_pars=True,
+        fit_width_bound_kev=15,
     ):
         """
         Perform energy calibration for HPGe detector using peak fitting.
@@ -533,7 +534,21 @@ class HPGeCalibration:
             pt_pars, _ = hpge_fit_energy_peak_tops(hist, bins, var, [loc], n_to_fit=5)
             # Drop failed fits
             if pt_pars[0] is not None:
-                range_uncal = (float(pt_pars[0][1]) * 20, float(pt_pars[0][1]) * 20)
+                range_uncal = (
+                    float(pt_pars[0][1]) * n_sigmas,
+                    float(pt_pars[0][1]) * n_sigmas,
+                )
+                if fit_width_bound_kev is not None:
+                    range_uncal = (
+                        min(
+                            fit_width_bound_kev / self.pars[1],
+                            range_uncal[0],
+                        ),
+                        min(
+                            fit_width_bound_kev / self.pars[1],
+                            range_uncal[1],
+                        ),
+                    )
                 n_bins = default_n_bins
             else:
                 range_uncal = None
@@ -2930,6 +2945,7 @@ def hpge_fit_energy_scale(mus, mu_vars, energies_kev, deg=0, fixed=None):
             .coef
         )
         c = cost.LeastSquares(energies_kev, mus, np.sqrt(mu_vars), poly_wrapper)
+        c.loss = "soft_l1"
         if fixed is not None:
             for idx, val in fixed.items():
                 if val is True or val is None:
@@ -3019,6 +3035,7 @@ def hpge_fit_energy_cal_func(
         c = cost.LeastSquares(
             mus[mask], energies_kev[mask], e_weights[mask], poly_wrapper
         )
+        c.loss = "soft_l1"
         m = Minuit(c, *poly_pars)
         if fixed is not None:
             for idx in list(fixed):
