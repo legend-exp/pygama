@@ -115,9 +115,9 @@ receives four positional arguments that are injected automatically by
 .. code-block:: python
 
     def my_processor(
-        datainfo,       # DataInfo: tier names, file names, HDF5 groups
-        tcm,            # TCMData: table_key and row_in_table arrays
-        table_names,    # list[str]: hit table names for this event
+        datainfo,  # DataInfo: tier names, file names, HDF5 groups
+        tcm,  # TCMData: table_key and row_in_table arrays
+        table_names,  # list[str]: hit table names for this event
         channel_mapping,  # dict | None: maps channel keys to detector names
         *,  # all following arguments are keyword-only
         arg1,
