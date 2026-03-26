@@ -109,15 +109,16 @@ modules — detector-specific processors
 The :mod:`pygama.evt.modules` sub-package provides ready-made *event
 processors* — callables with a standardised signature that can be invoked
 directly from the :func:`build_evt` JSON configuration.  Each processor
-receives three positional arguments that are injected automatically by
+receives four positional arguments that are injected automatically by
 :func:`build_evt`:
 
 .. code-block:: python
 
     def my_processor(
-        datainfo,  # DataInfo: tier names, file names, HDF5 groups
-        tcm,  # TCMData: table_key and row_in_table arrays
-        table_names,  # list[str]: hit table names for this event
+        datainfo,       # DataInfo: tier names, file names, HDF5 groups
+        tcm,            # TCMData: table_key and row_in_table arrays
+        table_names,    # list[str]: hit table names for this event
+        channel_mapping,  # dict | None: maps channel keys to detector names
         *,  # all following arguments are keyword-only
         arg1,
         arg2,
