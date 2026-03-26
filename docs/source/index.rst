@@ -3,7 +3,7 @@ Welcome to pygama's documentation!
 
 *pygama* is a Python package for:
 
-* optimizing digital signal processing (DSP) routines and tuning associated analysis parameters
+* optimizing those digital signal processing (DSP) routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
 Getting started
@@ -53,6 +53,17 @@ sub-package:
 * :doc:`manuals/evt` — TCM and event-tier building
 * :doc:`manuals/math` — statistical distributions and fitting utilities
 * :doc:`manuals/pargen` — detector calibration and parameter generation
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Documentation
+
+   overview
+
+.. toctree::
+   :maxdepth: 2
+
+   manuals/index
 
 .. toctree::
    :maxdepth: 1
