@@ -59,17 +59,6 @@ sub-package:
 .. toctree::
    :maxdepth: 1
 
-   overview
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Module guides
-
-   manuals/index
-
-.. toctree::
-   :maxdepth: 1
-
    Package API reference <api/modules>
 
 .. toctree::

@@ -100,7 +100,7 @@ overall processing chain::
     legend-daq2lh5          dspeed               pygama
     ┌─────────────┐       ┌──────────┐     ┌─────────────────────────────────┐
     │  raw tier   │──────▶│ dsp tier │────▶│  hit tier   (pygama.hit)        │
-    │  (decoded)  │─┐     │ (wvf     │     │  (calibrated quantities)        │
+    │  (decoded)  │─┐     │ (wf     │     │  (calibrated quantities)        │
     └─────────────┘ │     │  params) │     └────────────────┬────────────────┘
                     │     └──────────┘                      │
                     │ pygama.evt.build_tcm                   │ pygama.evt.build_evt
