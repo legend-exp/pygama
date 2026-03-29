@@ -84,10 +84,10 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     :func:`~pygama.pargen.utils.convert_to_minuit` so they can be passed
     directly to :class:`~iminuit.Minuit`.
 
-    local_dict
+    parameters
     ----------
     func
-        PDF to guess local_dict for; one of ``aoe_peak``,
+        PDF to guess parameters for; one of ``aoe_peak``,
         ``aoe_peak_with_high_tail``, ``exgauss``, or ``gaussian``.
     hist
         Histogram counts.
@@ -192,7 +192,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
     """
     Build parameter bounds for an A/E peak fit.
 
-    local_dict
+    parameters
     ----------
     func
         PDF to bound; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -262,9 +262,9 @@ def aoe_peak_bounds(func, guess, **kwargs):
 
 def aoe_peak_fixed(func, **_kwargs):
     """
-    Return the fixed local_dict and free-parameter mask for an A/E peak fit.
+    Return the fixed parameters and free-parameter mask for an A/E peak fit.
 
-    local_dict
+    parameters
     ----------
     func
         PDF to query; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -279,7 +279,7 @@ def aoe_peak_fixed(func, **_kwargs):
         boundaries ``x_lo`` and ``x_hi``).
     mask
         Boolean array aligned with ``func.required_args()``; ``True`` for
-        free local_dict, ``False`` for fixed ones.
+        free parameters, ``False`` for fixed ones.
     """
     if func in (aoe_peak, aoe_peak_with_high_tail):
         fixed = ["x_lo", "x_hi"]
@@ -356,7 +356,7 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    local_dict
+    parameters
     ----------
     aoe
         A/E values.
@@ -611,7 +611,7 @@ def fit_time_means(tstamps, means, sigmas):
     """
     Fit the time dependence of the means of the A/E distribution
 
-    local_dict
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -676,7 +676,7 @@ def average_consecutive(tstamps, means):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    local_dict
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -701,7 +701,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    local_dict
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -769,11 +769,11 @@ class CalAoE:
         debug_mode: bool = False,
     ):
         """
-        local_dict
+        parameters
         ----------
 
         cal_dicts
-            Dictionary of calibration local_dict; can be empty/None for a single run, or keyed by
+            Dictionary of calibration parameters; can be empty/None for a single run, or keyed by
             timestamp in the format ``YYYYMMDDTHHMMSSZ`` for multiple runs.
         cal_energy_param
             Calibrated energy parameter to use for A/E calibrations and for determining peak events.
@@ -788,7 +788,7 @@ class CalAoE:
         dep_correct
             Whether to correct the double escape peak into the single-site band before cut determination.
         dt_cut
-            Dictionary of the drift time cut local_dict in the form::
+            Dictionary of the drift time cut parameters in the form::
 
                 {"out_param": "dt_cut", "hard": False}
 
@@ -841,7 +841,7 @@ class CalAoE:
         fallback when a timestamp is absent.  Otherwise *update_dict* is
         merged directly.
 
-        local_dict
+        parameters
         ----------
         update_dict
             Dictionary of new calibration entries to merge.
@@ -871,7 +871,7 @@ class CalAoE:
         just perform a shift of the A/E parameter to 1 using the centroid otherwise for multiple
         runs the shift will be determined on the mode given in.
 
-        local_dict
+        parameters
         ----------
 
         df
@@ -1159,7 +1159,7 @@ class CalAoE:
         fitting the A/E peaks in each of these regions. A simple linear correction is then applied
         to align these regions.
 
-        local_dict
+        parameters
         ----------
 
         data
@@ -1302,7 +1302,7 @@ class CalAoE:
         Does this by fitting the compton continuum in slices and then applies fits
         to the centroid and variance.
 
-        local_dict
+        parameters
         ----------
 
         data
@@ -1590,7 +1590,7 @@ class CalAoE:
         Fits the resulting distribution and
         interpolates to get cut value at desired DEP survival fraction (typically 90%)
 
-        local_dict
+        parameters
         ----------
 
         data
@@ -1705,7 +1705,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks by sweeping through values
         of the A/E cut to show how this varies
 
-        local_dict
+        parameters
         ----------
 
         data
@@ -1824,7 +1824,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks for the final
         A/E cut value
 
-        local_dict
+        parameters
         ----------
 
         data
@@ -1929,7 +1929,7 @@ class CalAoE:
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
         energy correction, A/E cut determination and survival fraction calculation
 
-        local_dict
+        parameters
         ----------
 
         df
