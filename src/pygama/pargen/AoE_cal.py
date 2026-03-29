@@ -12,6 +12,7 @@ from datetime import datetime
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numexpr as ne
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost
@@ -83,7 +84,7 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     :func:`~pygama.pargen.utils.convert_to_minuit` so they can be passed
     directly to :class:`~iminuit.Minuit`.
 
-    Parameters
+    parameters
     ----------
     func
         PDF to guess parameters for; one of ``aoe_peak``,
@@ -191,7 +192,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
     """
     Build parameter bounds for an A/E peak fit.
 
-    Parameters
+    parameters
     ----------
     func
         PDF to bound; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -263,7 +264,7 @@ def aoe_peak_fixed(func, **_kwargs):
     """
     Return the fixed parameters and free-parameter mask for an A/E peak fit.
 
-    Parameters
+    parameters
     ----------
     func
         PDF to query; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -355,7 +356,7 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    Parameters
+    parameters
     ----------
     aoe
         A/E values.
@@ -610,7 +611,7 @@ def fit_time_means(tstamps, means, sigmas):
     """
     Fit the time dependence of the means of the A/E distribution
 
-    Parameters
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -675,7 +676,7 @@ def average_consecutive(tstamps, means):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    Parameters
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -700,7 +701,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    Parameters
+    parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -768,7 +769,7 @@ class CalAoE:
         debug_mode: bool = False,
     ):
         """
-        Parameters
+        parameters
         ----------
 
         cal_dicts
@@ -840,7 +841,7 @@ class CalAoE:
         fallback when a timestamp is absent.  Otherwise *update_dict* is
         merged directly.
 
-        Parameters
+        parameters
         ----------
         update_dict
             Dictionary of new calibration entries to merge.
@@ -870,7 +871,7 @@ class CalAoE:
         just perform a shift of the A/E parameter to 1 using the centroid otherwise for multiple
         runs the shift will be determined on the mode given in.
 
-        Parameters
+        parameters
         ----------
 
         df
@@ -1158,7 +1159,7 @@ class CalAoE:
         fitting the A/E peaks in each of these regions. A simple linear correction is then applied
         to align these regions.
 
-        Parameters
+        parameters
         ----------
 
         data
@@ -1301,7 +1302,7 @@ class CalAoE:
         Does this by fitting the compton continuum in slices and then applies fits
         to the centroid and variance.
 
-        Parameters
+        parameters
         ----------
 
         data
@@ -1589,7 +1590,7 @@ class CalAoE:
         Fits the resulting distribution and
         interpolates to get cut value at desired DEP survival fraction (typically 90%)
 
-        Parameters
+        parameters
         ----------
 
         data
@@ -1704,7 +1705,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks by sweeping through values
         of the A/E cut to show how this varies
 
-        Parameters
+        parameters
         ----------
 
         data
@@ -1823,7 +1824,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks for the final
         A/E cut value
 
-        Parameters
+        parameters
         ----------
 
         data
@@ -1922,12 +1923,13 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
+        override_dict=None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
         energy correction, A/E cut determination and survival fraction calculation
 
-        Parameters
+        parameters
         ----------
 
         df
@@ -1955,31 +1957,84 @@ class CalAoE:
         if fit_widths is None:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
-        self.time_correction(
-            df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
-        )
+        if override_dict is None or "AoE_Timecorr" not in override_dict:
+            self.time_correction(
+                df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
+            )
+        else:
+            self.update_cal_dicts({"AoE_Timecorr": override_dict["AoE_Timecorr"]})
+            df["AoE_Timecorr"] = ne.evaluate(
+                override_dict["AoE_Timecorr"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Timecorr"]["parameters"],
+            )
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
-            self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            if override_dict is None or "AoE_DTcorr" not in override_dict:
+                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            else:
+                self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
+                df["AoE_DTcorr"] = ne.evaluate(
+                    override_dict["AoE_DTcorr"]["expression"],
+                    local_dict={col: df[col].to_numpy() for col in df.columns}
+                    | override_dict["AoE_DTcorr"]["parameters"],
+                )
         else:
             aoe_param = "AoE_Timecorr"
 
-        self.energy_correction(
-            df,
-            aoe_param,
-            corrected_param="AoE_Corrected",
-            classifier_param="AoE_Classifier",
-        )
+        if override_dict is None or (
+            "AoE_Corrected" not in override_dict
+            and "AoE_Classifier" not in override_dict
+        ):
+            self.energy_correction(
+                df,
+                aoe_param,
+                corrected_param="AoE_Corrected",
+                classifier_param="AoE_Classifier",
+            )
+        else:
+            self.update_cal_dicts({"AoE_Corrected": override_dict["AoE_Corrected"]})
+            self.update_cal_dicts(
+                {
+                    "_AoE_Classifier_intermediate": override_dict[
+                        "_AoE_Classifier_intermediate"
+                    ]
+                }
+            )
+            self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
+            df["AoE_Corrected"] = ne.evaluate(
+                override_dict["AoE_Corrected"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Corrected"]["parameters"],
+            )
+            df["_AoE_Classifier_intermediate"] = ne.evaluate(
+                override_dict["_AoE_Classifier_intermediate"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["_AoE_Classifier_intermediate"]["parameters"],
+            )
+            df["AoE_Classifier"] = ne.evaluate(
+                override_dict["AoE_Classifier"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Classifier"]["parameters"],
+            )
 
-        self.get_aoe_cut_fit(
-            df,
-            "AoE_Classifier",
-            peaks_of_interest[cut_peak_idx],
-            fit_widths[cut_peak_idx],
-            dep_acc,
-            output_cut_param="AoE_Low_Cut",
-        )
+        if override_dict is None or ("AoE_Low_Cut" not in override_dict):
+            self.get_aoe_cut_fit(
+                df,
+                "AoE_Classifier",
+                peaks_of_interest[cut_peak_idx],
+                fit_widths[cut_peak_idx],
+                dep_acc,
+                output_cut_param="AoE_Low_Cut",
+            )
+        else:
+            self.update_cal_dicts({"AoE_Low_Cut": override_dict["AoE_Low_Cut"]})
+            df["AoE_Low_Cut"] = ne.evaluate(
+                override_dict["AoE_Low_Cut"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Low_Cut"]["parameters"],
+            )
 
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
