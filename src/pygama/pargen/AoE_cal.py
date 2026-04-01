@@ -84,7 +84,7 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     :func:`~pygama.pargen.utils.convert_to_minuit` so they can be passed
     directly to :class:`~iminuit.Minuit`.
 
-    parameters
+    Parameters
     ----------
     func
         PDF to guess parameters for; one of ``aoe_peak``,
