@@ -94,7 +94,7 @@ class HPGeCalibration:
             self.fixed = {0: 0}
         else:
             self.pars = np.zeros(self.deg + 1, dtype=float)
-            if isinstance(guess_kev, float) or len(guess_kev)==1:
+            if isinstance(guess_kev, float) or len(guess_kev) == 1:
                 self.pars[1] = guess_kev
             else:
                 self.pars = guess_kev
