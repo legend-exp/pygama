@@ -1923,7 +1923,7 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
-        override_dict=None,
+        override_dict: dict | None = None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -1950,6 +1950,26 @@ class CalAoE:
             Range of A/E cut values to use for the survival fraction sweep.
         timecorr_mode
             Mode to use for the time correction; see :meth:`time_correction` for details.
+        override_dict
+            Optional dictionary of pre-computed calibration entries that bypass one or more
+            fit steps. Each key should map to a sub-dict with ``"expression"`` (a string
+            expression) and ``"parameters"`` (a dict of named constants used by the expression).
+            Supported keys and the fit step they replace:
+
+            - ``"AoE_Timecorr"`` – skips :meth:`time_correction`; the expression is evaluated
+              with columns from *df* plus the stored parameters to populate ``df["AoE_Timecorr"]``.
+            - ``"AoE_DTcorr"`` – skips :meth:`drift_time_correction` (only relevant when
+              ``self.dt_corr`` is ``True``); populates ``df["AoE_DTcorr"]``. Silently ignored
+              if ``self.dt_corr`` is ``False``.
+            - ``"AoE_Corrected"``, ``"_AoE_Classifier_intermediate"``, and ``"AoE_Classifier"``
+              – together skip :meth:`energy_correction`. All three keys must be present to
+              take the override path; if only one of ``"AoE_Corrected"`` or ``"AoE_Classifier"``
+              is given (regardless of whether ``"_AoE_Classifier_intermediate"`` is present) a
+              warning is logged and normal energy correction runs instead.
+            - ``"AoE_Low_Cut"`` – skips :meth:`get_aoe_cut_fit`; the expression should evaluate
+              to a boolean array. The numeric cut threshold is read from ``parameters["a"]``
+              (or the sole parameter value if ``"a"`` is absent) and stored as
+              ``self.low_cut_val``.
 
         """
         if peaks_of_interest is None:
