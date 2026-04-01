@@ -100,13 +100,9 @@ class HPGeCalibration:
             else:
                 guess_arr = np.asarray(guess_kev, dtype=float)
                 if guess_arr.shape[0] != self.deg + 1:
-                    log.error(
-                        "hpge_E_cal warning: guess_kev length %s does not match deg+1 = %s",
-                        guess_arr.shape[0],
-                        self.deg + 1,
-                    )
-                else:
-                    self.pars = guess_arr.copy()
+                    msg = f"guess_kev length {guess_arr.shape[0]} does not match deg+1 = {self.deg + 1}"
+                    raise ValueError(msg)
+                self.pars = guess_arr.copy()
             self.fixed = fixed
         self.results = {}
 

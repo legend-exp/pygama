@@ -313,14 +313,21 @@ def gauss_mode_width_max(
         raise ValueError(msg)
 
     amp_guess = hist[i_0]
-    i_0 -= int(np.floor(n_bins / 2))
+    center_i = i_0
+    i_0 = center_i - int(np.floor(n_bins / 2))
     i_n = i_0 + n_bins
-    i_0 = max(i_0, 0)
-    i_n = min(i_n, len(hist))
-    if i_n >= len(hist):
-        msg = f"Fit range exceeds histogram bounds: i_n={i_n}, hist length: {len(hist)}"
+    # Recompute (i_0, i_n) together to keep the window size consistent
+    if i_0 < 0:
+        i_0 = 0
+        i_n = n_bins
+    if i_n > len(hist):
+        i_n = len(hist)
+        i_0 = len(hist) - n_bins
+    if i_0 < 0:
+        msg = f"n_bins={n_bins} exceeds histogram size {len(hist)}"
         raise ValueError(msg)
-    width_guess = bin_centers[i_n] - bin_centers[i_0]
+    # Use bins (not bin_centers) so that i_n == len(hist) is a valid index
+    width_guess = bins[i_n] - bins[i_0]
     vv = None if var is None else var[i_0:i_n]
     guess = (mode_guess, width_guess, amp_guess)
     pars, _errors, cov = fit_binned(
