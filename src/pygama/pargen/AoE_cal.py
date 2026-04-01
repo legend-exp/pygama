@@ -2036,6 +2036,16 @@ class CalAoE:
                 | override_dict["AoE_Low_Cut"]["parameters"],
             )
 
+            # Ensure the numeric low-cut threshold is stored for downstream use
+            params = override_dict["AoE_Low_Cut"].get("parameters", {})
+            low_cut_val = None
+            if "a" in params:
+                low_cut_val = params["a"]
+            elif len(params) == 1:
+                # Fall back to the single provided parameter if its name is not "a"
+                low_cut_val = next(iter(params.values()))
+            if low_cut_val is not None:
+                self.low_cut_val = low_cut_val
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
         )
