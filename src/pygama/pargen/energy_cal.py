@@ -94,10 +94,19 @@ class HPGeCalibration:
             self.fixed = {0: 0}
         else:
             self.pars = np.zeros(self.deg + 1, dtype=float)
-            if isinstance(guess_kev, float) or len(guess_kev) == 1:
-                self.pars[1] = guess_kev
+            if np.isscalar(guess_kev):
+                # treat guess_kev as an initial linear scaling factor
+                self.pars[1] = float(guess_kev)
             else:
-                self.pars = guess_kev
+                guess_arr = np.asarray(guess_kev, dtype=float)
+                if guess_arr.shape[0] != self.deg + 1:
+                    log.error(
+                        "hpge_E_cal warning: guess_kev length %s does not match deg+1 = %s",
+                        guess_arr.shape[0],
+                        self.deg + 1,
+                    )
+                else:
+                    self.pars = guess_arr.copy()
             self.fixed = fixed
         self.results = {}
 
