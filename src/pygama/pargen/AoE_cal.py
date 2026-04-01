@@ -1983,9 +1983,17 @@ class CalAoE:
         else:
             aoe_param = "AoE_Timecorr"
 
+        if override_dict is not None and (
+            ("AoE_Corrected" in override_dict) != ("AoE_Classifier" in override_dict)
+        ):
+            log.warning(
+                "override_dict must contain both 'AoE_Corrected' and 'AoE_Classifier' to "
+                "override energy correction; ignoring partial override and running energy correction."
+            )
+
         if override_dict is None or (
             "AoE_Corrected" not in override_dict
-            and "AoE_Classifier" not in override_dict
+            or "AoE_Classifier" not in override_dict
         ):
             self.energy_correction(
                 df,
