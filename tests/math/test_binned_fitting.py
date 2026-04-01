@@ -73,14 +73,19 @@ def test_gauss_mode_width_max_edge_cases():
     # histogram over range [-5, 5] with 100 bins, bin width = 0.1
     hist, bins, _var = get_hist(np.random.normal(size=10000), bins=100, range=(-5, 5))  # noqa: NPY002
 
-    # mode_guess near the lower edge: find_bin returns a small index
-    # so i_0 < floor(n_bins/2) triggers ValueError
-    with pytest.raises(ValueError, match="Fit range exceeds histogram bounds"):
-        pgbf.gauss_mode_width_max(hist, bins, mode_guess=-4.9, n_bins=5)
+    # mode_guess near the lower edge: window is shifted right so i_0 = 0, i_n = n_bins
+    fit, cov = pgbf.gauss_mode_width_max(hist, bins, mode_guess=-4.9, n_bins=5)
+    assert fit is not None
+    assert cov is not None
 
-    # mode_guess near the upper edge: i_n = i_0 + n_bins >= len(hist)
-    with pytest.raises(ValueError, match="Fit range exceeds histogram bounds"):
-        pgbf.gauss_mode_width_max(hist, bins, mode_guess=4.9, n_bins=5)
+    # mode_guess near the upper edge: window is shifted left so i_n = len(hist)
+    fit, cov = pgbf.gauss_mode_width_max(hist, bins, mode_guess=4.9, n_bins=5)
+    assert fit is not None
+    assert cov is not None
+
+    # n_bins larger than histogram raises ValueError
+    with pytest.raises(ValueError, match=r"n_bins=.*exceeds histogram size"):
+        pgbf.gauss_mode_width_max(hist, bins, n_bins=101)
 
 
 def test_taylor_mode_max():
