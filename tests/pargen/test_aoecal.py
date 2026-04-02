@@ -85,11 +85,15 @@ def test_aoe_cal_override_dict(lgnd_test_data):
         "AoE_Classifier",
         "AoE_Low_Cut",
     ):
-        assert col in data_df2.columns, f"column '{col}' missing after override calibrate()"
+        assert col in data_df2.columns, (
+            f"column '{col}' missing after override calibrate()"
+        )
 
     # All overridden entries must land in cal_dicts.
     for key, val in override_dict.items():
-        assert key in aoe_ovr.cal_dicts, f"cal_dict key '{key}' missing after override calibrate()"
+        assert key in aoe_ovr.cal_dicts, (
+            f"cal_dict key '{key}' missing after override calibrate()"
+        )
         assert aoe_ovr.cal_dicts[key] == val, (
             f"cal_dict entry for '{key}' was not taken from override_dict"
         )
@@ -101,11 +105,15 @@ def test_aoe_cal_override_dict(lgnd_test_data):
         )
 
     # low_cut_val must be set from the override and match the stored parameter.
-    assert hasattr(aoe_ovr, "low_cut_val"), "low_cut_val not set after AoE_Low_Cut override"
-    assert np.isfinite(aoe_ovr.low_cut_val), "low_cut_val is not finite after AoE_Low_Cut override"
-    assert aoe_ovr.low_cut_val == pytest.approx(
-        aoe_ref.low_cut_val
-    ), "low_cut_val from override does not match reference"
+    assert hasattr(aoe_ovr, "low_cut_val"), (
+        "low_cut_val not set after AoE_Low_Cut override"
+    )
+    assert np.isfinite(aoe_ovr.low_cut_val), (
+        "low_cut_val is not finite after AoE_Low_Cut override"
+    )
+    assert aoe_ovr.low_cut_val == pytest.approx(aoe_ref.low_cut_val), (
+        "low_cut_val from override does not match reference"
+    )
 
 
 def test_aoe_cal_override_partial_energy_warns(lgnd_test_data, caplog):
@@ -122,7 +130,9 @@ def test_aoe_cal_override_partial_energy_warns(lgnd_test_data, caplog):
     data_df2 = _load_test_df(lgnd_test_data)
     aoe_partial = _make_aoe()
     with caplog.at_level(logging.WARNING, logger="pygama.pargen.AoE_cal"):
-        aoe_partial.calibrate(data_df2, "AoE_Uncorr", override_dict=override_dict_partial)
+        aoe_partial.calibrate(
+            data_df2, "AoE_Uncorr", override_dict=override_dict_partial
+        )
 
     assert any(
         "AoE_Corrected" in rec.message and "AoE_Classifier" in rec.message
@@ -133,5 +143,3 @@ def test_aoe_cal_override_partial_energy_warns(lgnd_test_data, caplog):
     # Normal energy correction still ran, so the cut should be valid.
     assert hasattr(aoe_partial, "low_cut_val")
     assert np.isfinite(aoe_partial.low_cut_val)
-
-
