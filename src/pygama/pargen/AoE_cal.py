@@ -1961,11 +1961,12 @@ class CalAoE:
             - ``"AoE_DTcorr"`` - skips :meth:`drift_time_correction` (only relevant when
               ``self.dt_corr`` is ``True``); populates ``df["AoE_DTcorr"]``. Silently ignored
               if ``self.dt_corr`` is ``False``.
-            - ``"AoE_Corrected"``, ``"_AoE_Classifier_intermediate"``, and ``"AoE_Classifier"``
-              - together skip :meth:`energy_correction`. All three keys must be present to
-              take the override path; if only one of ``"AoE_Corrected"`` or ``"AoE_Classifier"``
-              is given (regardless of whether ``"_AoE_Classifier_intermediate"`` is present) a
-              warning is logged and normal energy correction runs instead.
+            - ``"AoE_Corrected"`` and ``"AoE_Classifier"`` -- together skip
+              :meth:`energy_correction`. Both keys must be present to take the override path;
+              if only one is given a warning is logged and normal energy correction runs instead.
+              ``"_AoE_Classifier_intermediate"`` is optional: if present it is evaluated and
+              stored before ``"AoE_Classifier"`` is evaluated (useful when the
+              ``"AoE_Classifier"`` expression references it).
             - ``"AoE_Low_Cut"`` - skips :meth:`get_aoe_cut_fit`; the expression should evaluate
               to a boolean array. The numeric cut threshold is read from ``parameters["a"]``
               (or the sole parameter value if ``"a"`` is absent) and stored as
@@ -2023,24 +2024,25 @@ class CalAoE:
             )
         else:
             self.update_cal_dicts({"AoE_Corrected": override_dict["AoE_Corrected"]})
-            self.update_cal_dicts(
-                {
-                    "_AoE_Classifier_intermediate": override_dict[
-                        "_AoE_Classifier_intermediate"
-                    ]
-                }
-            )
             self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
             df["AoE_Corrected"] = ne.evaluate(
                 override_dict["AoE_Corrected"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
                 | override_dict["AoE_Corrected"]["parameters"],
             )
-            df["_AoE_Classifier_intermediate"] = ne.evaluate(
-                override_dict["_AoE_Classifier_intermediate"]["expression"],
-                local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["_AoE_Classifier_intermediate"]["parameters"],
-            )
+            if "_AoE_Classifier_intermediate" in override_dict:
+                self.update_cal_dicts(
+                    {
+                        "_AoE_Classifier_intermediate": override_dict[
+                            "_AoE_Classifier_intermediate"
+                        ]
+                    }
+                )
+                df["_AoE_Classifier_intermediate"] = ne.evaluate(
+                    override_dict["_AoE_Classifier_intermediate"]["expression"],
+                    local_dict={col: df[col].to_numpy() for col in df.columns}
+                    | override_dict["_AoE_Classifier_intermediate"]["parameters"],
+                )
             df["AoE_Classifier"] = ne.evaluate(
                 override_dict["AoE_Classifier"]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
