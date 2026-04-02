@@ -192,7 +192,7 @@ def aoe_peak_bounds(func, guess, **kwargs):
     """
     Build parameter bounds for an A/E peak fit.
 
-    parameters
+    Parameters
     ----------
     func
         PDF to bound; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -264,7 +264,7 @@ def aoe_peak_fixed(func, **_kwargs):
     """
     Return the fixed parameters and free-parameter mask for an A/E peak fit.
 
-    parameters
+    Parameters
     ----------
     func
         PDF to query; one of ``aoe_peak``, ``aoe_peak_with_high_tail``,
@@ -356,7 +356,7 @@ def unbinned_aoe_fit(
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
     if fails will return NaN values
 
-    parameters
+    Parameters
     ----------
     aoe
         A/E values.
@@ -611,7 +611,7 @@ def fit_time_means(tstamps, means, sigmas):
     """
     Fit the time dependence of the means of the A/E distribution
 
-    parameters
+    Parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -676,7 +676,7 @@ def average_consecutive(tstamps, means):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    parameters
+    Parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -701,7 +701,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
     """
     Fit the time dependence of the means of the A/E distribution by average consecutive entries
 
-    parameters
+    Parameters
     ----------
     tstamps
         Timestamps of the data.
@@ -769,7 +769,7 @@ class CalAoE:
         debug_mode: bool = False,
     ):
         """
-        parameters
+        Parameters
         ----------
 
         cal_dicts
@@ -841,7 +841,7 @@ class CalAoE:
         fallback when a timestamp is absent.  Otherwise *update_dict* is
         merged directly.
 
-        parameters
+        Parameters
         ----------
         update_dict
             Dictionary of new calibration entries to merge.
@@ -871,7 +871,7 @@ class CalAoE:
         just perform a shift of the A/E parameter to 1 using the centroid otherwise for multiple
         runs the shift will be determined on the mode given in.
 
-        parameters
+        Parameters
         ----------
 
         df
@@ -1159,7 +1159,7 @@ class CalAoE:
         fitting the A/E peaks in each of these regions. A simple linear correction is then applied
         to align these regions.
 
-        parameters
+        Parameters
         ----------
 
         data
@@ -1302,7 +1302,7 @@ class CalAoE:
         Does this by fitting the compton continuum in slices and then applies fits
         to the centroid and variance.
 
-        parameters
+        Parameters
         ----------
 
         data
@@ -1590,7 +1590,7 @@ class CalAoE:
         Fits the resulting distribution and
         interpolates to get cut value at desired DEP survival fraction (typically 90%)
 
-        parameters
+        Parameters
         ----------
 
         data
@@ -1705,7 +1705,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks by sweeping through values
         of the A/E cut to show how this varies
 
-        parameters
+        Parameters
         ----------
 
         data
@@ -1824,7 +1824,7 @@ class CalAoE:
         Calculate survival fractions for the A/E cut for a list of peaks for the final
         A/E cut value
 
-        parameters
+        Parameters
         ----------
 
         data
@@ -1929,7 +1929,7 @@ class CalAoE:
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
         energy correction, A/E cut determination and survival fraction calculation
 
-        parameters
+        Parameters
         ----------
 
         df
@@ -1956,17 +1956,17 @@ class CalAoE:
             expression) and ``"parameters"`` (a dict of named constants used by the expression).
             Supported keys and the fit step they replace:
 
-            - ``"AoE_Timecorr"`` – skips :meth:`time_correction`; the expression is evaluated
+            - ``"AoE_Timecorr"`` - skips :meth:`time_correction`; the expression is evaluated
               with columns from *df* plus the stored parameters to populate ``df["AoE_Timecorr"]``.
-            - ``"AoE_DTcorr"`` – skips :meth:`drift_time_correction` (only relevant when
+            - ``"AoE_DTcorr"`` - skips :meth:`drift_time_correction` (only relevant when
               ``self.dt_corr`` is ``True``); populates ``df["AoE_DTcorr"]``. Silently ignored
               if ``self.dt_corr`` is ``False``.
             - ``"AoE_Corrected"``, ``"_AoE_Classifier_intermediate"``, and ``"AoE_Classifier"``
-              – together skip :meth:`energy_correction`. All three keys must be present to
+              - together skip :meth:`energy_correction`. All three keys must be present to
               take the override path; if only one of ``"AoE_Corrected"`` or ``"AoE_Classifier"``
               is given (regardless of whether ``"_AoE_Classifier_intermediate"`` is present) a
               warning is logged and normal energy correction runs instead.
-            - ``"AoE_Low_Cut"`` – skips :meth:`get_aoe_cut_fit`; the expression should evaluate
+            - ``"AoE_Low_Cut"`` - skips :meth:`get_aoe_cut_fit`; the expression should evaluate
               to a boolean array. The numeric cut threshold is read from ``parameters["a"]``
               (or the sole parameter value if ``"a"`` is absent) and stored as
               ``self.low_cut_val``.

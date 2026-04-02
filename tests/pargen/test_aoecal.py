@@ -32,10 +32,10 @@ def _load_test_df(lgnd_test_data):
     data = lgnd_test_data.get_path(
         "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
     )
-    df = lh5.read_as("ch1104000/dsp", data, "pd")
-    df["AoE_Uncorr"] = df["A_max"] / df["cuspEmax"]
-    df["cuspEmax_cal"] = df["cuspEmax"] * 0.155
-    return df
+    dsp_df = lh5.read_as("ch1104000/dsp", data, "pd")
+    dsp_df["AoE_Uncorr"] = dsp_df["A_max"] / dsp_df["cuspEmax"]
+    dsp_df["cuspEmax_cal"] = dsp_df["cuspEmax"] * 0.155
+    return dsp_df
 
 
 def test_aoe_cal(lgnd_test_data):
