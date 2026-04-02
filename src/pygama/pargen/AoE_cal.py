@@ -12,6 +12,7 @@ from datetime import datetime
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+import numexpr as ne
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost
@@ -1922,6 +1923,7 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
+        override_dict: dict | None = None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -1948,6 +1950,27 @@ class CalAoE:
             Range of A/E cut values to use for the survival fraction sweep.
         timecorr_mode
             Mode to use for the time correction; see :meth:`time_correction` for details.
+        override_dict
+            Optional dictionary of pre-computed calibration entries that bypass one or more
+            fit steps. Each key should map to a sub-dict with ``"expression"`` (a string
+            expression) and ``"parameters"`` (a dict of named constants used by the expression).
+            Supported keys and the fit step they replace:
+
+            - ``"AoE_Timecorr"`` - skips :meth:`time_correction`; the expression is evaluated
+              with columns from *df* plus the stored parameters to populate ``df["AoE_Timecorr"]``.
+            - ``"AoE_DTcorr"`` - skips :meth:`drift_time_correction` (only relevant when
+              ``self.dt_corr`` is ``True``); populates ``df["AoE_DTcorr"]``. Silently ignored
+              if ``self.dt_corr`` is ``False``.
+            - ``"AoE_Corrected"`` and ``"AoE_Classifier"`` -- together skip
+              :meth:`energy_correction`. Both keys must be present to take the override path;
+              if only one is given a warning is logged and normal energy correction runs instead.
+              ``"_AoE_Classifier_intermediate"`` is optional: if present it is evaluated and
+              stored before ``"AoE_Classifier"`` is evaluated (useful when the
+              ``"AoE_Classifier"`` expression references it).
+            - ``"AoE_Low_Cut"`` - skips :meth:`get_aoe_cut_fit`; the expression should evaluate
+              to a boolean array. The numeric cut threshold is read from ``parameters["a"]``
+              (or the sole parameter value if ``"a"`` is absent) and stored as
+              ``self.low_cut_val``.
 
         """
         if peaks_of_interest is None:
@@ -1955,32 +1978,104 @@ class CalAoE:
         if fit_widths is None:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
-        self.time_correction(
-            df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
-        )
+        if override_dict is None or "AoE_Timecorr" not in override_dict:
+            self.time_correction(
+                df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
+            )
+        else:
+            self.update_cal_dicts({"AoE_Timecorr": override_dict["AoE_Timecorr"]})
+            df["AoE_Timecorr"] = ne.evaluate(
+                override_dict["AoE_Timecorr"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Timecorr"]["parameters"],
+            )
 
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
-            self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            if override_dict is None or "AoE_DTcorr" not in override_dict:
+                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+            else:
+                self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
+                df["AoE_DTcorr"] = ne.evaluate(
+                    override_dict["AoE_DTcorr"]["expression"],
+                    local_dict={col: df[col].to_numpy() for col in df.columns}
+                    | override_dict["AoE_DTcorr"]["parameters"],
+                )
         else:
             aoe_param = "AoE_Timecorr"
 
-        self.energy_correction(
-            df,
-            aoe_param,
-            corrected_param="AoE_Corrected",
-            classifier_param="AoE_Classifier",
-        )
+        if override_dict is not None and (
+            ("AoE_Corrected" in override_dict) != ("AoE_Classifier" in override_dict)
+        ):
+            log.warning(
+                "override_dict must contain both 'AoE_Corrected' and 'AoE_Classifier' to "
+                "override energy correction; ignoring partial override and running energy correction."
+            )
 
-        self.get_aoe_cut_fit(
-            df,
-            "AoE_Classifier",
-            peaks_of_interest[cut_peak_idx],
-            fit_widths[cut_peak_idx],
-            dep_acc,
-            output_cut_param="AoE_Low_Cut",
-        )
+        if override_dict is None or (
+            "AoE_Corrected" not in override_dict
+            or "AoE_Classifier" not in override_dict
+        ):
+            self.energy_correction(
+                df,
+                aoe_param,
+                corrected_param="AoE_Corrected",
+                classifier_param="AoE_Classifier",
+            )
+        else:
+            self.update_cal_dicts({"AoE_Corrected": override_dict["AoE_Corrected"]})
+            self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
+            df["AoE_Corrected"] = ne.evaluate(
+                override_dict["AoE_Corrected"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Corrected"]["parameters"],
+            )
+            if "_AoE_Classifier_intermediate" in override_dict:
+                self.update_cal_dicts(
+                    {
+                        "_AoE_Classifier_intermediate": override_dict[
+                            "_AoE_Classifier_intermediate"
+                        ]
+                    }
+                )
+                df["_AoE_Classifier_intermediate"] = ne.evaluate(
+                    override_dict["_AoE_Classifier_intermediate"]["expression"],
+                    local_dict={col: df[col].to_numpy() for col in df.columns}
+                    | override_dict["_AoE_Classifier_intermediate"]["parameters"],
+                )
+            df["AoE_Classifier"] = ne.evaluate(
+                override_dict["AoE_Classifier"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Classifier"]["parameters"],
+            )
 
+        if override_dict is None or ("AoE_Low_Cut" not in override_dict):
+            self.get_aoe_cut_fit(
+                df,
+                "AoE_Classifier",
+                peaks_of_interest[cut_peak_idx],
+                fit_widths[cut_peak_idx],
+                dep_acc,
+                output_cut_param="AoE_Low_Cut",
+            )
+        else:
+            self.update_cal_dicts({"AoE_Low_Cut": override_dict["AoE_Low_Cut"]})
+            df["AoE_Low_Cut"] = ne.evaluate(
+                override_dict["AoE_Low_Cut"]["expression"],
+                local_dict={col: df[col].to_numpy() for col in df.columns}
+                | override_dict["AoE_Low_Cut"]["parameters"],
+            )
+
+            # Ensure the numeric low-cut threshold is stored for downstream use
+            params = override_dict["AoE_Low_Cut"].get("parameters", {})
+            low_cut_val = None
+            if "a" in params:
+                low_cut_val = params["a"]
+            elif len(params) == 1:
+                # Fall back to the single provided parameter if its name is not "a"
+                low_cut_val = next(iter(params.values()))
+            if low_cut_val is not None:
+                self.low_cut_val = low_cut_val
         df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
             df["AoE_Classifier"] < self.high_cut_val
         )

@@ -41,6 +41,7 @@ dependencies = [
     "matplotlib",
     "numba !=0.53.*,!=0.54.*,!=0.57",
     "numpy >=1.21",
+    "numexpr",
     "pandas >=1.4.4",
     "tables",
     "pint",
