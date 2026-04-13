@@ -744,7 +744,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
     return out_dict
 
 
-def twoblob(
+def bimodal_dt_fit(
     data: pd.DataFrame,
     aoe_param: str,
     dt_param: str,
@@ -787,7 +787,7 @@ def twoblob(
     dt_res_dict
         Dictionary containing intermediate fit results.
     """
-    log.info("Starting A/E drift time correction (twoblob mode)")
+    log.info("Starting A/E drift time correction (bimodal_dt_fit mode)")
     dt_res_dict = {}
     alpha = 0
     try:
@@ -889,7 +889,7 @@ def twoblob(
     except BaseException as e:
         if isinstance(e, KeyboardInterrupt) or debug_mode:
             raise e
-        log.error("Drift time correction (twoblob) failed")
+        log.error("Drift time correction (bimodal_dt_fit) failed")
 
     return alpha, dt_res_dict
 
@@ -1460,7 +1460,7 @@ class CalAoE:
             Mode used to estimate the correction coefficient. Options:
             - ``"mcdrift"``  : Minimum Covariance Determinant (MCD) based estimation
             (improved stability for low statistic and no evident structure)
-            - ``"twoblob"``  : Two-blob Gaussian fit method
+            - ``"bimodal_dt_fit"``  : Fit the position of two drift time peaks
             (heavily relying on DEP events and clear structure).
         display
             Plot verbosity level.
@@ -1470,7 +1470,7 @@ class CalAoE:
 
         _modes = {
             "mcdrift": mcdrift,
-            "twoblob": twoblob,
+            "bimodal_dt_fit": bimodal_dt_fit,
         }
 
         if mode not in _modes:
