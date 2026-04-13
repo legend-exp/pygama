@@ -743,6 +743,7 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
 
     return out_dict
 
+
 def twoblob(
     data: pd.DataFrame,
     aoe_param: str,
@@ -892,6 +893,7 @@ def twoblob(
 
     return alpha, dt_res_dict
 
+
 def mcdrift(
     data: pd.DataFrame,
     aoe_param: str,
@@ -928,7 +930,7 @@ def mcdrift(
         Dictionary containing intermediate fit results.
     """
     log.info("Starting A/E drift time correction (MCD mode)")
-    
+
     try:
         CC_events = data.query(
             f"{fit_selection}&{cal_energy_param}=={cal_energy_param}&{aoe_param}=={aoe_param}&{dt_param}=={dt_param}"
@@ -950,10 +952,10 @@ def mcdrift(
         )
     CC_events = CC_events[CC_selection]
 
-    if len(CC_events)==0:
+    if len(CC_events) == 0:
         log.error("MCD drift: no CC events found after selection")
         return 0, {}
-    
+
     aoe_vals = CC_events[aoe_param].to_numpy()
     dt_vals = CC_events[dt_param].to_numpy() / 1000.0  # convert to us for stability
     mcd_data = np.column_stack([aoe_vals, dt_vals])
@@ -969,7 +971,7 @@ def mcdrift(
     if bin_width_x <= 0:
         log.error("MCD drift: degenerate AoE distribution, bin width <= 0")
         return 0, {}
-    
+
     xbins = int((xrange[1] - xrange[0]) / bin_width_x)
     counts, bin_edges = np.histogram(classifier, bins=xbins, range=xrange, density=True)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
@@ -980,7 +982,7 @@ def mcdrift(
     if len(indices_above_half) < 2:
         log.error("MCD drift: could not determine FWHM of AoE peak")
         return 0, {}
-    
+
     bw = bin_centers[1] - bin_centers[0]
     fwhm = bin_centers[indices_above_half[-1]] - bin_centers[indices_above_half[0]] + bw
     x_low = peak_position - 2 * fwhm
@@ -996,7 +998,7 @@ def mcdrift(
     if len(subset) < 2:
         log.error("MCD drift: insufficient events in AoE range for MCD fit")
         return 0, {}
-    
+
     try:
         mcd = MinCovDet().fit(subset)
     except Exception as e:
@@ -1024,7 +1026,8 @@ def mcdrift(
     alpha = -principal[0] / principal[1] / 1000.0
     log.info("dtcorr (MCD) successful alpha: %s", alpha)
     return alpha, {"alpha": alpha}
-    
+
+
 class CalAoE:
     """
     Class for calibrating the A/E,
@@ -1455,9 +1458,9 @@ class CalAoE:
             stored in the DataFrame and added to the calibration dictionary.
         mode
             Mode used to estimate the correction coefficient. Options:
-            - ``"mcdrift"``  : Minimum Covariance Determinant (MCD) based estimation 
+            - ``"mcdrift"``  : Minimum Covariance Determinant (MCD) based estimation
             (improved stability for low statistic and no evident structure)
-            - ``"twoblob"``  : Two-blob Gaussian fit method 
+            - ``"twoblob"``  : Two-blob Gaussian fit method
             (heavily relying on DEP events and clear structure).
         display
             Plot verbosity level.
@@ -1475,7 +1478,7 @@ class CalAoE:
             log.error(
                 "Unknown mode '%s' for drift time correction. Valid options are: %s",
                 mode,
-                list(_modes)
+                list(_modes),
             )
             return
 
@@ -2135,7 +2138,7 @@ class CalAoE:
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
         dtcorr_mode: str = "mcdrift",
-        override_dict: dict | None = None
+        override_dict: dict | None = None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -2207,7 +2210,9 @@ class CalAoE:
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
             if override_dict is None or "AoE_DTcorr" not in override_dict:
-                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param, mode=dtcorr_mode)
+                self.drift_time_correction(
+                    df, "AoE_Timecorr", out_param=aoe_param, mode=dtcorr_mode
+                )
             else:
                 self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
                 df["AoE_DTcorr"] = ne.evaluate(
