@@ -752,7 +752,7 @@ def twoblob(
     pdf,
     debug_mode: bool = False,
     display: int = 0,
-    **kwargs,
+    **_kwargs,
 ) -> tuple[float, dict]:
     """
     Calculates the correction needed to align the two drift time regions for ICPC detectors.
@@ -899,7 +899,7 @@ def mcdrift(
     fit_selection: str,
     cal_energy_param: str,
     debug_mode: bool = False,
-    **kwargs,
+    **_kwargs,
 ) -> tuple[float, dict]:
     """
     Calculates the drift time correction for the A/E parameter using the
@@ -919,8 +919,6 @@ def mcdrift(
         Name of the calibrated energy parameter.
     debug_mode
         If True, re-raises exceptions instead of logging them.
-    display
-        Plot verbosity level.
 
     Returns
     -------
@@ -1475,8 +1473,9 @@ class CalAoE:
         if mode not in _modes:
             self.alpha = 0
             log.error(
-                f"Unknown mode '{mode}' for drift time correction. "
-                f"Valid options are: {list(_modes)}"
+                "Unknown mode '%s' for drift time correction. Valid options are: %s",
+                mode,
+                list(_modes)
             )
             return
 
