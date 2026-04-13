@@ -743,7 +743,290 @@ def interpolate_consecutive(tstamps, means, times, aoe_param, output_name):
 
     return out_dict
 
+def twoblob(
+    data: pd.DataFrame,
+    aoe_param: str,
+    dt_param: str,
+    fit_selection: str,
+    cal_energy_param: str,
+    pdf,
+    debug_mode: bool = False,
+    display: int = 0,
+    **kwargs,
+) -> tuple[float, dict]:
+    """
+    Calculates the correction needed to align the two drift time regions for ICPC detectors.
+    This is done by fitting the two drift time peaks in the drift time spectrum and then
+    fitting the A/E peaks in each of these regions. A simple linear correction is then applied
+    to align these regions.
 
+    Parameters
+    ----------
+    data
+        DataFrame containing the data.
+    aoe_param
+        Name of the A/E parameter to use as starting point.
+    dt_param
+        Name of the drift time parameter.
+    fit_selection
+        Selection string for the fit.
+    cal_energy_param
+        Name of the calibrated energy parameter.
+    pdf
+        PDF to use for the A/E fit.
+    debug_mode
+        If True, re-raises exceptions instead of logging them.
+    display
+        Plot verbosity level.
+
+    Returns
+    -------
+    alpha
+        Linear correction coefficient.
+    dt_res_dict
+        Dictionary containing intermediate fit results.
+    """
+    log.info("Starting A/E drift time correction (twoblob mode)")
+    dt_res_dict = {}
+    alpha = 0
+    try:
+        dep_events = data.query(
+            f"{fit_selection}&{cal_energy_param}>1582&{cal_energy_param}<1602&{cal_energy_param}=={cal_energy_param}&{aoe_param}=={aoe_param}"
+        )
+
+        hist, bins, var = pgh.get_hist(
+            dep_events[aoe_param],
+            bins=500,
+        )
+        bin_cs = (bins[1:] + bins[:-1]) / 2
+        mu = bin_cs[np.argmax(hist)]
+        aoe_range = [mu * 0.9, mu * 1.1]
+
+        dt_range = [
+            np.nanpercentile(dep_events[dt_param], 1),
+            np.nanpercentile(dep_events[dt_param], 99),
+        ]
+
+        dt_res_dict["final_selection"] = (
+            f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{dt_param}>{dt_range[0]}&{dt_param}<{dt_range[1]}&{dt_param}=={dt_param}"
+        )
+
+        final_df = dep_events.query(dt_res_dict["final_selection"])
+
+        hist, bins, var = pgh.get_hist(
+            final_df[dt_param],
+            dx=32,
+            range=(
+                np.nanmin(final_df[dt_param]),
+                np.nanmax(final_df[dt_param]),
+            ),
+        )
+
+        bcs = pgh.get_bin_centers(bins)
+        mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
+        pk_pars, _pk_covs = pgc.hpge_fit_energy_peak_tops(
+            hist,
+            bins,
+            var=var,
+            peak_locs=mus,
+            n_to_fit=5,
+        )
+
+        mus = pk_pars[:, 0]
+        sigmas = pk_pars[:, 1]
+        amps = pk_pars[:, 2]
+
+        if len(mus) > 2:
+            ids = np.array(
+                sorted([np.argmax(amps), np.argmax(amps[amps != np.argmax(amps)])])
+            )
+        else:
+            ids = np.full(len(mus), True, dtype=bool)
+        mus = mus[ids]
+        sigmas = sigmas[ids]
+        amps = amps[ids]
+
+        dt_res_dict["dt_fit"] = {"mus": mus, "sigmas": sigmas, "amps": amps}
+
+        if len(mus) < 2:
+            log.info("Only 1 drift time peak found, no correction needed")
+
+        else:
+            aoe_grp1 = dt_res_dict["aoe_grp1"] = (
+                f"{dt_param}>{mus[0] - 2 * sigmas[0]} & {dt_param}<{mus[0] + 2 * sigmas[0]}"
+            )
+            aoe_grp2 = dt_res_dict["aoe_grp2"] = (
+                f"{dt_param}>{mus[1] - 2 * sigmas[1]} & {dt_param}<{mus[1] + 2 * sigmas[1]}"
+            )
+
+            aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
+                final_df.query(aoe_grp1)[aoe_param], pdf=pdf, display=display
+            )
+            dt_res_dict["aoe_fit1"] = {
+                "pars": aoe_pars.to_dict(),
+                "errs": aoe_errs.to_dict(),
+            }
+
+            aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
+                final_df.query(aoe_grp2)[aoe_param], pdf=pdf, display=display
+            )
+            dt_res_dict["aoe_fit2"] = {
+                "pars": aoe_pars2.to_dict(),
+                "errs": aoe_errs2.to_dict(),
+            }
+
+            try:
+                alpha = (aoe_pars2["mu"] - aoe_pars["mu"]) / (
+                    (mus[0] * aoe_pars["mu"]) - (mus[1] * aoe_pars2["mu"])
+                )
+            except ZeroDivisionError:
+                alpha = 0
+
+            dt_res_dict["alpha"] = alpha
+            log.info("dtcorr successful alpha: %s", alpha)
+
+    except BaseException as e:
+        if isinstance(e, KeyboardInterrupt) or debug_mode:
+            raise e
+        log.error("Drift time correction (twoblob) failed")
+
+    return alpha, dt_res_dict
+
+def mcdrift(
+    data: pd.DataFrame,
+    aoe_param: str,
+    dt_param: str,
+    fit_selection: str,
+    cal_energy_param: str,
+    debug_mode: bool = False,
+    **kwargs,
+) -> tuple[float, dict]:
+    """
+    Calculates the drift time correction for the A/E parameter using the
+    Minimum Covariance Determinant (MCD) method and PCA on the (AoE, dt_eff) distribution.
+
+    Parameters
+    ----------
+    data
+        DataFrame containing the data.
+    aoe_param
+        Name of the A/E parameter to use as starting point.
+    dt_param
+        Name of the drift time parameter.
+    fit_selection
+        Selection string for the fit.
+    cal_energy_param
+        Name of the calibrated energy parameter.
+    debug_mode
+        If True, re-raises exceptions instead of logging them.
+    display
+        Plot verbosity level.
+
+    Returns
+    -------
+    alpha
+        Linear correction coefficient.
+    dt_res_dict
+        Dictionary containing intermediate fit results.
+    """
+    log.info("Starting A/E drift time correction (MCD mode)")
+    
+    try:
+        CC_events = data.query(
+            f"{fit_selection}&{cal_energy_param}=={cal_energy_param}&{aoe_param}=={aoe_param}&{dt_param}=={dt_param}"
+        )
+    except Exception as e:
+        if debug_mode:
+            raise e
+        log.error("MCD drift: event selection query failed: %s", e)
+        return 0, {}
+
+    peaks = np.array([1080, 1094, 1459, 1512, 1552, 1620, 1650, 1670, 1830, 2105])
+    CC_selection = (CC_events[cal_energy_param] >= 1000) & (
+        CC_events[cal_energy_param] <= 2400
+    )
+    for peak in peaks:
+        CC_selection &= ~(
+            (CC_events[cal_energy_param] >= peak - 5)
+            & (CC_events[cal_energy_param] <= peak + 5)
+        )
+    CC_events = CC_events[CC_selection]
+
+    if len(CC_events)==0:
+        log.error("MCD drift: no CC events found after selection")
+        return 0, {}
+    
+    aoe_vals = CC_events[aoe_param].to_numpy()
+    dt_vals = CC_events[dt_param].to_numpy() / 1000.0  # convert to us for stability
+    mcd_data = np.column_stack([aoe_vals, dt_vals])
+
+    # --- find AoE range ---
+    classifier = mcd_data[:, 0]
+    xrange = (0.9, 1.1)
+    bin_width_x = (
+        0.5
+        * (np.nanpercentile(classifier, 75) - np.nanpercentile(classifier, 25))
+        * len(classifier) ** (-1 / 3)
+    )
+    if bin_width_x <= 0:
+        log.error("MCD drift: degenerate AoE distribution, bin width <= 0")
+        return 0, {}
+    
+    xbins = int((xrange[1] - xrange[0]) / bin_width_x)
+    counts, bin_edges = np.histogram(classifier, bins=xbins, range=xrange, density=True)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    peak_position = bin_centers[np.argmax(counts)]
+    half_max = np.max(counts) / 2.0
+    indices_above_half = np.where(counts >= half_max)[0]
+
+    if len(indices_above_half) < 2:
+        log.error("MCD drift: could not determine FWHM of AoE peak")
+        return 0, {}
+    
+    bw = bin_centers[1] - bin_centers[0]
+    fwhm = bin_centers[indices_above_half[-1]] - bin_centers[indices_above_half[0]] + bw
+    x_low = peak_position - 2 * fwhm
+    x_high = peak_position + 3 * fwhm
+
+    # --- MCD fit ---
+    in_x = (mcd_data[:, 0] >= x_low) & (mcd_data[:, 0] <= x_high)
+    in_y = (mcd_data[:, 1] >= 0) & (
+        mcd_data[:, 1] <= np.quantile(mcd_data[:, 1], 0.999)
+    )
+    subset = mcd_data[in_x & in_y]
+
+    if len(subset) < 2:
+        log.error("MCD drift: insufficient events in AoE range for MCD fit")
+        return 0, {}
+    
+    try:
+        mcd = MinCovDet().fit(subset)
+    except Exception as e:
+        if debug_mode:
+            raise e
+        log.error("MCD drift: MCD fit failed: %s", e)
+        return 0, {}
+
+    # --- PCA slope ---
+    _, eigvecs = np.linalg.eigh(mcd.covariance_)
+    principal = eigvecs[:, -1]
+    if abs(principal[0]) > abs(principal[1]):
+        log.warning(
+            "Principal eigenvector not aligned with drift time axis (|v_aoe|=%.4f > |v_dt|=%.4f), "
+            "switching to minor eigenvector",
+            abs(principal[0]),
+            abs(principal[1]),
+        )
+        principal = eigvecs[:, -2]
+
+    if abs(principal[1]) < 1e-10:
+        log.error("MCD drift: eigenvector has near-zero dt component")
+        return 0, {}
+
+    alpha = -principal[0] / principal[1] / 1000.0
+    log.info("dtcorr (MCD) successful alpha: %s", alpha)
+    return alpha, {"alpha": alpha}
+    
 class CalAoE:
     """
     Class for calibrating the A/E,
@@ -1150,15 +1433,17 @@ class CalAoE:
     def drift_time_correction(
         self,
         data: pd.DataFrame,
-        aoe_param,
-        out_param="AoE_DTcorr",
+        aoe_param: str = "AoE_Timecorr",
+        out_param: str = "AoE_DTcorr",
+        mode: str = "mcdrift",
         display: int = 0,
     ):
         """
-        Calculates the correction needed to align the two drift time regions for ICPC detectors.
-        This is done by fitting the two drift time peaks in the drift time spectrum and then
-        fitting the A/E peaks in each of these regions. A simple linear correction is then applied
-        to align these regions.
+        Apply a linear drift-time correction to the A/E distribution.
+
+        Estimates a linear correction coefficient to align the A/E values
+        across drift time and writes the corrected parameter to the DataFrame
+        and calibration dictionary.
 
         Parameters
         ----------
@@ -1166,235 +1451,45 @@ class CalAoE:
         data
             DataFrame containing the data.
         aoe_param
-            Name of the A/E parameter to use as starting point.
+            Name of the A/E parameter to use as the starting point for correction.
         out_param
-            Name of the output parameter for the drift-time-corrected A/E in the dataframe and to
-            be added to the calibration dictionary.
+            Name of the output parameter for the drift-time-corrected A/E,
+            stored in the DataFrame and added to the calibration dictionary.
+        mode
+            Mode used to estimate the correction coefficient. Options:
+            - ``"mcdrift"``  : Minimum Covariance Determinant (MCD) based estimation 
+            (improved stability for low statistic and no evident structure)
+            - ``"twoblob"``  : Two-blob Gaussian fit method 
+            (heavily relying on DEP events and clear structure).
         display
             Plot verbosity level.
 
         """
         log.info("Starting A/E drift time correction")
-        self.dt_res_dict = {}
-        try:
-            dep_events = data.query(
-                f"{self.fit_selection}&{self.cal_energy_param}>1582&{self.cal_energy_param}<1602&{self.cal_energy_param}=={self.cal_energy_param}&{aoe_param}=={aoe_param}"
-            )
 
-            hist, bins, var = pgh.get_hist(
-                dep_events[aoe_param],
-                bins=500,
-            )
-            bin_cs = (bins[1:] + bins[:-1]) / 2
-            mu = bin_cs[np.argmax(hist)]
-            aoe_range = [mu * 0.9, mu * 1.1]
+        _modes = {
+            "mcdrift": mcdrift,
+            "twoblob": twoblob,
+        }
 
-            dt_range = [
-                np.nanpercentile(dep_events[self.dt_param], 1),
-                np.nanpercentile(dep_events[self.dt_param], 99),
-            ]
-
-            self.dt_res_dict["final_selection"] = (
-                f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{self.dt_param}>{dt_range[0]}&{self.dt_param}<{dt_range[1]}&{self.dt_param}=={self.dt_param}"
-            )
-
-            final_df = dep_events.query(self.dt_res_dict["final_selection"])
-
-            hist, bins, var = pgh.get_hist(
-                final_df[self.dt_param],
-                dx=32,
-                range=(
-                    np.nanmin(final_df[self.dt_param]),
-                    np.nanmax(final_df[self.dt_param]),
-                ),
-            )
-
-            bcs = pgh.get_bin_centers(bins)
-            mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
-            pk_pars, _pk_covs = pgc.hpge_fit_energy_peak_tops(
-                hist,
-                bins,
-                var=var,
-                peak_locs=mus,
-                n_to_fit=5,
-            )
-
-            mus = pk_pars[:, 0]
-            sigmas = pk_pars[:, 1]
-            amps = pk_pars[:, 2]
-
-            if len(mus) > 2:
-                ids = np.array(
-                    sorted([np.argmax(amps), np.argmax(amps[amps != np.argmax(amps)])])
-                )
-            else:
-                ids = np.full(len(mus), True, dtype=bool)
-            mus = mus[ids]
-            sigmas = sigmas[ids]
-            amps = amps[ids]
-
-            self.dt_res_dict["dt_fit"] = {"mus": mus, "sigmas": sigmas, "amps": amps}
-
-            if len(mus) < 2:
-                log.info("Only 1 drift time peak found, no correction needed")
-                self.alpha = 0
-
-            else:
-                aoe_grp1 = self.dt_res_dict["aoe_grp1"] = (
-                    f"{self.dt_param}>{mus[0] - 2 * sigmas[0]} & {self.dt_param}<{mus[0] + 2 * sigmas[0]}"
-                )
-                aoe_grp2 = self.dt_res_dict["aoe_grp2"] = (
-                    f"{self.dt_param}>{mus[1] - 2 * sigmas[1]} & {self.dt_param}<{mus[1] + 2 * sigmas[1]}"
-                )
-
-                aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
-                    final_df.query(aoe_grp1)[aoe_param], pdf=self.pdf, display=display
-                )
-
-                self.dt_res_dict["aoe_fit1"] = {
-                    "pars": aoe_pars.to_dict(),
-                    "errs": aoe_errs.to_dict(),
-                }
-
-                aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
-                    final_df.query(aoe_grp2)[aoe_param], pdf=self.pdf, display=display
-                )
-
-                self.dt_res_dict["aoe_fit2"] = {
-                    "pars": aoe_pars2.to_dict(),
-                    "errs": aoe_errs2.to_dict(),
-                }
-
-                try:
-                    self.alpha = (aoe_pars2["mu"] - aoe_pars["mu"]) / (
-                        (mus[0] * aoe_pars["mu"]) - (mus[1] * aoe_pars2["mu"])
-                    )
-                except ZeroDivisionError:
-                    self.alpha = 0
-                self.dt_res_dict["alpha"] = self.alpha
-                log.info("dtcorr successful alpha:%s", self.alpha)
-
-        except BaseException as e:
-            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
-                raise (e)
-            log.error("Drift time correction failed")
+        if mode not in _modes:
             self.alpha = 0
+            log.error(
+                f"Unknown mode '{mode}' for drift time correction. "
+                f"Valid options are: {list(_modes)}"
+            )
+            return
 
-        data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
-        self.update_cal_dicts(
-            {
-                out_param: {
-                    "expression": f"{aoe_param}*(1+a*{self.dt_param})",
-                    "parameters": {"a": self.alpha},
-                }
-            }
+        self.alpha, self.dt_res_dict = _modes[mode](
+            data,
+            aoe_param,
+            dt_param=self.dt_param,
+            fit_selection=self.fit_selection,
+            cal_energy_param=self.cal_energy_param,
+            pdf=self.pdf,
+            debug_mode=self.debug_mode,
+            display=display,
         )
-
-    def MCDrift(
-        self,
-        data: pd.DataFrame,
-        aoe_param,
-        out_param="AoE_DTcorr",
-    ):
-        """
-        Calculates the drift time correction for the A/E parameter using the
-        Minimum Covariance Determinant (MCD) method and PCA on the (AoE, dt_eff) distribution.
-
-        Parameters
-        ----------
-        data
-            DataFrame containing the data.
-        aoe_param
-            Name of the A/E parameter to use as starting point.
-        out_param
-            Name of the output parameter for the drift-time-corrected A/E.
-        """
-        log.info("Starting A/E drift time correction (MCD method)")
-        self.dt_res_dict = {}
-        try:
-            CC_events = data.query(
-                f"{self.fit_selection}&{self.cal_energy_param}=={self.cal_energy_param}&{aoe_param}=={aoe_param}"
-            )
-
-            peaks = np.array(
-                [1080, 1094, 1459, 1512, 1552, 1620, 1650, 1670, 1830, 2105]
-            )
-
-            CC_selection = (CC_events[self.cal_energy_param] >= 1000) & (
-                CC_events[self.cal_energy_param] <= 2400
-            )
-            for peak in peaks:
-                CC_selection &= ~(
-                    (CC_events[self.cal_energy_param] >= peak - 5)
-                    & (CC_events[self.cal_energy_param] <= peak + 5)
-                )
-            CC_events = CC_events[CC_selection]
-            aoe_vals = CC_events[aoe_param].to_numpy()
-            dt_vals = (
-                CC_events[self.dt_param].to_numpy() / 1000.0
-            )  # Compute alpha in us for more stability
-            mcd_data = np.column_stack([aoe_vals, dt_vals])
-
-            # --- find AoE range ---
-            classifier = mcd_data[:, 0]
-            xrange = (0.9, 1.1)
-            bin_width_x = (
-                0.5
-                * (np.nanpercentile(classifier, 75) - np.nanpercentile(classifier, 25))
-                * len(classifier) ** (-1 / 3)
-            )
-            xbins = int((xrange[1] - xrange[0]) / bin_width_x)
-            counts, bin_edges = np.histogram(
-                classifier, bins=xbins, range=xrange, density=True
-            )
-            bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-            peak_position = bin_centers[np.argmax(counts)]
-            half_max = np.max(counts) / 2.0
-            indices_above_half = np.where(counts >= half_max)[0]
-            bw = bin_centers[1] - bin_centers[0]
-            fwhm = (
-                bin_centers[indices_above_half[-1]]
-                - bin_centers[indices_above_half[0]]
-                + bw
-            )
-            x_low = peak_position - 2 * fwhm
-            x_high = peak_position + 3 * fwhm
-
-            # --- MCD fit ---
-            in_x = (mcd_data[:, 0] >= x_low) & (mcd_data[:, 0] <= x_high)
-            in_y = (mcd_data[:, 1] >= 0) & (
-                mcd_data[:, 1] <= np.quantile(mcd_data[:, 1], 0.999)
-            )
-            subset = mcd_data[in_x & in_y]
-            mcd = MinCovDet().fit(subset)
-
-            # --- PCA slope ---
-            _, eigvecs = np.linalg.eigh(mcd.covariance_)
-            principal = eigvecs[:, -1]
-            if abs(principal[0]) > abs(principal[1]):
-                log.warning(
-                    "Principal eigenvector not aligned with AoE axis (|v_aoe|=%.4f > |v_dt|=%.4f), "
-                    "switching to minor eigenvector",
-                    abs(principal[0]),
-                    abs(principal[1]),
-                )
-                principal = eigvecs[:, -2]
-
-            if abs(principal[1]) < 1e-10:
-                msg = "Eigenvector has near-zero dt component, alpha set to 0"
-                raise ValueError(msg)
-
-            slope_us = principal[0] / principal[1]
-
-            self.alpha = -slope_us / 1000.0
-            self.dt_res_dict["alpha"] = self.alpha
-            log.info("dtcorr (MCD) successful alpha: %s", self.alpha)
-
-        except BaseException as e:
-            if isinstance(e, KeyboardInterrupt) or self.debug_mode:
-                raise e
-            log.error("Drift time correction (MCD) failed")
-            self.alpha = 0
 
         data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
         self.update_cal_dicts(
@@ -2040,7 +2135,8 @@ class CalAoE:
         sf_nsamples: int = 11,
         sf_cut_range: tuple = (-5, 5),
         timecorr_mode: str = "full",
-        override_dict: dict | None = None,
+        dtcorr_mode: str = "mcdrift",
+        override_dict: dict | None = None
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -2067,6 +2163,8 @@ class CalAoE:
             Range of A/E cut values to use for the survival fraction sweep.
         timecorr_mode
             Mode to use for the time correction; see :meth:`time_correction` for details.
+        dtcorr_mode
+            Mode to use for the drift time correction; see :meth:`drift_time_correction` for details.
         override_dict
             Optional dictionary of pre-computed calibration entries that bypass one or more
             fit steps. Each key should map to a sub-dict with ``"expression"`` (a string
@@ -2110,7 +2208,7 @@ class CalAoE:
         if self.dt_corr is True:
             aoe_param = "AoE_DTcorr"
             if override_dict is None or "AoE_DTcorr" not in override_dict:
-                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param)
+                self.drift_time_correction(df, "AoE_Timecorr", out_param=aoe_param, mode=dtcorr_mode)
             else:
                 self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
                 df["AoE_DTcorr"] = ne.evaluate(
