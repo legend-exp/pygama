@@ -111,6 +111,10 @@ def gather_pulse_data(
         chan_tcm_indexs = np.where(ak.flatten(tcm.table_key) == table_id)[0].to_numpy()
         tbl_idxs_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
 
+        if len(tbl_idxs_ch) == 0:
+            msg = f"No entries for channel {channel}"
+            log.warning(msg)
+            continue  # would break lgdo_obj.view_as("np") otherwise
         # read the data in
         lgdo_obj = lh5.read(
             f"/{channel}/{tierinfo.group}/{column}", tierinfo.file, idx=tbl_idxs_ch

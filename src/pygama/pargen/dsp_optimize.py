@@ -40,7 +40,7 @@ def run_one_dsp(
     Parameters
     ----------
     tb_data
-        Input LH5 table of waveform data.  Typically a pre-selected subset
+        Input LH5 table of waveform data.  Typically a preselected subset
         is passed so optimisation does not run over the full dataset.
     dsp_config
         DSP processing chain configuration (see ``build_processing_chain``).
