@@ -3,8 +3,6 @@ Welcome to pygama's documentation!
 
 *pygama* is a Python package for:
 
-* converting physics data acquisition system output to LEGEND LH5-format HDF5 files
-* performing bulk digital signal processing on time-series data
 * optimizing those digital signal processing (DSP) routines and tuning associated analysis parameters
 * generating and selecting high-level event data for further analysis
 
@@ -45,6 +43,27 @@ If you plan to develop *pygama*, refer to the :doc:`developer's guide
 
 Next steps
 ----------
+
+Start with the :doc:`package overview <overview>` for a high-level description
+of *pygama*'s data tiers and main sub-packages.  Then dive into the
+:doc:`module guides <manuals/index>` for detailed documentation of each
+sub-package:
+
+* :doc:`manuals/hit` — hit-tier production from DSP parameters
+* :doc:`manuals/evt` — TCM and event-tier building
+* :doc:`manuals/math` — statistical distributions and fitting utilities
+* :doc:`manuals/pargen` — detector calibration and parameter generation
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Documentation
+
+   overview
+
+.. toctree::
+   :maxdepth: 2
+
+   manuals/index
 
 .. toctree::
    :maxdepth: 1
