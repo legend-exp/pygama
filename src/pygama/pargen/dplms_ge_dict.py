@@ -38,7 +38,8 @@ def dplms_ge_dict(
     Parameters
     ----------
     raw_fft
-        table with fft raw data
+        Table with FFT raw data already baseline-selected upstream. All events in
+        this table are used to estimate the noise matrix.
     raw_cal
         table with cal raw data
     dsp_config
@@ -56,7 +57,7 @@ def dplms_ge_dict(
     """
 
     t0 = time.time()
-    log.info("Selecting baselines")
+    log.info("Using baseline-selected FFT events")
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
 
@@ -64,15 +65,10 @@ def dplms_ge_dict(
     log.info("... %s baselines", len(dsp_fft[bl_field].values.nda))
 
     bls = dsp_fft[bl_field].values.nda[:, : dplms_dict["bsize"]]
-    bls_par = {}
-    bls_cut_pars = list(dplms_dict["bls_cut_pars"])
-    for par in bls_cut_pars:
-        bls_par[par] = dsp_fft[dplms_dict["bls_cut_pars"][par]["cut_parameter"]].nda
     t1 = time.time()
     log.info(
-        "total events %s, %s baseline selected in %.2f s",
+        "using %s baseline-selected events for noise estimation in %.2f s",
         len(raw_fft),
-        len(bls),
         t1 - t0,
     )
     log.info(
