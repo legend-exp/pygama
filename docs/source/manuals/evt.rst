@@ -13,10 +13,6 @@ steps in the LEGEND processing chain:
 2. **Building the event tier** — evaluating per-event quantities by
    aggregating channel-level data according to a user-supplied configuration.
 
-.. contents:: Contents
-   :local:
-   :depth: 2
-
 Overview
 --------
 
@@ -25,16 +21,16 @@ Data from a multi-channel detector system is stored channel-by-channel in the
 signals in several channels at nearly the same time.  The ``evt`` module
 reconstructs these physics events in two stages.
 
-First, :func:`build_tcm` scans the per-channel timestamp columns and groups
-rows that fall within a configurable coincidence window into *events*.  The
-result is a TCM table containing, for each event, a list of ``(channel,
-row)`` pairs — one for every hit that belongs to that event.
+First, :func:`~pygama.evt.build_tcm.build_tcm` scans the per-channel timestamp
+columns and groups rows that fall within a configurable coincidence window into
+*events*.  The result is a TCM table containing, for each event, a list of
+``(channel, row)`` pairs — one for every hit that belongs to that event.
 
-Second, :func:`build_evt` reads the TCM together with the ``hit`` and ``dsp``
-tiers, evaluates arbitrary expressions over the contributing hits, and writes
-the results to the ``evt`` tier.  The expressions and the aggregation strategy
-(e.g. sum, take-first, take-last, …) are specified in a JSON configuration
-file.
+Second, :func:`~pygama.evt.build_evt.build_evt` reads the TCM together with
+the ``hit`` and ``dsp`` tiers, evaluates arbitrary expressions over the
+contributing hits, and writes the results to the ``evt`` tier.  The expressions
+and the aggregation strategy (e.g. sum, take-first, take-last, …) are specified
+in a JSON configuration file.
 
 Submodules
 ----------
@@ -42,64 +38,75 @@ Submodules
 build_tcm
 ^^^^^^^^^
 
-.. automodule:: pygama.evt.build_tcm
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.build_tcm.build_tcm`
+     - Scan per-channel timestamp columns and group coincident hits into physics
+       events, producing the Time Coincidence Map.
 
 build_evt
 ^^^^^^^^^
 
-.. automodule:: pygama.evt.build_evt
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.build_evt.build_evt`
+     - Read the TCM and hit/dsp tiers, evaluate per-event expressions, and
+       write the event tier.
+   * - :func:`~pygama.evt.build_evt.build_evt_cols`
+     - Evaluate a subset of event-tier columns, useful for incremental builds.
 
 tcm
 ^^^
 
-.. automodule:: pygama.evt.tcm
-   :members:
-   :undoc-members:
-   :no-index:
+:mod:`pygama.evt.tcm` defines the data structures used to represent the TCM
+within Python.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.tcm.generate_tcm_cols`
+     - Generate the channel and row-in-table index arrays that make up the TCM
+       from a set of sorted per-channel timestamp columns.
 
 aggregators
 ^^^^^^^^^^^
 
 The :mod:`~pygama.evt.aggregators` module contains the low-level functions
-that :func:`build_evt` calls to collapse per-channel hit data into a single
-per-event scalar or array.  Each aggregator receives the full TCM, the list of
-channels to aggregate over, an expression string, and optional query masks and
-sorting columns.
+that :func:`~pygama.evt.build_evt.build_evt` calls to collapse per-channel hit
+data into a single per-event scalar or array.  Each aggregator receives the
+full TCM, the list of channels to aggregate over, an expression string, and
+optional query masks and sorting columns.
 
-Available aggregators:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-* ``evaluate_to_first_or_last`` — return the expression value for the channel
-  whose *sorter* column is the smallest (``is_first=True``) or largest
-  (``is_first=False``) within the event (e.g. the channel with the earliest
-  or latest timestamp).
-* ``evaluate_to_tot_or_any`` — return the scalar sum (or logical OR) of the
-  expression across all channels in the event.
-* ``evaluate_to_scalar`` — evaluate a generic expression that produces one
-  value per event using arbitrary aggregation logic.
-* ``evaluate_at_channel`` — evaluate an expression at a specific named channel
-  rather than aggregating across all channels.
-* ``evaluate_to_vector`` — return the per-hit expression values as a
-  :class:`~lgdo.types.vectorofvectors.VectorOfVectors`, preserving the
-  per-channel structure within each event.
-
-.. automodule:: pygama.evt.aggregators
-   :members:
-   :undoc-members:
-   :no-index:
-
-utils
-^^^^^
-
-.. automodule:: pygama.evt.utils
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.aggregators.evaluate_to_first_or_last`
+     - Return the expression value for the channel whose *sorter* column is the
+       smallest or largest within the event (e.g. earliest or latest timestamp).
+   * - :func:`~pygama.evt.aggregators.evaluate_to_scalar`
+     - Evaluate a generic expression that produces one value per event using
+       arbitrary aggregation logic.
+   * - :func:`~pygama.evt.aggregators.evaluate_at_channel`
+     - Evaluate an expression at a specific named channel rather than
+       aggregating across all channels.
+   * - :func:`~pygama.evt.aggregators.evaluate_to_vector`
+     - Return the per-hit expression values as a
+       :class:`~lgdo.types.vectorofvectors.VectorOfVectors`, preserving the
+       per-channel structure within each event.
 
 .. _evt-modules:
 
@@ -108,9 +115,9 @@ modules — detector-specific processors
 
 The :mod:`pygama.evt.modules` sub-package provides ready-made *event
 processors* — callables with a standardised signature that can be invoked
-directly from the :func:`build_evt` JSON configuration.  Each processor
-receives four positional arguments that are injected automatically by
-:func:`build_evt`:
+directly from the :func:`~pygama.evt.build_evt.build_evt` JSON configuration.
+Each processor receives four positional arguments injected automatically by
+:func:`~pygama.evt.build_evt.build_evt`:
 
 .. code-block:: python
 
@@ -136,16 +143,19 @@ geds
 :mod:`pygama.evt.modules.geds` provides processors specific to HPGe
 (germanium) detectors.
 
-* **apply_recovery_cut** — flags events that fall within a configurable time
-  window after a discharge event, allowing recovery-time cuts to be applied.
-* **apply_xtalk_correction** — corrects cross-talk between HPGe channels by
-  subtracting the estimated cross-talk contribution from the energy of each
-  hit.
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
 
-.. automodule:: pygama.evt.modules.geds
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.modules.geds.apply_recovery_cut`
+     - Flag events within a configurable time window after a discharge event.
+   * - :func:`~pygama.evt.modules.geds.apply_xtalk_correction`
+     - Subtract the estimated cross-talk contribution from the energy of each
+       hit.
+   * - :func:`~pygama.evt.modules.geds.apply_xtalk_correction_and_calibrate`
+     - Apply cross-talk correction and energy calibration in a single step.
 
 spms
 """"
@@ -153,15 +163,17 @@ spms
 :mod:`pygama.evt.modules.spms` provides processors for Silicon PhotoMultiplier
 (SiPM) channels, used in the liquid-argon veto system.
 
-* **gather_pulse_data** — collects SiPM pulse observables (amplitude,
-  arrival time, …) from all SiPM channels into a
-  :class:`~lgdo.types.vectorofvectors.VectorOfVectors` indexed by event, with
-  optional amplitude and timing masks.
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
 
-.. automodule:: pygama.evt.modules.spms
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.modules.spms.gather_pulse_data`
+     - Collect SiPM pulse observables (amplitude, arrival time, …) from all
+       SiPM channels into a
+       :class:`~lgdo.types.vectorofvectors.VectorOfVectors` indexed by event,
+       with optional amplitude and timing masks.
 
 larveto
 """""""
@@ -169,15 +181,15 @@ larveto
 :mod:`pygama.evt.modules.larveto` implements the statistical classifier used
 for the LEGEND-200 liquid-argon veto.
 
-* **l200_combined_test_stat** — computes a combined test statistic that
-  correlates HPGe hit timing with SiPM pulse information, accounting for
-  channel-specific noise rates and response curves.  The output is a per-event
-  scalar suitable for use as a veto discriminant.
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
 
-.. automodule:: pygama.evt.modules.larveto
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.modules.larveto.l200_combined_test_stat`
+     - Compute a combined test statistic correlating HPGe hit timing with SiPM
+       pulse information, for use as a veto discriminant.
 
 legend
 """"""
@@ -186,10 +198,16 @@ legend
 that combine outputs from several sub-systems for the full LEGEND experimental
 configuration.
 
-.. automodule:: pygama.evt.modules.legend
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Function
+     - Description
+   * - :func:`~pygama.evt.modules.legend.metadata`
+     - Attach detector metadata fields to the event table.
+   * - :func:`~pygama.evt.modules.legend.convert_rawid`
+     - Convert raw channel IDs to detector names using the channel mapping.
 
 xtalk
 """""
@@ -197,18 +215,15 @@ xtalk
 :mod:`pygama.evt.modules.xtalk` contains the cross-talk matrix arithmetic
 used by :mod:`~pygama.evt.modules.geds`.
 
-.. automodule:: pygama.evt.modules.xtalk
-   :members:
-   :undoc-members:
-   :no-index:
+For the complete parameter reference see :mod:`pygama.evt`.
 
 .. _evt-config:
 
 Configuration reference
 -----------------------
 
-:func:`build_evt` is driven by a JSON (or Python dict) configuration.  A
-minimal example::
+:func:`~pygama.evt.build_evt.build_evt` is driven by a JSON (or Python dict)
+configuration.  A minimal example::
 
     {
       "channels": {

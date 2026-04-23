@@ -10,17 +10,14 @@ The :mod:`pygama.hit` sub-package transforms ``dsp``-tier tables into
 principal mechanism through which calibrated quantities, quality-cut flags, and
 other derived parameters are added to the data before event building.
 
-.. contents:: Contents
-   :local:
-   :depth: 2
-
 Overview
 --------
 
-The hit tier is produced by :func:`build_hit`.  The function reads one or more
-:class:`~lgdo.types.table.Table` objects from an LH5 file and, for each table,
-evaluates a set of string expressions against the existing columns.  The
-resulting new columns are written to an output LH5 file.
+The hit tier is produced by :func:`~pygama.hit.build_hit.build_hit`.  The
+function reads one or more :class:`~lgdo.types.table.Table` objects from an
+LH5 file and, for each table, evaluates a set of string expressions against
+the existing columns.  The resulting new columns are written to an output LH5
+file.
 
 Expressions are evaluated column-by-column (not row-by-row) using
 :meth:`~lgdo.types.table.Table.eval`, which internally relies on `numexpr
@@ -88,33 +85,37 @@ ratio ``AoE``:
     }
 
 Note that ``AoE`` references ``calE``, which is itself a derived column.
-Within a single table, :func:`build_hit` automatically orders operations based
-on their expression dependencies, so columns are evaluated in a
-dependency-respecting order rather than strictly in JSON insertion order.
-This dependency-based reordering is what allows forward references like this
-to be supported.
+Within a single table, :func:`~pygama.hit.build_hit.build_hit` automatically
+orders operations based on their expression dependencies, so columns are
+evaluated in a dependency-respecting order rather than strictly in JSON
+insertion order.  This dependency-based reordering is what allows forward
+references like this to be supported.
 
 Per-table configuration
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 When an LH5 file contains tables for many channels, it is often convenient to
 apply slightly different configurations to different channels (e.g. different
-calibration constants).  :func:`build_hit` supports this through the
-``lh5_tables_config`` argument, which maps LH5 table paths to individual
-configuration dictionaries::
+calibration constants).  :func:`~pygama.hit.build_hit.build_hit` supports this
+through the ``lh5_tables_config`` argument, which maps LH5 table paths to
+individual configuration dictionaries::
 
     lh5_tables_config = {
         "ch1084803/dsp": {"outputs": [...], "operations": {...}},
         "ch1084804/dsp": {"outputs": [...], "operations": {...}},
     }
 
-Submodule
----------
+API reference
+-------------
 
-build_hit
-^^^^^^^^^
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
 
-.. automodule:: pygama.hit.build_hit
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.hit.build_hit.build_hit`
+     - Read DSP-tier LH5 tables and write calibrated hit-tier quantities by
+       evaluating the supplied configuration expressions.
+
+For the complete parameter reference see :mod:`pygama.hit`.

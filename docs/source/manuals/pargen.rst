@@ -11,10 +11,6 @@ Typical outputs are JSON parameter files containing calibration polynomials,
 cut thresholds, and filter settings, which are then referenced in the hit-tier
 configuration.
 
-.. contents:: Contents
-   :local:
-   :depth: 2
-
 Overview
 --------
 
@@ -44,31 +40,36 @@ energy_cal
 ^^^^^^^^^^
 
 :mod:`pygama.pargen.energy_cal` implements the end-to-end HPGe energy
-calibration workflow.  The central class is :class:`~pygama.pargen.energy_cal.HPGeCalibration`.
+calibration workflow.
 
-**Workflow:**
+The central class is :class:`~pygama.pargen.energy_cal.HPGeCalibration`, which
+encapsulates the full calibration sequence:
 
-1. ``hpge_find_energy_peaks`` — searches the uncalibrated energy spectrum
-   for local maxima and matches them to the known gamma-ray lines supplied
-   by the user, using the ratio of peak spacings as a fingerprint.
-2. ``hpge_get_energy_peaks`` — refines the peak positions around the initial
-   guesses.
-3. ``hpge_fit_energy_peaks`` — fits each peak with the
-   :obj:`~pygama.math.functions.hpge_peak.hpge_peak` model, returning
-   the centroid, resolution, and peak shape parameters together with their
-   uncertainties.
-4. The calibration method fits a polynomial (default degree 1) through the
-   ``(ADC centroid, keV energy)`` pairs to obtain the calibration function.
-   The polynomial coefficients are stored in :attr:`~pygama.pargen.energy_cal.HPGeCalibration.results`.
+1. Search the uncalibrated energy spectrum for local maxima and match them to
+   known gamma-ray lines using the ratio of peak spacings as a fingerprint.
+2. Refine the peak positions around the initial guesses.
+3. Fit each peak with the :obj:`~pygama.math.functions.hpge_peak.hpge_peak`
+   model, returning the centroid, resolution, and peak-shape parameters with
+   their uncertainties.
+4. Fit a polynomial (default degree 1) through the ``(ADC centroid, keV
+   energy)`` pairs to obtain the calibration function.
 
-All intermediate results are accumulated in a ``results`` dictionary so that
-the full calibration history can be inspected and stored as a JSON parameter
-file.
+All intermediate results are accumulated so that the full calibration history
+can be inspected and stored as a JSON parameter file.
 
-.. automodule:: pygama.pargen.energy_cal
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 45 55
+
+   * - Class / Function
+     - Description
+   * - :class:`~pygama.pargen.energy_cal.HPGeCalibration`
+     - Main calibration class; runs the full peak-finding, fitting, and
+       polynomial-mapping workflow.
+   * - :class:`~pygama.pargen.energy_cal.FWHMLinear`
+     - Linear model for the energy dependence of the FWHM resolution.
+   * - :class:`~pygama.pargen.energy_cal.FWHMQuadratic`
+     - Quadratic model for the energy dependence of the FWHM resolution.
 
 AoE_cal
 ^^^^^^^
@@ -77,9 +78,7 @@ AoE_cal
 parameter used to discriminate single-site events (e.g. double-beta decay
 signal) from multi-site Compton-scatter backgrounds.
 
-The central class is :class:`~pygama.pargen.AoE_cal.CalAoE`.
-
-**Key steps:**
+Key steps performed by :class:`~pygama.pargen.AoE_cal.CalAoE`:
 
 * **Energy-dependence correction** — the A/E ratio exhibits a slow dependence
   on energy; this is modelled and corrected so that the corrected A/E is
@@ -89,26 +88,26 @@ The central class is :class:`~pygama.pargen.AoE_cal.CalAoE`.
 * **Cut determination** — the cut value is set to achieve a specified
   survival fraction in the double-escape peak (DEP), which is a proxy for
   signal-like events.
-* **Survival fractions** — :mod:`~pygama.pargen.AoE_cal` wraps
-  :mod:`~pygama.pargen.survival_fractions` to calculate the signal and
-  background survival fractions as a function of the cut position.
 
-.. automodule:: pygama.pargen.AoE_cal
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Class
+     - Description
+   * - :class:`~pygama.pargen.AoE_cal.CalAoE`
+     - End-to-end A/E calibration class; performs energy-dependence and
+       optional time-dependence corrections and determines the cut threshold.
 
 lq_cal
 ^^^^^^
 
 :mod:`pygama.pargen.lq_cal` calibrates the late-charge (LQ) parameter, which
-is defined as the ratio of the charge collected after a fixed time delay to
-the total charge.  LQ is sensitive to the depth of the interaction within the
+is defined as the ratio of the charge collected after a fixed time delay to the
+total charge.  LQ is sensitive to the depth of the interaction within the
 detector and provides complementary MSE discrimination to A/E.
 
-The central class is :class:`~pygama.pargen.lq_cal.LQCal`.
-
-**Key steps:**
+Key steps performed by :class:`~pygama.pargen.lq_cal.LQCal`:
 
 * **Distribution fitting** — the LQ distribution is histogrammed and fitted
   with a Gaussian model in a signal-dominated region.
@@ -117,10 +116,15 @@ The central class is :class:`~pygama.pargen.lq_cal.LQCal`.
 * **Cut determination** — the cut threshold is derived from the DEP survival
   fraction, consistent with the A/E calibration procedure.
 
-.. automodule:: pygama.pargen.lq_cal
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Class
+     - Description
+   * - :class:`~pygama.pargen.lq_cal.LQCal`
+     - End-to-end LQ calibration class with drift-time correction and cut
+       determination via the DEP survival fraction.
 
 data_cleaning
 ^^^^^^^^^^^^^
@@ -129,46 +133,54 @@ data_cleaning
 applying quality cuts that remove non-physics events from the dataset.
 
 Typical quality parameters include the baseline level, the baseline
-root-mean-square (RMS), and the current-pulse amplitude.  The module fits
-the distribution of each parameter with a Gaussian model and determines
-symmetric or asymmetric cut boundaries at a specified number of sigma.
+root-mean-square (RMS), and the current-pulse amplitude.  The module fits the
+distribution of each parameter and determines cut boundaries at a specified
+number of sigma.
 
-Key functions:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-* :func:`~pygama.pargen.data_cleaning.get_cut_parameters` — fits the
-  distribution of a quality parameter and returns the cut boundaries.
-* :func:`~pygama.pargen.data_cleaning.apply_cuts` — applies a set of
-  cut parameters to a table and returns a boolean mask.
-
-.. automodule:: pygama.pargen.data_cleaning
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.pargen.data_cleaning.generate_cuts`
+     - Fit the distribution of quality parameters and return cut boundaries.
+   * - :func:`~pygama.pargen.data_cleaning.get_cut_indexes`
+     - Apply a set of cut parameters to a dataset and return a boolean mask.
+   * - :func:`~pygama.pargen.data_cleaning.generate_cut_classifiers`
+     - Generate classifier expressions from cut parameters suitable for use
+       in the hit-tier configuration.
 
 dsp_optimize
 ^^^^^^^^^^^^
 
-:mod:`pygama.pargen.dsp_optimize` implements Bayesian optimisation of DSP
-filter parameters (e.g. trapezoidal-filter rise time and flat-top time) to
-minimise the FWHM of a calibration peak.
+:mod:`pygama.pargen.dsp_optimize` implements optimisation of DSP filter
+parameters (e.g. trapezoidal-filter rise time and flat-top time) to minimise
+the FWHM of a calibration peak.
 
-The optimiser wraps a Gaussian-process regressor from `scikit-learn
-<https://scikit-learn.org>`_ and uses it to build a surrogate model of the
-figure-of-merit (FOM) as a function of the filter parameters.  At each
-iteration, the parameter combination that maximises the expected improvement is
-evaluated by running DSP on a representative data sample.
+The :class:`~pygama.pargen.dsp_optimize.BayesianOptimizer` wraps a
+Gaussian-process surrogate model to efficiently search the parameter space,
+evaluating only the most promising configurations by running DSP on a
+representative data sample.  A grid-search alternative is also provided via
+:class:`~pygama.pargen.dsp_optimize.ParGrid`.
 
-Key functions:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-* :func:`~pygama.pargen.dsp_optimize.run_one_dsp` — run a single DSP
-  iteration on a data table and compute the FOM.
-* :func:`~pygama.pargen.dsp_optimize.run_bayesian_optimisation` — Bayesian
-  optimisation loop over the DSP parameter space.
-
-.. automodule:: pygama.pargen.dsp_optimize
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Class / Function
+     - Description
+   * - :class:`~pygama.pargen.dsp_optimize.BayesianOptimizer`
+     - Gaussian-process Bayesian optimisation loop over the DSP parameter
+       space; minimises a figure-of-merit (e.g. peak FWHM).
+   * - :class:`~pygama.pargen.dsp_optimize.ParGrid`
+     - Grid-search optimiser; exhaustively evaluates all parameter
+       combinations in a user-specified grid.
+   * - :func:`~pygama.pargen.dsp_optimize.run_one_dsp`
+     - Run a single DSP pass on a data table and compute the figure-of-merit.
+   * - :func:`~pygama.pargen.dsp_optimize.run_bayesian_optimisation`
+     - Convenience function that sets up and runs the full Bayesian
+       optimisation loop.
 
 noise_optimization
 ^^^^^^^^^^^^^^^^^^
@@ -182,21 +194,15 @@ The strategy is a grid search over the filter parameter space, evaluating the
 ENC peak width (FWHM) at each grid point.  A smooth interpolating spline is
 then fitted to the grid to locate the global minimum.
 
-.. automodule:: pygama.pargen.noise_optimization
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-energy_optimisation
-^^^^^^^^^^^^^^^^^^^
-
-:mod:`pygama.pargen.energy_optimisation` provides additional helpers for
-energy-resolution optimisation that complement :mod:`~pygama.pargen.dsp_optimize`.
-
-.. automodule:: pygama.pargen.energy_optimisation
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.pargen.noise_optimization.noise_optimization`
+     - Run the grid search and spline fit to find the noise-minimising filter
+       parameters.
 
 survival_fractions
 ^^^^^^^^^^^^^^^^^^
@@ -205,19 +211,19 @@ survival_fractions
 survival fractions as a function of a cut threshold.  It is used by both
 :mod:`~pygama.pargen.AoE_cal` and :mod:`~pygama.pargen.lq_cal`.
 
-Key functions:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-* :func:`~pygama.pargen.survival_fractions.get_survival_fraction` — compute
-  the fraction of events in a given energy window that survive a cut.
-* :func:`~pygama.pargen.survival_fractions.get_sf_sweep` — sweep the cut
-  value and return the survival fraction at each point.
-* :func:`~pygama.pargen.survival_fractions.compton_sf` — estimate the
-  survival fraction in the Compton continuum.
-
-.. automodule:: pygama.pargen.survival_fractions
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.pargen.survival_fractions.get_survival_fraction`
+     - Compute the fraction of events in a given energy window that survive a
+       cut at a specific threshold.
+   * - :func:`~pygama.pargen.survival_fractions.get_sf_sweep`
+     - Sweep the cut value and return the survival fraction at each point.
+   * - :func:`~pygama.pargen.survival_fractions.compton_sf`
+     - Estimate the survival fraction in the Compton continuum.
 
 pz_correct
 ^^^^^^^^^^
@@ -226,11 +232,6 @@ pz_correct
 constant for the HPGe preamplifier decay time, which is required by some DSP
 filters.
 
-.. automodule:: pygama.pargen.pz_correct
-   :members:
-   :undoc-members:
-   :no-index:
-
 dplms_ge_dict
 ^^^^^^^^^^^^^
 
@@ -238,15 +239,4 @@ dplms_ge_dict
 configuration dictionaries used by the DPLMS (Data-driven Pseudo-Matched
 Filter) DSP processor for germanium detectors.
 
-.. automodule:: pygama.pargen.dplms_ge_dict
-   :members:
-   :undoc-members:
-   :no-index:
-
-utils
-^^^^^
-
-.. automodule:: pygama.pargen.utils
-   :members:
-   :undoc-members:
-   :no-index:
+For the complete parameter reference see :mod:`pygama.pargen`.

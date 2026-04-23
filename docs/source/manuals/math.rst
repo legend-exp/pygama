@@ -10,10 +10,6 @@ used throughout *pygama*: histogram helpers, probability distributions, and
 fitting routines.  It is designed to be usable independently of the rest of
 the processing chain for ad-hoc data analysis.
 
-.. contents:: Contents
-   :local:
-   :depth: 2
-
 Overview
 --------
 
@@ -24,8 +20,8 @@ Overview
   var)`` triple expected by the fitting routines.
 * **Distributions** — a library of probability density functions (PDFs) and
   cumulative distribution functions (CDFs) that model the signal and
-  background shapes encountered in HPGe detector data.  All functions are JIT-
-  compiled with `Numba <https://numba.readthedocs.io>`_ for speed and are
+  background shapes encountered in HPGe detector data.  All functions are
+  JIT-compiled with `Numba <https://numba.readthedocs.io>`_ for speed and are
   compatible with `iminuit <https://iminuit.readthedocs.io>`_.
 * **Fitting** — thin wrappers around *iminuit* that expose a consistent
   interface for binned and unbinned maximum-likelihood fits, including
@@ -46,11 +42,9 @@ histogram triple ``(hist, bins, var)``:
 * ``var`` — array of per-bin variances; defaults to ``hist`` (Poisson
   statistics) if not supplied.
 
-Key functions:
-
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 35 65
 
    * - Function
      - Description
@@ -58,19 +52,17 @@ Key functions:
      - Bin a 1-D array of data values, returning ``(hist, bins, var)``.
        Accepts a fixed bin count, an explicit array of edges, a bin-width
        ``dx``, or any string accepted by ``numpy.histogram_bin_edges``.
+   * - :func:`~pygama.math.histogram.get_fwhm`
+     - Compute the full-width at half-maximum (FWHM) of a histogram peak.
    * - :func:`~pygama.math.histogram.get_fwfm`
-     - Compute the full-width at a given fraction of the maximum (FWFM) of a
-       histogram peak.
+     - Compute the full-width at a given fraction of the maximum (FWFM).
    * - :func:`~pygama.math.histogram.get_i_local_maxima`
      - Return the indices of local maxima above a threshold, used for
        automatic peak finding.
+   * - :func:`~pygama.math.histogram.get_bin_estimates`
+     - Evaluate a normalised PDF on a histogram grid for use in plotting.
    * - :func:`~pygama.math.histogram.plot_hist`
      - Plot a histogram triple on a Matplotlib axes object.
-
-.. automodule:: pygama.math.histogram
-   :members:
-   :undoc-members:
-   :no-index:
 
 distributions
 ^^^^^^^^^^^^^
@@ -86,7 +78,7 @@ most commonly used in HPGe peak fitting:
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 40 60
 
    * - Distribution
      - Description
@@ -112,15 +104,15 @@ Primitive distributions:
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 70
+   :widths: 40 60
 
    * - Distribution
      - Description
    * - :obj:`~pygama.math.functions.gauss.gaussian`
      - Normal (Gaussian) distribution.
    * - :obj:`~pygama.math.functions.exgauss.exgauss`
-     - Exponentially modified Gaussian (exGaussian); models the low-energy
-       tail of HPGe peaks due to incomplete charge collection.
+     - Exponentially modified Gaussian; models the low-energy tail of HPGe
+       peaks due to incomplete charge collection.
    * - :obj:`~pygama.math.functions.crystal_ball.crystal_ball`
      - Crystal Ball function; a Gaussian with a power-law low-energy tail.
    * - :obj:`~pygama.math.functions.step.step`
@@ -137,63 +129,48 @@ Primitive distributions:
    * - :obj:`~pygama.math.functions.polynomial.nb_poly`
      - Polynomial of arbitrary degree.
 
-.. automodule:: pygama.math.distributions
-   :members:
-   :undoc-members:
-   :no-index:
-
-functions
-^^^^^^^^^
-
-:mod:`pygama.math.functions` contains the individual distribution
-implementations.  Each sub-module defines one distribution.
-
-.. automodule:: pygama.math.functions
-   :members:
-   :undoc-members:
-   :no-index:
-
 binned_fitting
 ^^^^^^^^^^^^^^
 
-:mod:`pygama.math.binned_fitting` provides :func:`~pygama.math.binned_fitting.fit_binned`,
-a unified interface for fitting a function to a histogram triple.
+:mod:`pygama.math.binned_fitting` provides a unified interface for fitting a
+function to a histogram triple.  The default cost function is an extended
+binned log-likelihood fit (:class:`iminuit.cost.ExtendedBinnedNLL`).
 
-Default behaviour is an extended binned log-likelihood fit using
-:class:`iminuit.cost.ExtendedBinnedNLL`.  Least-squares and other cost
-functions are also available.  The function returns arrays of best-fit
-parameter values and their uncertainties, and optionally the full
-:class:`~iminuit.Minuit` object for further inspection.
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
 
-Additional helpers:
-
-* :func:`~pygama.math.binned_fitting.goodness_of_fit` — compute a
-  reduced chi-squared statistic and p-value for a fit result.
-* :func:`~pygama.math.binned_fitting.get_bin_estimates` — evaluate a
-  normalised PDF on a histogram grid for use in plotting.
-
-.. automodule:: pygama.math.binned_fitting
-   :members:
-   :undoc-members:
-   :no-index:
+   * - Function
+     - Description
+   * - :func:`~pygama.math.binned_fitting.fit_binned`
+     - Fit a model to a histogram triple; returns best-fit parameter values,
+       uncertainties, and optionally the full :class:`~iminuit.Minuit` object.
+   * - :func:`~pygama.math.binned_fitting.goodness_of_fit`
+     - Compute a reduced chi-squared statistic and p-value for a fit result.
+   * - :func:`~pygama.math.binned_fitting.gauss_mode_width_max`
+     - Fit a Gaussian to a histogram peak and return the mode, width, and
+       maximum, useful for robust initial-parameter estimation.
 
 unbinned_fitting
 ^^^^^^^^^^^^^^^^
 
-:mod:`pygama.math.unbinned_fitting` provides
-:func:`~pygama.math.unbinned_fitting.fit_unbinned`, the unbinned counterpart
-to :func:`~pygama.math.binned_fitting.fit_binned`.  The default cost function
-is the extended unbinned negative log-likelihood
-(:class:`iminuit.cost.ExtendedUnbinnedNLL`).
+:mod:`pygama.math.unbinned_fitting` provides the unbinned counterpart to
+:mod:`~pygama.math.binned_fitting`.  The default cost function is the extended
+unbinned negative log-likelihood (:class:`iminuit.cost.ExtendedUnbinnedNLL`).
 
 Unbinned fits are preferred when the dataset is small (fewer than a few
 thousand events) or when the bin-size choice would significantly affect the
 result.
 
-.. automodule:: pygama.math.unbinned_fitting
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Function
+     - Description
+   * - :func:`~pygama.math.unbinned_fitting.fit_unbinned`
+     - Fit a model to an array of unbinned data values using extended
+       unbinned negative log-likelihood minimisation.
 
 hpge_peak_fitting
 ^^^^^^^^^^^^^^^^^
@@ -203,10 +180,19 @@ combine the distribution and fitting machinery to fit the standard HPGe peak
 model (:obj:`~pygama.math.functions.hpge_peak.hpge_peak`) to data, with
 automatic initial-parameter estimation.
 
-.. automodule:: pygama.math.hpge_peak_fitting
-   :members:
-   :undoc-members:
-   :no-index:
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Function
+     - Description
+   * - :func:`~pygama.math.hpge_peak_fitting.hpge_peak_fwhm`
+     - Compute the FWHM of an HPGe peak from the fit parameters, propagating
+       uncertainties analytically.
+   * - :func:`~pygama.math.hpge_peak_fitting.hpge_peak_fwfm`
+     - Compute the full-width at a given fraction of the maximum.
+   * - :func:`~pygama.math.hpge_peak_fitting.hpge_peak_mode`
+     - Return the mode (peak position) of the HPGe peak model.
 
 least_squares
 ^^^^^^^^^^^^^
@@ -214,26 +200,10 @@ least_squares
 :mod:`pygama.math.least_squares` provides simple linear least-squares helpers
 used internally by :mod:`pygama.pargen.energy_cal`.
 
-.. automodule:: pygama.math.least_squares
-   :members:
-   :undoc-members:
-   :no-index:
-
 units
 ^^^^^
 
 :mod:`pygama.math.units` exposes the unit registry (backed by `pint
 <https://pint.readthedocs.io>`_) and a small set of unit-conversion helpers.
 
-.. automodule:: pygama.math.units
-   :members:
-   :undoc-members:
-   :no-index:
-
-utils
-^^^^^
-
-.. automodule:: pygama.math.utils
-   :members:
-   :undoc-members:
-   :no-index:
+For the complete parameter reference see :mod:`pygama.math`.
