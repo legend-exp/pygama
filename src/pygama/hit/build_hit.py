@@ -156,6 +156,9 @@ def build_hit(
                 if "lgdo_attrs" in info:
                     outcol.attrs |= info["lgdo_attrs"]
 
+                if "description" in info:
+                    outcol.attrs["description"] = info["description"]
+
                 log.debug("made new column %r=%r", outname, outcol)
                 outtbl_obj.add_column(outname, outcol)
 

@@ -212,6 +212,33 @@ def test_build_hit_calc(dsp_test_file, tmp_dir):
         assert np.all(np.isclose(df_hit, np.sqrt(1.23 + 42.69 * (2 * df_dsp) ** 2)))
 
 
+def test_description_attr(dsp_test_file, tmp_dir):
+    outfile = f"{tmp_dir}/test_description_hit.lh5"
+
+    lh5_tables_config = {
+        "/ch1084803/dsp": {
+            "outputs": ["calE"],
+            "operations": {
+                "calE": {
+                    "expression": "sqrt(a + b * trapEmax**2)",
+                    "parameters": {"a": 1.23, "b": 42.69},
+                    "description": "Calibrated energy in keV",
+                }
+            },
+        }
+    }
+
+    build_hit(
+        dsp_test_file,
+        outfile=outfile,
+        lh5_tables_config=lh5_tables_config,
+        wo_mode="overwrite",
+    )
+
+    tbl = lh5.read("ch1084803/hit", outfile)
+    assert tbl.calE.attrs["description"] == "Calibrated energy in keV"
+
+
 def test_vov_input(lgnd_test_data, tmp_dir):
     infile = lgnd_test_data.get_path(
         "lh5/l200-p03-r000-phy-20230312T055349Z-tier_psp.lh5"
