@@ -308,6 +308,9 @@ def build_evt_cols(
                 if "lgdo_attrs" in v:
                     obj.attrs |= v["lgdo_attrs"]
 
+                if "description" in v:
+                    obj.attrs["description"] = v["description"]
+
             # else we build the event entry
             else:
                 if "channels" not in v:
@@ -356,6 +359,9 @@ def build_evt_cols(
                 # add attribute if present
                 if "lgdo_attrs" in v:
                     obj.attrs |= v["lgdo_attrs"]
+
+                if "description" in v:
+                    obj.attrs["description"] = v["description"]
 
             # cast to type, if required
             # hijack the poor LGDO

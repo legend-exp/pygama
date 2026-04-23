@@ -368,6 +368,33 @@ def test_build_evt_write(files_config_write):
     assert Path(outfile).exists()
 
 
+def test_description_attr(files_config_nowrite):
+    config = {
+        "channels": {"geds_on": ["ch1084803", "ch1084804", "ch1121600"]},
+        "outputs": ["multiplicity", "multiplicity_squared"],
+        "operations": {
+            "multiplicity": {
+                "channels": "geds_on",
+                "aggregation_mode": "sum",
+                "expression": "hit.cuspEmax_ctc_cal > a",
+                "parameters": {"a": 25},
+                "initial": 0,
+                "description": "Number of triggered detectors",
+            },
+            "multiplicity_squared": {
+                "expression": "evt.multiplicity * evt.multiplicity",
+                "description": "Square of event multiplicity",
+            },
+        },
+    }
+
+    evt = build_evt(files_config_nowrite, config=config)
+    assert evt.multiplicity.attrs["description"] == "Number of triggered detectors"
+    assert (
+        evt.multiplicity_squared.attrs["description"] == "Square of event multiplicity"
+    )
+
+
 def test_buffered_build_evt(files_config_nowrite):
     evt1 = build_evt(
         files_config_nowrite,
