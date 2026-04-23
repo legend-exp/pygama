@@ -14,7 +14,6 @@ from lgdo import Table
 from scipy.signal import convolve, convolve2d
 from scipy.stats import chi2
 
-from pygama.pargen.data_cleaning import generate_cuts
 from pygama.pargen.dsp_optimize import run_one_dsp
 from pygama.pargen.energy_optimisation import fom_fwhm_with_alpha_fit
 
@@ -61,20 +60,10 @@ def dplms_ge_dict(
 
     dsp_fft = run_one_dsp(raw_fft, dsp_config, db_dict=par_dsp)
 
-    cut_dict = generate_cuts(dsp_fft, cut_dict=dplms_dict["bls_cut_pars"])
-    log.debug("Cuts are %s", cut_dict)
-    idxs = np.full(len(dsp_fft), True, dtype=bool)
-    for outname, info in cut_dict.items():
-        outcol = dsp_fft.eval(info["expression"], info.get("parameters", None))
-        dsp_fft.add_column(outname, outcol)
-    for cut in cut_dict:
-        idxs = dsp_fft[cut].nda & idxs
-    log.debug("Applied Cuts")
-
     bl_field = dplms_dict["bl_field"]
-    log.info("... %s baselines after cuts", len(dsp_fft[bl_field].values.nda[idxs, :]))
+    log.info("... %s baselines", len(dsp_fft[bl_field].values.nda))
 
-    bls = dsp_fft[bl_field].values.nda[idxs, : dplms_dict["bsize"]]
+    bls = dsp_fft[bl_field].values.nda[:, : dplms_dict["bsize"]]
     bls_par = {}
     bls_cut_pars = list(dplms_dict["bls_cut_pars"])
     for par in bls_cut_pars:
@@ -304,27 +293,7 @@ def dplms_ge_dict(
                 ax.plot(wf)
         ax.legend(loc="upper right")
         plot_dict["bls"] = fig
-        fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
-        for ii, par in enumerate(bls_cut_pars):
-            if "parameters" in cut_dict[par]:
-                if "a" in cut_dict[par]["parameters"]:
-                    llo = cut_dict[par]["parameters"]["a"]
-                else:
-                    llo = np.nan
-                if "b" in cut_dict[par]["parameters"]:
-                    lup = cut_dict[par]["parameters"]["b"]
-                else:
-                    lup = np.nan
-            mean = (lup + llo) / 2
-            plo, pup = mean - 2 * (mean - llo), mean + 2 * (lup - mean)
-            hh, bb = np.histogram(bls_par[par], bins=np.linspace(plo, pup, 200))
-            ax.flat[ii].plot(bb[1:], hh, ds="steps", label=f"cut on {par}")
-            ax.flat[ii].axvline(lup, color="k", linestyle=":", label="selection")
-            ax.flat[ii].axvline(llo, color="k", linestyle=":")
-            ax.flat[ii].set_xlabel(par)
-            ax.flat[ii].set_yscale("log")
-            ax.flat[ii].legend(loc="upper right")
-        plot_dict["bl_sel"] = fig
+        plt.close()
 
         wf_idxs = np.random.choice(len(wfs), dplms_dict["n_plot"])  # noqa: NPY002
         wfs = wfs[wf_idxs]
@@ -343,6 +312,7 @@ def dplms_ge_dict(
         axin.set_xlim(wsize / 2 - dplms_dict["zoom"], wsize / 2 + dplms_dict["zoom"])
         axin.set_yticklabels("")
         plot_dict["wfs"] = fig
+        plt.close()
 
         peak_pos = dsp_cal["peak_pos"].nda
         risetime = dsp_cal["tp_90"].nda - dsp_cal["tp_10"].nda
@@ -392,6 +362,7 @@ def dplms_ge_dict(
         ax.flat[0].set_yscale("log")
         ax.flat[0].legend(loc="upper right")
         plot_dict["wf_sel"] = fig
+        plt.close()
 
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
         ax.plot(x, "r-", label="filter")
@@ -405,6 +376,8 @@ def dplms_ge_dict(
         )
         axin.set_yticklabels("")
         ax.indicate_inset_zoom(axin)
+        plot_dict["filter"] = fig
+        plt.close()
 
         return out_dict, plot_dict
     return out_dict
