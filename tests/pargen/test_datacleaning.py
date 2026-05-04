@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import lh5
 import pytest
-from lgdo import lh5
 
 import pygama.pargen.data_cleaning as dc
 

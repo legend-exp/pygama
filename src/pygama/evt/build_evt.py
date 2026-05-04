@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import awkward as ak
+import lh5
 import numpy as np
-from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors, lh5
+from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors
 
 from ..utils import load_dict
 from . import aggregators, utils
@@ -130,7 +131,7 @@ def build_evt(
             }
 
     wo_mode
-        writing mode, see :func:`lgdo.lh5.core.write`.
+        writing mode, see :func:`lh5.io.core.write`.
     """
     if not isinstance(config, dict):
         config = load_dict(config)
@@ -252,7 +253,7 @@ def build_evt_cols(
     channels
         list of channels to be used in the event table.
     wo_mode
-        writing mode, see :func:`lgdo.lh5.core.write`.
+        writing mode, see :func:`lh5.io.core.write`.
     buffer_len
         number of rows to be processed at once.
     channel_mapping

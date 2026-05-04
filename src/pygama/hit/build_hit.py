@@ -10,9 +10,9 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import lgdo
+import lh5
 import numpy as np
-from lgdo import lh5
-from lgdo.lh5 import LH5Iterator, ls
+from lh5 import LH5Iterator, ls
 
 from .. import utils
 

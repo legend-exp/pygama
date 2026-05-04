@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import awkward as ak
+import lh5
 import numpy as np
-from lgdo import lh5, types
+from lgdo import types
 
 from .. import utils
 from . import xtalk

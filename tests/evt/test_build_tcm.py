@@ -4,9 +4,9 @@ from pathlib import Path
 
 import awkward as ak
 import lgdo
+import lh5
 import numpy as np
 import pytest
-from lgdo import lh5
 from lgdo.types import Table, VectorOfVectors
 
 from pygama import evt

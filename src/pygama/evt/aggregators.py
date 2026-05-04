@@ -5,9 +5,10 @@ This module provides aggregators to build the `evt` tier.
 from __future__ import annotations
 
 import awkward as ak
+import lh5
 import numpy as np
 import pandas as pd
-from lgdo import lh5, types
+from lgdo import types
 
 from . import utils
 

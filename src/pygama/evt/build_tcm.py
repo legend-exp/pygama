@@ -6,7 +6,7 @@ from pathlib import Path
 
 import awkward as ak
 import lgdo
-from lgdo import lh5
+import lh5
 from lgdo.types import Struct, Table, VectorOfVectors
 
 from . import tcm as ptcm

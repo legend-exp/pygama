@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from lgdo.lh5.exceptions import LH5EncodeError
+from lh5.io.exceptions import LH5EncodeError
 from pandas.testing import assert_frame_equal
 
 from pygama.flow import FileDB

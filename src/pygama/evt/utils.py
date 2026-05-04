@@ -9,8 +9,8 @@ import re
 from collections import namedtuple
 
 import awkward as ak
+import lh5
 import numpy as np
-from lgdo import lh5
 from numpy.typing import NDArray
 
 H5DataLoc = namedtuple(

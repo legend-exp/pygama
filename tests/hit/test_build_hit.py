@@ -4,9 +4,9 @@ import json
 from pathlib import Path
 
 import awkward as ak
+import lh5
 import numpy as np
 import pytest
-from lgdo import lh5
 
 from pygama.hit import build_hit
 from pygama.hit.build_hit import _reorder_table_operations

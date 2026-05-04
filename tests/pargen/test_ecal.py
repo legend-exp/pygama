@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import lh5
 import numpy as np
 import pytest
-from lgdo import lh5
 
 from pygama.math.distributions import hpge_peak
 from pygama.pargen import energy_cal

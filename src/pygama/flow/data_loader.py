@@ -16,8 +16,8 @@ import numpy as np
 import pandas as pd
 from awkward_pandas import AwkwardDtype
 from dspeed.vis import WaveformBrowser
-from lgdo.lh5 import LH5Iterator
-from lgdo.lh5.utils import expand_vars
+from lh5 import LH5Iterator
+from lh5.io.utils import expand_vars
 from lgdo.types import Array, Struct, Table
 from lgdo.types.vovutils import build_cl, explode_arrays
 from tqdm.auto import tqdm

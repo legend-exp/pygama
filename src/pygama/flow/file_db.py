@@ -13,8 +13,8 @@ import h5py
 import lgdo.lh5 as lh5
 import numpy as np
 import pandas as pd
-from lgdo.lh5 import ls
-from lgdo.lh5.utils import expand_path, expand_vars
+from lh5 import ls
+from lh5.io.utils import expand_path, expand_vars
 from lgdo.types import Array, Scalar, VectorOfVectors
 from parse import parse
 

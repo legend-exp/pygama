@@ -3,11 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 import awkward as ak
+import lh5
 import numpy as np
 import pytest
 import yaml
 from dbetto import AttrsDict
-from lgdo import Array, Table, VectorOfVectors, lh5, read_as
+from lgdo import Array, Table, VectorOfVectors
+from lh5 import read_as
 
 from pygama.evt import build_evt
 
