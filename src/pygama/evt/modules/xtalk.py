@@ -103,7 +103,7 @@ def gather_energy(
                 # read the energy data
                 data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=tbl_idxs_ch)
                 tbl.add_column(name, data)
-            except (lh5.exceptions.LH5DecodeError, KeyError):
+            except (lh5.io.exceptions.LH5DecodeError, KeyError):
                 tbl.add_column(name, types.Array(np.full_like(evt_ids_ch, np.nan)))
 
         res = tbl.eval(observable)
@@ -170,7 +170,7 @@ def filter_hits(
                 data = lh5.read(f"ch{channel}/{group}/{column}", file, idx=tbl_idxs_ch)
 
                 tbl.add_column(name, data)
-            except (lh5.exceptions.LH5DecodeError, KeyError):
+            except (lh5.io.exceptions.LH5DecodeError, KeyError):
                 tbl.add_column(name, types.Array(np.full_like(evt_ids_ch, np.nan)))
 
         # add the corrected energy to the table
