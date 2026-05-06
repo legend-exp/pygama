@@ -10,9 +10,9 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import lgdo
+import lh5
 import numpy as np
-from lgdo import lh5
-from lgdo.lh5 import LH5Iterator, ls
+from lh5 import LH5Iterator, ls
 
 from .. import utils
 
@@ -76,7 +76,7 @@ def build_hit(
     n_max
         maximum number of rows to process
     wo_mode
-        forwarded to :meth:`lgdo.lh5.write`.
+        forwarded to :func:`lh5.io.core.write`.
 
     See Also
     --------

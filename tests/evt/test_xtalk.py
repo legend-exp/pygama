@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import lh5
 import numpy as np
 import pytest
-from lgdo import lh5
 
 from pygama.evt import utils
 from pygama.evt.modules import xtalk

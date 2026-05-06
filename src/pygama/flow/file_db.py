@@ -10,11 +10,11 @@ import string
 import warnings
 
 import h5py
-import lgdo.lh5 as lh5
+import lh5
 import numpy as np
 import pandas as pd
-from lgdo.lh5 import ls
-from lgdo.lh5.utils import expand_path, expand_vars
+from lh5 import ls
+from lh5.io.utils import expand_path, expand_vars
 from lgdo.types import Array, Scalar, VectorOfVectors
 from parse import parse
 
@@ -600,7 +600,7 @@ class FileDB:
         filename
             output LH5 file name.
         wo_mode
-            passed to :meth:`~.lgdo.lh5.write`.
+            passed to :func:`~lh5.io.core.write`.
         """
         log.debug(f"writing database to {filename}")
 

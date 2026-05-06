@@ -8,10 +8,10 @@ from __future__ import annotations
 import logging
 from types import FunctionType
 
+import lh5
 import numpy as np
 import pandas as pd
 from iminuit import Minuit, cost
-from lgdo import lh5
 
 log = logging.getLogger(__name__)
 

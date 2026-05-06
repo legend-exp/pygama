@@ -6,7 +6,7 @@ from pathlib import Path
 
 import awkward as ak
 import lgdo
-from lgdo import lh5
+import lh5
 from lgdo.types import Struct, Table, VectorOfVectors
 
 from . import tcm as ptcm
@@ -85,7 +85,7 @@ def build_tcm(
     out_name
         name for the TCM table in the output file.
     wo_mode
-        mode to send to :meth:`~.lgdo.lh5.LH5Store.write`.
+        mode to send to :meth:`~lh5.io.store.LH5Store.write`.
 
     out_fields
         Optional additional fields to propagate from the input tables into the

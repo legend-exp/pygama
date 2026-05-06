@@ -5,9 +5,10 @@ Module for cross talk correction of energies.
 from __future__ import annotations
 
 import awkward as ak
+import lh5
 import numpy as np
 from dbetto import Props
-from lgdo import lh5, types
+from lgdo import types
 from numpy.typing import ArrayLike
 
 from pygama.hit.build_hit import _remove_uneeded_operations, _reorder_table_operations

@@ -9,11 +9,11 @@ import re
 from collections.abc import Collection, Mapping
 
 import awkward as ak
+import lh5
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from lgdo import lh5
 from lgdo.types import Table
 from scipy import stats
 from scipy.stats import chi2, skewnorm

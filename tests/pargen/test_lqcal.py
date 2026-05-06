@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import lh5
 import numpy as np
-from lgdo import lh5
 
 import pygama.pargen.lq_cal as lq
 from pygama.math.distributions import gaussian

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import lh5
 import numpy as np
-from lgdo import Table, lh5
+from lgdo import Table
 from matplotlib.figure import Figure
 
 from pygama.pargen import dsp_optimize

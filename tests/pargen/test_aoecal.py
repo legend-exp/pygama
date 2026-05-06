@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
+import lh5
 import numpy as np
 import pytest
-from lgdo import lh5
 
 import pygama.pargen.AoE_cal as Coe
 
