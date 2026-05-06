@@ -1420,6 +1420,7 @@ class DataLoader:
                             field_mask=field_mask,
                             buffer_len=buffer_len,
                             friend=lh5_it,
+                            safe_mode=False,
                         )
 
             return lh5_it
@@ -1516,6 +1517,7 @@ class DataLoader:
                 buffer_len=buffer_len,
                 field_mask={"tracelist": False},
                 friend=lh5_it,
+                safe_mode=False,
             )
 
         return WaveformBrowser(lh5_it, buffer_len=buffer_len, **kwargs)
