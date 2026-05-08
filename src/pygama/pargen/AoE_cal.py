@@ -2139,6 +2139,7 @@ class CalAoE:
         timecorr_mode: str = "full",
         dtcorr_mode: str = "mcdrift",
         override_dict: dict | None = None,
+        suffix: str | None = None,
     ):
         """
         Main function to run a full A/E calibration with all steps i.e. time correction, drift time correction,
@@ -2189,42 +2190,61 @@ class CalAoE:
               (or the sole parameter value if ``"a"`` is absent) and stored as
               ``self.low_cut_val``.
 
+            When *suffix* is specified, keys in this dict must use the suffixed names
+            (e.g. ``"AoE_Timecorr_foo"`` rather than ``"AoE_Timecorr"`` when
+            ``suffix="foo"``).
+        suffix
+            Optional suffix appended to all output parameter names, separated by an underscore
+            (e.g. ``suffix="foo"`` produces ``"AoE_Timecorr_foo"``, ``"AoE_Classifier_foo"``,
+            etc.). When ``None`` (the default) the original names are used unchanged.
+
         """
         if peaks_of_interest is None:
             peaks_of_interest = [1592.5, 1620.5, 2039, 2103.53, 2614.50]
         if fit_widths is None:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
-        if override_dict is None or "AoE_Timecorr" not in override_dict:
+        _n = (lambda base: f"{base}_{suffix}") if suffix else (lambda base: base)
+
+        timecorr_name = _n("AoE_Timecorr")
+        dtcorr_name = _n("AoE_DTcorr")
+        corrected_name = _n("AoE_Corrected")
+        classifier_name = _n("AoE_Classifier")
+        classifier_intermediate_name = _n("_AoE_Classifier_intermediate")
+        low_cut_name = _n("AoE_Low_Cut")
+        high_cut_name = _n("AoE_High_Side_Cut")
+        double_cut_name = _n("AoE_Double_Sided_Cut")
+
+        if override_dict is None or timecorr_name not in override_dict:
             self.time_correction(
-                df, initial_aoe_param, mode=timecorr_mode, output_name="AoE_Timecorr"
+                df, initial_aoe_param, mode=timecorr_mode, output_name=timecorr_name
             )
         else:
-            self.update_cal_dicts({"AoE_Timecorr": override_dict["AoE_Timecorr"]})
-            df["AoE_Timecorr"] = ne.evaluate(
-                override_dict["AoE_Timecorr"]["expression"],
+            self.update_cal_dicts({timecorr_name: override_dict[timecorr_name]})
+            df[timecorr_name] = ne.evaluate(
+                override_dict[timecorr_name]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Timecorr"]["parameters"],
+                | override_dict[timecorr_name]["parameters"],
             )
 
         if self.dt_corr is True:
-            aoe_param = "AoE_DTcorr"
-            if override_dict is None or "AoE_DTcorr" not in override_dict:
+            aoe_param = dtcorr_name
+            if override_dict is None or dtcorr_name not in override_dict:
                 self.drift_time_correction(
-                    df, "AoE_Timecorr", out_param=aoe_param, mode=dtcorr_mode
+                    df, timecorr_name, out_param=aoe_param, mode=dtcorr_mode
                 )
             else:
-                self.update_cal_dicts({"AoE_DTcorr": override_dict["AoE_DTcorr"]})
-                df["AoE_DTcorr"] = ne.evaluate(
-                    override_dict["AoE_DTcorr"]["expression"],
+                self.update_cal_dicts({dtcorr_name: override_dict[dtcorr_name]})
+                df[dtcorr_name] = ne.evaluate(
+                    override_dict[dtcorr_name]["expression"],
                     local_dict={col: df[col].to_numpy() for col in df.columns}
-                    | override_dict["AoE_DTcorr"]["parameters"],
+                    | override_dict[dtcorr_name]["parameters"],
                 )
         else:
-            aoe_param = "AoE_Timecorr"
+            aoe_param = timecorr_name
 
         if override_dict is not None and (
-            ("AoE_Corrected" in override_dict) != ("AoE_Classifier" in override_dict)
+            (corrected_name in override_dict) != (classifier_name in override_dict)
         ):
             log.warning(
                 "override_dict must contain both 'AoE_Corrected' and 'AoE_Classifier' to "
@@ -2232,61 +2252,60 @@ class CalAoE:
             )
 
         if override_dict is None or (
-            "AoE_Corrected" not in override_dict
-            or "AoE_Classifier" not in override_dict
+            corrected_name not in override_dict or classifier_name not in override_dict
         ):
             self.energy_correction(
                 df,
                 aoe_param,
-                corrected_param="AoE_Corrected",
-                classifier_param="AoE_Classifier",
+                corrected_param=corrected_name,
+                classifier_param=classifier_name,
             )
         else:
-            self.update_cal_dicts({"AoE_Corrected": override_dict["AoE_Corrected"]})
-            self.update_cal_dicts({"AoE_Classifier": override_dict["AoE_Classifier"]})
-            df["AoE_Corrected"] = ne.evaluate(
-                override_dict["AoE_Corrected"]["expression"],
+            self.update_cal_dicts({corrected_name: override_dict[corrected_name]})
+            self.update_cal_dicts({classifier_name: override_dict[classifier_name]})
+            df[corrected_name] = ne.evaluate(
+                override_dict[corrected_name]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Corrected"]["parameters"],
+                | override_dict[corrected_name]["parameters"],
             )
-            if "_AoE_Classifier_intermediate" in override_dict:
+            if classifier_intermediate_name in override_dict:
                 self.update_cal_dicts(
                     {
-                        "_AoE_Classifier_intermediate": override_dict[
-                            "_AoE_Classifier_intermediate"
+                        classifier_intermediate_name: override_dict[
+                            classifier_intermediate_name
                         ]
                     }
                 )
-                df["_AoE_Classifier_intermediate"] = ne.evaluate(
-                    override_dict["_AoE_Classifier_intermediate"]["expression"],
+                df[classifier_intermediate_name] = ne.evaluate(
+                    override_dict[classifier_intermediate_name]["expression"],
                     local_dict={col: df[col].to_numpy() for col in df.columns}
-                    | override_dict["_AoE_Classifier_intermediate"]["parameters"],
+                    | override_dict[classifier_intermediate_name]["parameters"],
                 )
-            df["AoE_Classifier"] = ne.evaluate(
-                override_dict["AoE_Classifier"]["expression"],
+            df[classifier_name] = ne.evaluate(
+                override_dict[classifier_name]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Classifier"]["parameters"],
+                | override_dict[classifier_name]["parameters"],
             )
 
-        if override_dict is None or ("AoE_Low_Cut" not in override_dict):
+        if override_dict is None or (low_cut_name not in override_dict):
             self.get_aoe_cut_fit(
                 df,
-                "AoE_Classifier",
+                classifier_name,
                 peaks_of_interest[cut_peak_idx],
                 fit_widths[cut_peak_idx],
                 dep_acc,
-                output_cut_param="AoE_Low_Cut",
+                output_cut_param=low_cut_name,
             )
         else:
-            self.update_cal_dicts({"AoE_Low_Cut": override_dict["AoE_Low_Cut"]})
-            df["AoE_Low_Cut"] = ne.evaluate(
-                override_dict["AoE_Low_Cut"]["expression"],
+            self.update_cal_dicts({low_cut_name: override_dict[low_cut_name]})
+            df[low_cut_name] = ne.evaluate(
+                override_dict[low_cut_name]["expression"],
                 local_dict={col: df[col].to_numpy() for col in df.columns}
-                | override_dict["AoE_Low_Cut"]["parameters"],
+                | override_dict[low_cut_name]["parameters"],
             )
 
             # Ensure the numeric low-cut threshold is stored for downstream use
-            params = override_dict["AoE_Low_Cut"].get("parameters", {})
+            params = override_dict[low_cut_name].get("parameters", {})
             low_cut_val = None
             if "a" in params:
                 low_cut_val = params["a"]
@@ -2295,14 +2314,14 @@ class CalAoE:
                 low_cut_val = next(iter(params.values()))
             if low_cut_val is not None:
                 self.low_cut_val = low_cut_val
-        df["AoE_Double_Sided_Cut"] = df["AoE_Low_Cut"] & (
-            df["AoE_Classifier"] < self.high_cut_val
+        df[double_cut_name] = df[low_cut_name] & (
+            df[classifier_name] < self.high_cut_val
         )
 
         self.update_cal_dicts(
             {
-                "AoE_High_Side_Cut": {
-                    "expression": "(a>AoE_Classifier)",
+                high_cut_name: {
+                    "expression": f"(a>{classifier_name})",
                     "parameters": {"a": self.high_cut_val},
                 }
             }
@@ -2310,8 +2329,8 @@ class CalAoE:
 
         self.update_cal_dicts(
             {
-                "AoE_Double_Sided_Cut": {
-                    "expression": "(AoE_High_Side_Cut) & (AoE_Low_Cut)",
+                double_cut_name: {
+                    "expression": f"({high_cut_name}) & ({low_cut_name})",
                     "parameters": {},
                 }
             }
@@ -2323,7 +2342,7 @@ class CalAoE:
             self.low_side_peak_dfs,
         ) = self.calculate_survival_fractions_sweep(
             df,
-            "AoE_Classifier",
+            classifier_name,
             peaks_of_interest,
             fit_widths,
             n_samples=sf_nsamples,
@@ -2333,7 +2352,7 @@ class CalAoE:
 
         log.info("Compute 2 side survival fractions: ")
         self.two_side_sfs = self.calculate_survival_fractions(
-            df, "AoE_Classifier", peaks_of_interest, fit_widths, mode="greater"
+            df, classifier_name, peaks_of_interest, fit_widths, mode="greater"
         )
 
         if re.match(r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))):
@@ -2343,7 +2362,7 @@ class CalAoE:
                 log.info("Compute survival fractions for %s: ", tstamp)
                 self.low_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
                     df.query(f"run_timestamp == '{tstamp}'"),
-                    "AoE_Classifier",
+                    classifier_name,
                     peaks_of_interest,
                     fit_widths,
                     mode="greater",
@@ -2351,7 +2370,7 @@ class CalAoE:
 
                 self.two_side_sfs_by_run[tstamp] = self.calculate_survival_fractions(
                     df.query(f"run_timestamp == '{tstamp}'"),
-                    "AoE_Classifier",
+                    classifier_name,
                     peaks_of_interest,
                     fit_widths,
                     mode="greater",
