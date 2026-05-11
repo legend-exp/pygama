@@ -31,6 +31,8 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "hist",
+    "astropy",
+    "awkward",
     "colorlog",
     "dbetto",
     "dspeed >=2.0",
