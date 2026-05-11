@@ -75,6 +75,9 @@ def hist_bblocks(
         data = np.asarray(ak.ravel(data))
 
     if prebin_width is not None:
+        if not (np.isfinite(prebin_width) and prebin_width > 0):
+            msg = f"prebin_width must be finite and > 0, got {prebin_width}"
+            raise ValueError(msg)
         lo = float(np.min(data)) if prebin_low is None else float(prebin_low)
         hi = float(np.max(data)) if prebin_high is None else float(prebin_high)
         if hi <= lo:
@@ -89,7 +92,12 @@ def hist_bblocks(
             bh.axis.Regular(nbins, lo, lo + nbins * prebin_width),
             storage=bh.storage.Weight(),
         )
-        fine.fill(data)
+        # Filter data to [prebin_low, prebin_high) range when explicitly specified
+        if prebin_low is not None or prebin_high is not None:
+            mask = (data >= lo) & (data < hi)
+            fine.fill(data[mask])
+        else:
+            fine.fill(data)
         return rebin_bblocks(fine, p0=p0)
 
     if prebin_low is not None or prebin_high is not None:
@@ -141,7 +149,7 @@ def rebin_bblocks(
     values = h.values()
     variances = h.variances()
     if variances is None:
-        variances = np.where(values > 0, values, 1.0)
+        variances = values  # Poisson statistics: variance = counts
 
     sigma = np.sqrt(np.where(variances > 0, variances, 1.0))
 

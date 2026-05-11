@@ -73,8 +73,8 @@ def test_hist_bblocks_prebin_with_range():
     # on the upper edge from the ceil-and-extend step)
     assert edges[0] == low
     assert high <= edges[-1] <= high + 0.05 + 1e-9
-    # only data in [low, high) contributes
-    in_range_count = int(np.sum((data >= low) & (data < edges[-1])))
+    # only data in [low, high) contributes (as documented)
+    in_range_count = int(np.sum((data >= low) & (data < high)))
     assert h.values().sum() == pytest.approx(in_range_count)
 
 
@@ -84,6 +84,19 @@ def test_hist_bblocks_prebin_low_high_require_prebin_width():
         hist_bblocks(data, prebin_low=-1.0)
     with pytest.raises(ValueError, match="prebin_width"):
         hist_bblocks(data, prebin_high=1.0)
+
+
+def test_hist_bblocks_prebin_width_validation():
+    data = _two_population_data()
+    # Test invalid prebin_width values
+    with pytest.raises(ValueError, match="finite and > 0"):
+        hist_bblocks(data, prebin_width=0.0)
+    with pytest.raises(ValueError, match="finite and > 0"):
+        hist_bblocks(data, prebin_width=-0.1)
+    with pytest.raises(ValueError, match="finite and > 0"):
+        hist_bblocks(data, prebin_width=np.inf)
+    with pytest.raises(ValueError, match="finite and > 0"):
+        hist_bblocks(data, prebin_width=np.nan)
 
 
 def test_rebin_bblocks_preserves_total_counts():
