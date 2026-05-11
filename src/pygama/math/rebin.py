@@ -27,6 +27,8 @@ def hist_bblocks(
     data: np.ndarray | ak.Array,
     *,
     prebin_width: float | None = None,
+    prebin_low: float | None = None,
+    prebin_high: float | None = None,
     p0: float = 0.05,
 ) -> bh.Hist:
     """Histogram an unbinned data array using Bayesian-blocks edges.
@@ -52,6 +54,14 @@ def hist_bblocks(
         ``prebin_width`` much finer than the smallest feature you expect
         to resolve; otherwise the resolution loss propagates to the
         output edges.
+    prebin_low, prebin_high
+        Optional lower / upper edge of the pre-binned histogram.
+        Default to ``data.min()`` / ``data.max()``. Values outside
+        ``[prebin_low, prebin_high)`` land in the overflow bins of
+        the fine histogram and are excluded from the output. Only
+        valid when ``prebin_width`` is given. The effective upper
+        edge may exceed ``prebin_high`` by up to ``prebin_width`` so
+        that an integer number of bins covers the requested range.
     p0
         False-alarm probability for change-point detection.
 
@@ -65,10 +75,14 @@ def hist_bblocks(
         data = np.asarray(ak.ravel(data))
 
     if prebin_width is not None:
-        lo = float(np.min(data))
-        hi = float(np.max(data))
+        lo = float(np.min(data)) if prebin_low is None else float(prebin_low)
+        hi = float(np.max(data)) if prebin_high is None else float(prebin_high)
+        if hi <= lo:
+            msg = f"prebin_high ({hi}) must be greater than prebin_low ({lo})"
+            raise ValueError(msg)
         nbins = max(1, int(np.ceil((hi - lo) / prebin_width)))
-        # ensure data.max() falls strictly inside the last fine bin
+        # ensure the requested upper edge falls strictly inside the last bin
+        # (boost_histogram's Regular axis is right-exclusive)
         if lo + nbins * prebin_width <= hi:
             nbins += 1
         fine = bh.Hist(
@@ -77,6 +91,10 @@ def hist_bblocks(
         )
         fine.fill(data)
         return rebin_bblocks(fine, p0=p0)
+
+    if prebin_low is not None or prebin_high is not None:
+        msg = "prebin_low/prebin_high are only valid when prebin_width is given"
+        raise ValueError(msg)
 
     edges = bayesian_blocks(data, fitness="events", p0=p0).astype(float)
     # boost_histogram's Variable axis is right-exclusive; bayesian_blocks

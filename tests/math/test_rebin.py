@@ -63,6 +63,29 @@ def test_hist_bblocks_prebin_preserves_counts_and_finds_gap():
     assert np.any((internal > -2.0) & (internal < 2.0))
 
 
+def test_hist_bblocks_prebin_with_range():
+    data = _two_population_data()  # spans roughly [-5, 5]
+    low, high = -4.0, 4.0
+    h = hist_bblocks(data, prebin_width=0.05, prebin_low=low, prebin_high=high)
+
+    edges = h.axes[0].edges
+    # output must stay within the requested range (up to ~prebin_width slack
+    # on the upper edge from the ceil-and-extend step)
+    assert edges[0] == low
+    assert high <= edges[-1] <= high + 0.05 + 1e-9
+    # only data in [low, high) contributes
+    in_range_count = int(np.sum((data >= low) & (data < edges[-1])))
+    assert h.values().sum() == pytest.approx(in_range_count)
+
+
+def test_hist_bblocks_prebin_low_high_require_prebin_width():
+    data = _two_population_data()
+    with pytest.raises(ValueError, match="prebin_width"):
+        hist_bblocks(data, prebin_low=-1.0)
+    with pytest.raises(ValueError, match="prebin_width"):
+        hist_bblocks(data, prebin_high=1.0)
+
+
 def test_rebin_bblocks_preserves_total_counts():
     data = _two_population_data()
     h = bh.Hist(bh.axis.Regular(500, -6.0, 6.0), storage=bh.storage.Weight())
