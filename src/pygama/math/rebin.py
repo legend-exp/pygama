@@ -4,7 +4,7 @@ Provides:
 
 - :func:`hist_bblocks` and :func:`rebin_bblocks`: Bayesian-blocks
   adaptive binning (Scargle et al. 2013), backed by
-  :func:`astropy.stats.bayesian_blocks`.
+  :func:`hepstats.modeling.bayesian_blocks`.
 - :func:`collapse_peaks`: merges bins on each side of each detected
   peak by walking outward while the rate is descending and bin widths
   are not yet jumping up to continuum scale. Designed for histograms
@@ -19,7 +19,7 @@ from __future__ import annotations
 import awkward as ak
 import hist as bh
 import numpy as np
-from astropy.stats import bayesian_blocks
+from hepstats.modeling import bayesian_blocks
 from scipy import signal
 
 
@@ -61,11 +61,11 @@ def hist_bblocks(
 ) -> bh.Hist:
     """Histogram an unbinned data array using Bayesian-blocks edges.
 
-    By default runs :func:`astropy.stats.bayesian_blocks` with
-    ``fitness='events'`` directly on ``data``. Since ``events`` is
-    O(N²) in the sample size, passing ``prebin_width`` first bins
-    ``data`` into a uniform fine histogram and runs
-    :func:`rebin_bblocks` (``measures`` fitness) on it instead.
+    By default runs :func:`hepstats.modeling.bayesian_blocks` directly
+    on ``data``, which is O(N²) in sample size. Passing
+    ``prebin_width`` first bins ``data`` into a uniform fine histogram
+    and calls :func:`rebin_bblocks` instead, which is the faster path
+    for large samples.
 
     Awkward inputs are flattened across all axes before binning.
 
@@ -125,7 +125,7 @@ def hist_bblocks(
         msg = "prebin_low/prebin_high are only valid when prebin_width is given"
         raise ValueError(msg)
 
-    edges = bayesian_blocks(data, fitness="events", p0=p0).astype(float)
+    edges = bayesian_blocks(data, p0=p0).astype(float)
     # boost_histogram's Variable axis is right-exclusive; bayesian_blocks
     # places the last edge at data.max(), so nudge it up by one ULP to
     # include the rightmost data point in the last bin.
@@ -142,10 +142,10 @@ def rebin_bblocks(
 ) -> bh.Hist:
     """Rebin a 1D :class:`hist.Hist` using Bayesian-blocks adaptive binning.
 
-    Uses :func:`astropy.stats.bayesian_blocks` with ``fitness='measures'``
-    on the fine-bin centers, snaps the resulting block edges to the
-    fine-bin grid, and aggregates the input histogram onto the new
-    edges by summing counts and variances.
+    Uses :func:`hepstats.modeling.bayesian_blocks` treating each
+    fine-bin center as a weighted event (weight = bin count), snaps
+    the resulting block edges to the fine-bin grid, and aggregates the
+    input histogram onto the new edges by summing counts and variances.
 
     Parameters
     ----------
@@ -172,11 +172,11 @@ def rebin_bblocks(
     if variances is None:
         variances = values  # Poisson statistics: variance = counts
 
-    sigma = np.sqrt(np.where(variances > 0, variances, 1.0))
-
-    block_edges = bayesian_blocks(
-        centers, x=values, sigma=sigma, fitness="measures", p0=p0
-    )
+    # hepstats raises RuntimeWarning on log(0) for empty bins; strip them
+    # before running the algorithm — the snap step below maps block edges
+    # back to fine_edges regardless, so no information is lost.
+    nonzero = values > 0
+    block_edges = bayesian_blocks(centers[nonzero], weights=values[nonzero], p0=p0)
 
     # snap block edges to the nearest fine-bin edge
     right = np.searchsorted(fine_edges, block_edges)
