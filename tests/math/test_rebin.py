@@ -5,7 +5,17 @@ import hist as bh
 import numpy as np
 import pytest
 
-from pygama.math.rebin import collapse_peaks, hist_bblocks, rebin_bblocks
+from pygama.math.rebin import (
+    _collapse_peaks,
+    _find_peak_regions,
+    _uniform_edges_with_peaks,
+    hist_bblocks,
+    hist_bblocks_with_peaks,
+    hist_uniform_with_peaks,
+    rebin_bblocks,
+    rebin_bblocks_with_peaks,
+    rebin_uniform_with_peaks,
+)
 
 
 def _two_population_data(seed: int = 42) -> np.ndarray:
@@ -197,7 +207,7 @@ def test_collapse_peaks_merges_descending_peak_and_stops_at_width_jump():
             (10.0, 100.0),  # right continuum
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
 
     # 3 output bins: left continuum, merged peak, right continuum
     new_edges = out.axes[0].edges
@@ -227,7 +237,7 @@ def test_collapse_peaks_walk_stops_at_rate_local_minimum():
             (5.0, 100.0),  # right continuum
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
 
     new_edges = out.axes[0].edges
     new_widths = np.diff(new_edges)
@@ -262,7 +272,7 @@ def test_collapse_peaks_walk_stops_at_width_jump_even_if_rate_descends():
             # rate-descent would walk INTO it
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
     out_edges = out.axes[0].edges
     out_widths = np.diff(out_edges)
     # the wide continuum bins must remain in the output as 10 keV bins
@@ -287,7 +297,7 @@ def test_collapse_peaks_preserves_counts_and_variances():
             (5.0, 100.0),
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0)
 
     h_var = h.variances()
     out_var = out.variances()
@@ -307,7 +317,7 @@ def test_collapse_peaks_edges_subset_of_input():
             (10.0, 100.0),
         ]
     )
-    out = collapse_peaks(h)
+    out = _collapse_peaks(h)
     fine_edges = h.axes[0].edges
     new_edges = out.axes[0].edges
     assert np.all(np.isin(new_edges, fine_edges))
@@ -318,7 +328,7 @@ def test_collapse_peaks_edges_subset_of_input():
 def test_collapse_peaks_no_peaks_returns_unchanged():
     # flat rate everywhere — no rate-local-maxima, no peaks detected.
     h = _hist_from_widths_rates([(1.0, 100.0)] * 10)
-    out = collapse_peaks(h, n_sigma=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0)
     assert np.array_equal(out.axes[0].edges, h.axes[0].edges)
     assert np.array_equal(out.values(), h.values())
 
@@ -343,12 +353,12 @@ def test_collapse_peaks_max_bin_width_caps_wide_peak_walk():
     )
 
     # without absolute cap: the walk drags in the 8.5-keV bin
-    out_loose = collapse_peaks(h, n_sigma=2.0, width_factor=3.0)
+    out_loose = _collapse_peaks(h, n_sigma=2.0, width_factor=3.0)
     widths_loose = np.diff(out_loose.axes[0].edges)
     assert widths_loose.max() > 10.0  # merged region grew through the 8.5 bin
 
     # with absolute cap of 5 keV: walk stops before the 8.5-keV bin
-    out_tight = collapse_peaks(h, n_sigma=2.0, width_factor=3.0, max_bin_width=5.0)
+    out_tight = _collapse_peaks(h, n_sigma=2.0, width_factor=3.0, max_bin_width=5.0)
     widths_tight = np.diff(out_tight.axes[0].edges)
     # the wide bins remain at their original sizes (8.5 and 50)
     assert int(np.sum(np.isclose(widths_tight, 8.5))) == 1
@@ -367,7 +377,7 @@ def test_collapse_peaks_handles_low_stats_peak_on_wider_bin():
             (50.0, 30.0),  # far-right continuum
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
     new_edges = out.axes[0].edges
     new_widths = np.diff(new_edges)
     # all three 3-keV bins should be merged into one 9-keV bin
@@ -388,7 +398,7 @@ def test_collapse_peaks_with_rebin_bblocks_end_to_end():
     fine.fill(data)
 
     bb = rebin_bblocks(fine)
-    out = collapse_peaks(bb, n_sigma=5.0)
+    out = _collapse_peaks(bb, n_sigma=5.0)
 
     assert out.values().sum() == pytest.approx(bb.values().sum())
     assert out.values().size <= bb.values().size
@@ -414,7 +424,7 @@ def test_collapse_peaks_rejects_tail_false_positives_from_width_variation():
     counts = widths_arr * rates
     h = _hist_from_arrays(edges, counts)
 
-    out = collapse_peaks(h, n_sigma=2.0)
+    out = _collapse_peaks(h, n_sigma=2.0)
     assert np.array_equal(out.axes[0].edges, edges)
     assert np.array_equal(out.values(), counts)
 
@@ -423,7 +433,7 @@ def test_collapse_peaks_single_bin_histogram():
     # one-bin histogram: no local maxima possible, output equals input
     edges = np.array([0.0, 1.0])
     h = _hist_from_arrays(edges, np.array([42.0]))
-    out = collapse_peaks(h)
+    out = _collapse_peaks(h)
     assert np.array_equal(out.axes[0].edges, edges)
     assert np.array_equal(out.values(), h.values())
 
@@ -432,7 +442,7 @@ def test_collapse_peaks_all_zero_histogram():
     # all-zero histogram: rate is all zeros, no peaks, output unchanged
     edges = np.linspace(0.0, 10.0, 11)
     h = _hist_from_arrays(edges, np.zeros(10))
-    out = collapse_peaks(h)
+    out = _collapse_peaks(h)
     assert np.array_equal(out.axes[0].edges, edges)
     assert np.array_equal(out.values(), h.values())
 
@@ -444,7 +454,7 @@ def test_collapse_peaks_spike_at_boundary_is_passed_through():
     edges = np.linspace(0.0, 10.0, 11)
     values = np.array([100.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
     h = _hist_from_arrays(edges, values)
-    out = collapse_peaks(h, n_sigma=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0)
     # output is unchanged (no peak detected)
     assert np.array_equal(out.axes[0].edges, edges)
     assert np.array_equal(out.values(), values)
@@ -456,7 +466,7 @@ def test_collapse_peaks_rejects_negative_counts():
     view = np.asarray(h.view())
     view["value"] = [1.0, 2.0, 3.0, 4.0, 5.0, -1.0, 5.0, 4.0, 3.0, 2.0]
     with pytest.raises(ValueError, match="non-negative"):
-        collapse_peaks(h)
+        _collapse_peaks(h)
 
 
 def test_collapse_peaks_adjacent_regions_not_merged():
@@ -472,7 +482,7 @@ def test_collapse_peaks_adjacent_regions_not_merged():
             (5.0, 100.0),  # right continuum
         ]
     )
-    out = collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
+    out = _collapse_peaks(h, n_sigma=5.0, width_factor=5.0)
     # output: 5 bins (left cont, peak1, valley, peak2, right cont) —
     # the two peaks must NOT merge even though their walks could end
     # at adjacent indices
@@ -484,17 +494,17 @@ def test_collapse_peaks_input_validation():
     h = bh.Hist(bh.axis.Variable(edges), storage=bh.storage.Weight())
 
     with pytest.raises(ValueError, match="n_sigma"):
-        collapse_peaks(h, n_sigma=0.0)
+        _collapse_peaks(h, n_sigma=0.0)
     with pytest.raises(ValueError, match="n_sigma"):
-        collapse_peaks(h, n_sigma=-1.0)
+        _collapse_peaks(h, n_sigma=-1.0)
     with pytest.raises(ValueError, match="width_factor"):
-        collapse_peaks(h, width_factor=1.0)
+        _collapse_peaks(h, width_factor=1.0)
     with pytest.raises(ValueError, match="width_factor"):
-        collapse_peaks(h, width_factor=0.5)
+        _collapse_peaks(h, width_factor=0.5)
     with pytest.raises(ValueError, match="max_bin_width"):
-        collapse_peaks(h, max_bin_width=0.0)
+        _collapse_peaks(h, max_bin_width=0.0)
     with pytest.raises(ValueError, match="max_bin_width"):
-        collapse_peaks(h, max_bin_width=-1.0)
+        _collapse_peaks(h, max_bin_width=-1.0)
 
     h2 = bh.Hist(
         bh.axis.Regular(10, 0.0, 1.0),
@@ -502,4 +512,288 @@ def test_collapse_peaks_input_validation():
         storage=bh.storage.Weight(),
     )
     with pytest.raises(ValueError, match="1D"):
-        collapse_peaks(h2)
+        _collapse_peaks(h2)
+
+
+# ---------------------------------------------------------------------------
+# _find_peak_regions
+# ---------------------------------------------------------------------------
+
+
+def test_find_peak_regions_no_peaks_returns_empty():
+    h = _hist_from_widths_rates([(1.0, 100.0)] * 10)
+    regions = _find_peak_regions(h, n_sigma=5.0)
+    assert regions.shape == (0, 2)
+
+
+def test_find_peak_regions_returns_edges_in_axis_units():
+    h = _hist_from_widths_rates(
+        [
+            (10.0, 100.0),
+            (0.5, 1000.0),
+            (0.5, 50000.0),
+            (0.5, 1000.0),
+            (10.0, 100.0),
+        ]
+    )
+    regions = _find_peak_regions(h, n_sigma=5.0, width_factor=5.0)
+    assert regions.shape == (1, 2)
+    # the merged peak should span the three narrow bins (indices 1-3)
+    in_edges = h.axes[0].edges
+    assert np.isclose(regions[0, 0], in_edges[1])
+    assert np.isclose(regions[0, 1], in_edges[4])
+
+
+# ---------------------------------------------------------------------------
+# _uniform_edges_with_peaks
+# ---------------------------------------------------------------------------
+
+
+def test_uniform_edges_with_peaks_no_peaks_returns_uniform():
+    edges = _uniform_edges_with_peaks(
+        0.0, 10.0, bin_width=1.0, peak_regions=np.empty((0, 2))
+    )
+    assert np.allclose(edges, np.arange(11.0))
+
+
+def test_uniform_edges_with_peaks_inserts_peaks_and_drops_interior_uniform():
+    # peak region [3.2, 4.7] should drop uniform edge 4 and insert 3.2, 4.7
+    regions = np.array([[3.2, 4.7]])
+    edges = _uniform_edges_with_peaks(0.0, 10.0, bin_width=1.0, peak_regions=regions)
+    # 4 was strictly inside the peak region, so it must be gone
+    assert 4.0 not in edges
+    # peak boundaries must be present
+    assert 3.2 in edges
+    assert 4.7 in edges
+    # uniform edges outside the peak region must survive
+    for x in [0.0, 1.0, 2.0, 3.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]:
+        assert x in edges
+
+
+def test_uniform_edges_with_peaks_bin_width_larger_than_range_keeps_two_edges():
+    edges = _uniform_edges_with_peaks(
+        0.0, 1.0, bin_width=10.0, peak_regions=np.empty((0, 2))
+    )
+    assert edges[0] == 0.0
+    assert edges[-1] == 1.0
+
+
+def test_uniform_edges_with_peaks_validation():
+    with pytest.raises(ValueError, match="bin_width"):
+        _uniform_edges_with_peaks(
+            0.0, 1.0, bin_width=0.0, peak_regions=np.empty((0, 2))
+        )
+    with pytest.raises(ValueError, match="bin_width"):
+        _uniform_edges_with_peaks(
+            0.0, 1.0, bin_width=-1.0, peak_regions=np.empty((0, 2))
+        )
+    with pytest.raises(ValueError, match="greater than"):
+        _uniform_edges_with_peaks(
+            1.0, 0.0, bin_width=0.1, peak_regions=np.empty((0, 2))
+        )
+
+
+# ---------------------------------------------------------------------------
+# hist_bblocks_with_peaks / rebin_bblocks_with_peaks
+# ---------------------------------------------------------------------------
+
+
+def _peaked_data(seed: int = 42) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return np.concatenate(
+        [
+            rng.uniform(0.0, 100.0, 20_000),
+            rng.normal(50.0, 0.3, 10_000),
+        ]
+    )
+
+
+def test_hist_bblocks_with_peaks_preserves_total_counts():
+    data = _peaked_data()
+    out = hist_bblocks_with_peaks(data, prebin_width=0.05, n_sigma=5.0)
+    assert out.values().sum() == pytest.approx(len(data))
+
+
+def test_hist_bblocks_with_peaks_consolidates_peak_region():
+    # the function should produce a merged bin around the true peak at 50
+    data = _peaked_data()
+    out = hist_bblocks_with_peaks(data, prebin_width=0.05, n_sigma=5.0)
+    edges = out.axes[0].edges
+    widths = np.diff(edges)
+    # at least one wide bin should contain the peak center
+    for i, w in enumerate(widths):
+        center = (edges[i] + edges[i + 1]) / 2
+        if w > 0.5 and 45.0 < center < 55.0:
+            return  # success
+    pytest.fail("no merged region found around the true peak at 50")
+
+
+def test_rebin_bblocks_with_peaks_equals_collapse_after_rebin():
+    data = _peaked_data()
+    fine = bh.Hist(bh.axis.Regular(2000, 0.0, 100.0), storage=bh.storage.Weight())
+    fine.fill(data)
+
+    expected = _collapse_peaks(rebin_bblocks(fine, p0=0.05), n_sigma=5.0)
+    actual = rebin_bblocks_with_peaks(fine, n_sigma=5.0, p0=0.05)
+
+    assert np.allclose(expected.axes[0].edges, actual.axes[0].edges)
+    assert np.allclose(expected.values(), actual.values())
+
+
+# ---------------------------------------------------------------------------
+# hist_uniform_with_peaks / rebin_uniform_with_peaks
+# ---------------------------------------------------------------------------
+
+
+def test_hist_uniform_with_peaks_continuum_is_bin_width():
+    data = _peaked_data()
+    out = hist_uniform_with_peaks(data, bin_width=1.0, prebin_width=0.05, n_sigma=5.0)
+    edges = out.axes[0].edges
+    widths = np.diff(edges)
+    # most bins should be exactly bin_width wide (continuum); only peak
+    # regions are wider/narrower
+    n_at_bin_width = int(np.sum(np.isclose(widths, 1.0, atol=1e-6)))
+    assert n_at_bin_width > 50  # majority of the 100-unit range
+
+
+def test_hist_uniform_with_peaks_preserves_total_counts():
+    data = _peaked_data()
+    out = hist_uniform_with_peaks(data, bin_width=1.0, prebin_width=0.05, n_sigma=5.0)
+    assert out.values().sum() == pytest.approx(len(data))
+
+
+def test_hist_uniform_with_peaks_with_range():
+    data = _peaked_data()
+    out = hist_uniform_with_peaks(
+        data,
+        bin_width=1.0,
+        prebin_width=0.05,
+        prebin_low=10.0,
+        prebin_high=90.0,
+        n_sigma=5.0,
+    )
+    edges = out.axes[0].edges
+    assert edges[0] == 10.0
+    in_range = int(np.sum((data >= 10.0) & (data < 90.0)))
+    assert out.values().sum() == pytest.approx(in_range)
+
+
+def test_rebin_uniform_with_peaks_preserves_total_counts():
+    data = _peaked_data()
+    fine = bh.Hist(bh.axis.Regular(2000, 0.0, 100.0), storage=bh.storage.Weight())
+    fine.fill(data)
+    out = rebin_uniform_with_peaks(fine, bin_width=1.0, n_sigma=5.0)
+    assert out.values().sum() == pytest.approx(fine.values().sum())
+
+
+def test_rebin_uniform_with_peaks_edges_are_subset_of_fine_grid():
+    data = _peaked_data()
+    fine = bh.Hist(bh.axis.Regular(2000, 0.0, 100.0), storage=bh.storage.Weight())
+    fine.fill(data)
+    out = rebin_uniform_with_peaks(fine, bin_width=1.0, n_sigma=5.0)
+    assert np.all(np.isin(out.axes[0].edges, fine.axes[0].edges))
+
+
+def test_rebin_uniform_with_peaks_continuum_near_bin_width():
+    data = _peaked_data()
+    fine = bh.Hist(bh.axis.Regular(2000, 0.0, 100.0), storage=bh.storage.Weight())
+    fine.fill(data)
+    out = rebin_uniform_with_peaks(fine, bin_width=1.0, n_sigma=5.0)
+    widths = np.diff(out.axes[0].edges)
+    n_continuum = int(np.sum(np.isclose(widths, 1.0, atol=0.05)))
+    assert n_continuum > 50
+
+
+def test_hist_bblocks_with_peaks_with_range():
+    data = _peaked_data()
+    out = hist_bblocks_with_peaks(
+        data,
+        prebin_width=0.05,
+        prebin_low=10.0,
+        prebin_high=90.0,
+        n_sigma=5.0,
+    )
+    edges = out.axes[0].edges
+    assert edges[0] == 10.0
+    in_range = int(np.sum((data >= 10.0) & (data < 90.0)))
+    assert out.values().sum() == pytest.approx(in_range)
+
+
+# ---------------------------------------------------------------------------
+# zero-peaks paths through all four *_with_peaks public entry points
+# ---------------------------------------------------------------------------
+
+
+def _flat_data(seed: int = 42) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    return rng.uniform(0.0, 10.0, 10_000)
+
+
+def test_hist_bblocks_with_peaks_zero_peaks_returns_variable_axis():
+    data = _flat_data()
+    out = hist_bblocks_with_peaks(data, prebin_width=0.1, n_sigma=5.0)
+    assert isinstance(out.axes[0], bh.axis.Variable)
+    assert out.values().sum() == pytest.approx(len(data))
+
+
+def test_rebin_bblocks_with_peaks_zero_peaks_returns_variable_axis():
+    data = _flat_data()
+    fine = bh.Hist(bh.axis.Regular(100, 0.0, 10.0), storage=bh.storage.Weight())
+    fine.fill(data)
+    out = rebin_bblocks_with_peaks(fine, n_sigma=5.0)
+    # _collapse_peaks must promote to Variable even when no peaks were found
+    assert isinstance(out.axes[0], bh.axis.Variable)
+    assert out.values().sum() == pytest.approx(fine.values().sum())
+
+
+def test_hist_uniform_with_peaks_zero_peaks_returns_uniform_grid():
+    data = _flat_data()
+    out = hist_uniform_with_peaks(data, bin_width=1.0, prebin_width=0.1, n_sigma=5.0)
+    widths = np.diff(out.axes[0].edges)
+    # all bins should be close to bin_width when no peaks were inserted
+    assert np.allclose(widths, 1.0, atol=0.01)
+
+
+def test_rebin_uniform_with_peaks_zero_peaks_returns_uniform_grid():
+    data = _flat_data()
+    fine = bh.Hist(bh.axis.Regular(1000, 0.0, 10.0), storage=bh.storage.Weight())
+    fine.fill(data)
+    out = rebin_uniform_with_peaks(fine, bin_width=1.0, n_sigma=5.0)
+    widths = np.diff(out.axes[0].edges)
+    # snapped to fine grid (0.01 wide), so bins should be within ~0.01 of 1.0
+    assert np.allclose(widths, 1.0, atol=0.02)
+
+
+# ---------------------------------------------------------------------------
+# _snap_indices
+# ---------------------------------------------------------------------------
+
+
+def test_snap_indices_exact_targets_return_exact_indices():
+    from pygama.math.rebin import _snap_indices
+
+    fine = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    idx = _snap_indices(fine, np.array([0.0, 2.0, 4.0]))
+    assert np.array_equal(idx, [0, 2, 4])
+
+
+def test_snap_indices_misaligned_targets_snap_to_nearest():
+    from pygama.math.rebin import _snap_indices
+
+    fine = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    # 1.4 → nearest 1, 2.6 → nearest 3
+    idx = _snap_indices(fine, np.array([0.0, 1.4, 2.6, 4.0]))
+    assert np.array_equal(idx, [0, 1, 3, 4])
+
+
+def test_snap_indices_endpoints_clamped_and_duplicates_removed():
+    from pygama.math.rebin import _snap_indices
+
+    fine = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    # two close targets snap to the same fine index — dedup must collapse
+    idx = _snap_indices(fine, np.array([0.0, 1.1, 1.2, 4.0]))
+    # both 1.1 and 1.2 → 1; result must be strictly increasing
+    assert np.all(np.diff(idx) > 0)
+    # endpoints must be 0 and len(fine) - 1
+    assert idx[0] == 0
+    assert idx[-1] == len(fine) - 1
