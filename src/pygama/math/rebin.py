@@ -11,6 +11,32 @@ Two adaptive strategies are offered:
 Functions taking a raw data array are named ``hist_*``; those taking a
 finely-binned :class:`hist.Hist` are named ``rebin_*``. All routines
 return a ``Variable``-axis ``Weight``-storage :class:`hist.Hist`.
+
+Public functions
+----------------
+
+- :func:`hist_bblocks`: histogram raw data using Bayesian-blocks edges.
+- :func:`hist_bblocks_with_peaks`: histogram raw data with bblocks edges
+  on the continuum and one merged bin per detected peak.
+- :func:`hist_uniform_with_peaks`: histogram raw data with a uniform
+  continuum binning and one merged bin per detected peak.
+- :func:`rebin_bblocks`: rebin an existing fine histogram onto
+  Bayesian-blocks edges.
+- :func:`rebin_bblocks_with_peaks`: rebin an existing fine histogram
+  onto bblocks edges and merge each detected peak into a single bin.
+- :func:`rebin_uniform_with_peaks`: rebin an existing fine histogram
+  onto a uniform continuum binning and merge each detected peak into
+  a single bin.
+
+Rebinning a histogram with the edges of another
+-----------------------------------------------
+
+To rebin a fine histogram ``h_fine`` onto the edges of another
+histogram ``h_ref``, use :func:`hist.rebin` directly (the edges of
+``h_ref`` must be a subset of those of ``h_fine``):
+
+>>> import hist as bh
+>>> h_out = h_fine[:: bh.rebin(edges=h_ref.axes[0].edges.tolist())]
 """
 
 from __future__ import annotations
@@ -21,22 +47,13 @@ import numpy as np
 from hepstats.modeling import bayesian_blocks
 from scipy import signal
 
-# ---------------------------------------------------------------------------
-# private primitives
-# ---------------------------------------------------------------------------
-
 
 def _prepare_data(
     data: np.ndarray | ak.Array,
     prebin_low: float | None,
     prebin_high: float | None,
 ) -> tuple[np.ndarray, float, float]:
-    """Flatten awkward inputs, derive the data range, and apply the
-    ``[prebin_low, prebin_high)`` mask when a range is requested.
-
-    Returns ``(data, lo, hi)`` with ``lo`` and ``hi`` set to the user-
-    supplied bounds or to ``data.min()``/``data.max()`` as default.
-    """
+    """Flatten awkward inputs and apply the optional range mask."""
     if isinstance(data, ak.Array):
         data = np.asarray(ak.ravel(data))
     if prebin_low is None and prebin_high is None:
@@ -77,16 +94,9 @@ def _walk_peak(
     return i
 
 
-def _bblocks_edges(
-    data: np.ndarray,
-    *,
-    weights: np.ndarray | None = None,
-    p0: float = 0.05,
-) -> np.ndarray:
-    """Bayesian-blocks edges from raw data; last edge nudged by one ULP
-    so :class:`bh.axis.Variable` (right-exclusive) includes ``data.max()``.
-    """
-    edges = bayesian_blocks(data, weights=weights, p0=p0).astype(float)
+def _bblocks_edges(data: np.ndarray, **kwargs) -> np.ndarray:
+    """Bblocks edges; last edge nudged by 1 ULP for right-exclusive axes."""
+    edges = bayesian_blocks(data, **kwargs).astype(float)
     edges[-1] = np.nextafter(edges[-1], np.inf)
     return edges
 
@@ -111,9 +121,10 @@ def _snap_indices(fine_edges: np.ndarray, target_edges: np.ndarray) -> np.ndarra
 
 
 def _bblocks_edges_from_hist(h: bh.Hist, *, p0: float = 0.05) -> np.ndarray:
-    """Bayesian-blocks edges from a finely-binned histogram, snapped to
-    ``h.axes[0].edges``. Empty bins are dropped to avoid the ``log(0)``
-    warning hepstats raises on zero-weight events.
+    """Bayesian-blocks edges from a fine histogram, snapped to its grid.
+
+    Empty bins are dropped to avoid the ``log(0)`` warning hepstats
+    raises on zero-weight events.
     """
     if len(h.axes) != 1:
         msg = f"only 1D histograms supported, got {len(h.axes)}D"
@@ -134,14 +145,16 @@ def _find_peak_regions(
     width_factor: float = 5.0,
     max_bin_width: float | None = None,
 ) -> np.ndarray:
-    """Detect peaks in an adaptive-bin histogram and return the merged
-    region edges in axis units. Shape ``(n_regions, 2)``; empty array
-    if no peaks are detected.
+    """Detect peaks and return ``(n_regions, 2)`` merged region edges.
 
-    Peaks are strict local maxima of the rate (counts/width), filtered
-    by significance ``prominence * w_peak / sqrt(n_peak)`` against
-    ``n_sigma``. Each surviving peak is grown outward via
-    :func:`_walk_peak` and overlapping regions are merged.
+    Edges are in axis units; the array is empty if no peaks pass the
+    significance threshold. Peaks are strict local maxima of the rate
+    (counts/width), filtered by ``prominence * w_peak / sqrt(n_peak)``
+    against ``n_sigma``. When ``max_bin_width`` is given, candidates
+    sitting on a bin wider than the cap are also rejected (line-like
+    features have resolution-bounded widths; wide bins flag Compton
+    edges and smooth-continuum plateaus). Each surviving peak is grown
+    outward via :func:`_walk_peak` and overlapping regions are merged.
     """
     if len(h.axes) != 1:
         msg = f"only 1D histograms supported, got {len(h.axes)}D"
@@ -176,6 +189,8 @@ def _find_peak_regions(
     prominences, _, _ = signal.peak_prominences(rate, peaks)
     significance = prominences * widths[peaks] / np.sqrt(np.maximum(values[peaks], 1.0))
     peaks = peaks[significance >= n_sigma]
+    if max_bin_width is not None:
+        peaks = peaks[widths[peaks] < max_bin_width]
     if len(peaks) == 0:
         return np.empty((0, 2), dtype=float)
 
@@ -207,10 +222,7 @@ def _collapse_peaks(
     width_factor: float = 5.0,
     max_bin_width: float | None = None,
 ) -> bh.Hist:
-    """Merge bins inside each detected peak region into a single bin.
-
-    Output edges are a subset of the input edges.
-    """
+    """Merge bins inside each detected peak region into a single bin."""
     regions = _find_peak_regions(
         h,
         n_sigma=n_sigma,
@@ -237,13 +249,14 @@ def _uniform_edges_with_peaks(
     bin_width: float,
     peak_regions: np.ndarray,
 ) -> np.ndarray:
-    """Uniform grid in ``[low, high]`` with each peak region inserted
-    as a single bin, replacing any uniform edges strictly inside it.
+    """Uniform grid over ``[low, high]`` with peak regions as single bins.
 
-    Assumes ``peak_regions`` is sorted and non-overlapping (the output
-    of :func:`_find_peak_regions` is). Peak regions outside
-    ``[low, high]`` produce out-of-range edges in the result; the
-    caller is responsible for ensuring the range covers them.
+    Any uniform edge strictly inside a peak region, OR within
+    ``bin_width`` of one of its boundaries, is dropped: the peak
+    region's neighboring continuum bins absorb the would-be fragment,
+    making them up to ``2 * bin_width`` wide instead. Uniform edges
+    exactly on a peak boundary are kept. Assumes ``peak_regions`` is
+    sorted and non-overlapping.
     """
     if not (np.isfinite(bin_width) and bin_width > 0):
         msg = f"bin_width must be finite and > 0, got {bin_width}"
@@ -264,13 +277,10 @@ def _uniform_edges_with_peaks(
 
     keep_mask = np.ones(len(uniform), dtype=bool)
     for lo_p, hi_p in peak_regions:
-        keep_mask &= ~((uniform > lo_p) & (uniform < hi_p))
+        in_zone = (uniform > lo_p - bin_width) & (uniform < hi_p + bin_width)
+        is_boundary = (uniform == lo_p) | (uniform == hi_p)
+        keep_mask &= ~(in_zone & ~is_boundary)
     return np.unique(np.concatenate([uniform[keep_mask], peak_regions.flatten()]))
-
-
-# ---------------------------------------------------------------------------
-# public API — raw data → histogram
-# ---------------------------------------------------------------------------
 
 
 def hist_bblocks(
@@ -283,36 +293,39 @@ def hist_bblocks(
 ) -> bh.Hist:
     """Histogram an unbinned data array using Bayesian-blocks edges.
 
-    By default runs :func:`hepstats.modeling.bayesian_blocks` directly
-    on ``data``, which is O(N²) in sample size. Passing
-    ``prebin_width`` first bins ``data`` into a uniform fine histogram
-    and calls :func:`rebin_bblocks` instead, which is the faster path
-    for large samples.
-
-    Awkward inputs are flattened across all axes before binning.
+    For large samples, pass ``prebin_width`` to first bin the data
+    on a uniform fine grid and then call :func:`rebin_bblocks` --
+    this is much faster than running bblocks on the raw data
+    directly. Awkward inputs are flattened before binning.
 
     Parameters
     ----------
     data
-        Array of measurement values.
+        Array of measurement values (numpy or awkward).
     prebin_width
-        Pre-binning width. Must be much finer than the smallest
-        feature to resolve; resolution loss propagates to the output.
+        Width of the uniform pre-binning grid. Should be a few
+        times finer than the narrowest feature you want to
+        resolve (e.g. ~0.5 keV for HPGe lines with ~3 keV FWHM).
     prebin_low, prebin_high
-        Range of the pre-binned histogram. Default to ``data.min()``
-        / ``data.max()``. Data outside ``[prebin_low, prebin_high)``
-        is discarded. Only valid when ``prebin_width`` is given. The
-        effective upper edge may exceed ``prebin_high`` by up to
-        ``prebin_width`` to cover the range with an integer number
-        of bins.
+        Histogram range. Default to ``data.min()`` / ``data.max()``.
+        Data outside the range is discarded. Only valid together
+        with ``prebin_width``. The upper edge may overshoot
+        ``prebin_high`` by up to ``prebin_width`` so the range is
+        covered by an integer number of bins.
     p0
-        False-alarm probability for change-point detection.
+        Bblocks sensitivity: lower values give coarser bins, higher
+        values finer. Typical 0.01-0.1.
 
     Returns
     -------
     h
-        A ``Variable``-axis ``Weight``-storage histogram filled with
-        ``data``.
+        A ``Variable``-axis ``Weight``-storage histogram filled
+        with ``data``.
+
+    Examples
+    --------
+    >>> from pygama.math.rebin import hist_bblocks
+    >>> h = hist_bblocks(energies, prebin_width=0.5, prebin_low=0, prebin_high=3000)
     """
     if prebin_width is None:
         if prebin_low is not None or prebin_high is not None:
@@ -353,12 +366,32 @@ def hist_bblocks_with_peaks(
     width_factor: float = 5.0,
     max_bin_width: float | None = None,
 ) -> bh.Hist:
-    """Histogram raw data with Bayesian-blocks edges, then collapse
-    each detected peak region into a single bin.
+    """Histogram raw data with Bayesian-blocks edges and collapsed peaks.
 
-    Equivalent to applying peak consolidation to the output of
-    :func:`hist_bblocks`. See those two functions for the meaning of
-    each parameter.
+    Equivalent to ``_collapse_peaks(hist_bblocks(data, ...))``.
+
+    Parameters
+    ----------
+    data, prebin_width, prebin_low, prebin_high, p0
+        See :func:`hist_bblocks`.
+    n_sigma, width_factor, max_bin_width
+        See :func:`rebin_bblocks_with_peaks`.
+
+    Returns
+    -------
+    h
+        A ``Variable``-axis ``Weight``-storage histogram.
+
+    Examples
+    --------
+    Starting with a large data array, prebin it for performance and use a
+    maximum peak width of 10.
+
+    >>> from pygama.math.rebin import hist_bblocks_with_peaks
+    >>> data = [...]
+    >>> h = hist_bblocks_with_peaks(
+    ...     data, prebin_width=0.5, prebin_low=0, prebin_high=3000, max_bin_width=10
+    ... )
     """
     bb = hist_bblocks(
         data,
@@ -387,31 +420,42 @@ def hist_uniform_with_peaks(
     width_factor: float = 5.0,
     max_bin_width: float | None = None,
 ) -> bh.Hist:
-    """Histogram raw data with uniform-width continuum bins, with each
-    detected peak collapsed to a single bin.
+    """Histogram raw data with uniform continuum bins and collapsed peaks.
 
     Parameters
     ----------
-    bin_width
-        Uniform continuum bin width. The output spans
-        ``[prebin_low, prebin_high)`` (or ``[data.min(), data.max()]``
-        if not given); bins overlapping any detected peak region are
-        replaced by a single peak-region bin.
-    prebin_width, p0
-        Forwarded to the internal :func:`hist_bblocks` peak-detection
-        pass.
+    data, prebin_width, p0
+        See :func:`hist_bblocks`.
     prebin_low, prebin_high
-        Define both the output range and (after masking ``data`` to
-        ``[prebin_low, prebin_high)``) the input range of the
-        peak-detection pass.
+        See :func:`hist_bblocks`; here they also define the
+        output range.
+    bin_width
+        See :func:`rebin_uniform_with_peaks`.
     n_sigma, width_factor, max_bin_width
-        Forwarded to peak detection; see :func:`_find_peak_regions`.
+        See :func:`rebin_bblocks_with_peaks`.
 
     Returns
     -------
     h
-        A ``Variable``-axis ``Weight``-storage histogram filled with
-        ``data``.
+        A ``Variable``-axis ``Weight``-storage histogram filled
+        with ``data``.
+
+    Examples
+    --------
+    Starting with a large data array, prebin it for performance and use a
+    maximum peak width of 10. In between the peaks use an uniform bin width of
+    2.
+
+    >>> from pygama.math.rebin import hist_uniform_with_peaks
+    >>> data = [...]
+    >>> h = hist_uniform_with_peaks(
+    ...     energies,
+    ...     bin_width=2,
+    ...     prebin_width=0.5,
+    ...     prebin_low=0,
+    ...     prebin_high=3000,
+    ...     max_bin_width=10,
+    ... )
     """
     data, lo, hi = _prepare_data(data, prebin_low, prebin_high)
     bb = hist_bblocks(data, prebin_width=prebin_width, p0=p0)
@@ -431,31 +475,31 @@ def hist_uniform_with_peaks(
     return out
 
 
-# ---------------------------------------------------------------------------
-# public API — fine histogram → coarser histogram
-# ---------------------------------------------------------------------------
-
-
 def rebin_bblocks(h: bh.Hist, *, p0: float = 0.05) -> bh.Hist:
-    """Rebin a 1D :class:`hist.Hist` using Bayesian-blocks adaptive binning.
+    """Rebin a fine 1D histogram using Bayesian-blocks adaptive binning.
 
-    Uses :func:`hepstats.modeling.bayesian_blocks` treating each
-    fine-bin center as a weighted event (weight = bin count), snaps
-    the resulting block edges to the fine-bin grid, and aggregates the
-    input histogram onto the new edges.
+    Each fine bin is treated as a weighted event (weight = bin count);
+    the resulting block edges are snapped to the input grid.
 
     Parameters
     ----------
     h
         Input finely-binned 1D histogram.
     p0
-        False-alarm probability for change-point detection.
+        See :func:`hist_bblocks`.
 
     Returns
     -------
     out
         A ``Variable``-axis ``Weight``-storage histogram whose edges
         are a subset of the input edges.
+
+    Examples
+    --------
+    >>> from pygama.math.rebin import rebin_bblocks
+    >>> import hist
+    >>> h_fine = hist.new.Reg(1000, 0, 1000).Double().fill(...)
+    >>> h_bb = rebin_bblocks(h_fine)
     """
     # _bblocks_edges_from_hist returns edges that are exact members of
     # h.axes[0].edges, so they pass bh.rebin's edge-membership check directly.
@@ -470,11 +514,73 @@ def rebin_bblocks_with_peaks(
     max_bin_width: float | None = None,
     p0: float = 0.05,
 ) -> bh.Hist:
-    """Rebin a 1D :class:`hist.Hist` with Bayesian-blocks adaptive
-    binning, then collapse each detected peak region into a single bin.
+    """Rebin a fine histogram with bblocks edges and collapsed peaks.
 
-    See :func:`rebin_bblocks` and :func:`_find_peak_regions` for the
-    meaning of each parameter.
+    First applies :func:`rebin_bblocks` to get adaptive continuum
+    bins, then merges each detected gamma peak into a single bin.
+
+    Parameters
+    ----------
+    h
+        Input finely-binned 1D histogram.
+    n_sigma
+        How tall a peak must be above its local baseline to be
+        flagged, in units of Poisson noise. Default ``5.0``.
+        Lower values pick up weaker peaks but also more spurious
+        detections.
+    width_factor
+        How far the merge can extend on each side of a peak,
+        relative to the width of the peak's own bblocks bin.
+        The walk stops at the first bin wider than
+        ``width_factor * peak_bin_width``. Default ``5.0``;
+        try ``2.0-3.0`` for tighter merges on HPGe spectra.
+    max_bin_width
+        Maximum allowed width for a peak bin (in axis units).
+        Two effects:
+
+        1. Detection: candidates whose bblocks bin is wider than
+           this are **rejected** -- useful for filtering out
+           Compton edges, continuum plateaus, and other broad
+           features that the peak finder cannot tell apart from
+           real gamma lines based on shape alone (see Notes).
+        2. Walk: the merge walk never extends into a bin wider
+           than this, regardless of ``width_factor``.
+
+        Default ``None`` (no filter). **For HPGe spectra set it
+        to a few times FWHM at the highest energy of interest
+        (5-20 keV is typical)** to suppress non-line features.
+    p0
+        See :func:`hist_bblocks`.
+
+    Returns
+    -------
+    out
+        A ``Variable``-axis ``Weight``-storage histogram whose
+        edges are a subset of the input edges.
+
+    Notes
+    -----
+    The peak finder only looks at local maxima of the rate
+    (counts/width) and how high they stand above their local
+    baseline; it knows nothing about what a real gamma line
+    looks like. It can therefore flag features that aren't
+    line-like:
+
+    * resolution-limited gamma peaks (the intended target);
+    * the upper end of a long Compton-edge ramp;
+    * step transitions;
+    * wide continuum plateaus that bblocks captured in a single
+      wide bin.
+
+    Real HPGe peaks live on narrow bblocks bins (FWHM is a few
+    keV even at multi-MeV energies); the other features end up
+    on much wider bins. ``max_bin_width`` is the simplest filter
+    to reject everything that isn't a real line.
+
+    Examples
+    --------
+    >>> from pygama.math.rebin import rebin_bblocks_with_peaks
+    >>> h_out = rebin_bblocks_with_peaks(h_fine, max_bin_width=10)
     """
     bb = rebin_bblocks(h, p0=p0)
     return _collapse_peaks(
@@ -494,29 +600,39 @@ def rebin_uniform_with_peaks(
     max_bin_width: float | None = None,
     p0: float = 0.05,
 ) -> bh.Hist:
-    """Rebin a 1D :class:`hist.Hist` onto uniform continuum bins, with
-    each detected peak region kept as a single bin.
+    """Rebin a fine histogram onto uniform continuum bins with collapsed peaks.
 
-    Peak detection runs on an internal :func:`rebin_bblocks` pass.
-    Output edges are snapped to ``h.axes[0].edges``, so ``bin_width``
-    need not align exactly with the input grid.
+    Runs an internal :func:`rebin_bblocks` pass to find the peaks,
+    then builds the output: uniform-``bin_width`` continuum bins
+    everywhere except inside detected peak regions, which each
+    become a single bin. Output edges are snapped to
+    ``h.axes[0].edges``, so ``bin_width`` need not align exactly
+    with the input grid.
 
     Parameters
     ----------
     h
         Input finely-binned 1D histogram.
     bin_width
-        Uniform continuum bin width (in axis units).
-    n_sigma, width_factor, max_bin_width
-        Forwarded to peak detection; see :func:`_find_peak_regions`.
-    p0
-        False-alarm probability for the internal bblocks pass.
+        Continuum bin width (in axis units). To avoid tiny
+        fragment bins right next to peaks, the continuum bin
+        bordering each peak absorbs the leftover and can be up
+        to ``2 * bin_width`` wide.
+    n_sigma, width_factor, max_bin_width, p0
+        See :func:`rebin_bblocks_with_peaks`.
 
     Returns
     -------
     out
-        A ``Variable``-axis ``Weight``-storage histogram whose edges
-        are a subset of the input edges.
+        A ``Variable``-axis ``Weight``-storage histogram whose
+        edges are a subset of the input edges.
+
+    Examples
+    --------
+    >>> from pygama.math.rebin import rebin_uniform_with_peaks
+    >>> import hist
+    >>> h_fine = hist.new.Reg(1000, 0, 1000).Double().fill(...)
+    >>> h_out = rebin_uniform_with_peaks(h_fine, bin_width=2, max_bin_width=10)
     """
     bb = rebin_bblocks(h, p0=p0)
     regions = _find_peak_regions(

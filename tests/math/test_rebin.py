@@ -365,6 +365,30 @@ def test_collapse_peaks_max_bin_width_caps_wide_peak_walk():
     assert int(np.sum(np.isclose(widths_tight, 50.0))) == 2
 
 
+def test_find_peak_regions_max_bin_width_rejects_wide_peak_bins():
+    # a Compton-edge-like feature: a wide plateau bin (highest rate) sandwiched
+    # between lower-rate continuum on one side and a steep drop on the other.
+    # The plateau bin is a rate local maximum but is not a line-like peak.
+    h = _hist_from_widths_rates(
+        [
+            (50.0, 1000.0),  # left continuum (lower rate)
+            (30.0, 2700.0),  # wide plateau — rate local max, NOT a real line
+            (3.0, 2500.0),  # sharp drop
+            (8.0, 2200.0),
+            (12.0, 2060.0),
+            (50.0, 30.0),  # far continuum
+        ]
+    )
+    # without max_bin_width: the 30-keV plateau is flagged as a "peak"
+    regions_loose = _find_peak_regions(h, n_sigma=5.0, width_factor=2.0)
+    assert len(regions_loose) >= 1
+    # with max_bin_width=15: the wide-bin "peak" is rejected
+    regions_tight = _find_peak_regions(
+        h, n_sigma=5.0, width_factor=2.0, max_bin_width=15.0
+    )
+    assert len(regions_tight) == 0
+
+
 def test_collapse_peaks_handles_low_stats_peak_on_wider_bin():
     # peak sits on a 3 keV bin (low-stats peak); neighbors are also moderately
     # wide. width_factor only kicks in at the boundary to wide continuum.
@@ -556,18 +580,47 @@ def test_uniform_edges_with_peaks_no_peaks_returns_uniform():
     assert np.allclose(edges, np.arange(11.0))
 
 
-def test_uniform_edges_with_peaks_inserts_peaks_and_drops_interior_uniform():
-    # peak region [3.2, 4.7] should drop uniform edge 4 and insert 3.2, 4.7
+def test_uniform_edges_with_peaks_inserts_peaks_and_absorbs_fragments():
+    # peak region [3.2, 4.7] with bin_width=1: the interior uniform edge
+    # (4) AND the fragment-creating edges within bin_width of either
+    # peak boundary (3 and 5) are dropped, so the neighboring continuum
+    # bins absorb the would-be fragments.
     regions = np.array([[3.2, 4.7]])
     edges = _uniform_edges_with_peaks(0.0, 10.0, bin_width=1.0, peak_regions=regions)
-    # 4 was strictly inside the peak region, so it must be gone
-    assert 4.0 not in edges
+    # interior + fragment-creating uniform edges must be gone
+    for x in [3.0, 4.0, 5.0]:
+        assert x not in edges
     # peak boundaries must be present
     assert 3.2 in edges
     assert 4.7 in edges
-    # uniform edges outside the peak region must survive
-    for x in [0.0, 1.0, 2.0, 3.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]:
+    # uniform edges well outside the peak region must survive
+    for x in [0.0, 1.0, 2.0, 6.0, 7.0, 8.0, 9.0, 10.0]:
         assert x in edges
+    # the neighbors of the peak region are now wider than bin_width
+    widths = np.diff(edges)
+    # left neighbor [2.0, 3.2] = 1.2, right neighbor [4.7, 6.0] = 1.3
+    assert any(np.isclose(widths, 1.2))
+    assert any(np.isclose(widths, 1.3))
+
+
+def test_uniform_edges_with_peaks_keeps_uniform_edge_on_peak_boundary():
+    # peak edge coincides with a uniform edge → no fragment, no absorption
+    regions = np.array([[3.0, 4.7]])
+    edges = _uniform_edges_with_peaks(0.0, 10.0, bin_width=1.0, peak_regions=regions)
+    # 3.0 is both a uniform edge and the peak's lo edge — must be present
+    assert 3.0 in edges
+    # the left-neighbor continuum bin should be exactly bin_width
+    # ([2.0, 3.0]) since there is no fragment to absorb
+    widths = np.diff(edges)
+    # interior of peak: no uniform edge between 3.0 and 4.7 to drop (4 is
+    # interior); right side: 5 is in absorption zone → dropped
+    assert 4.0 not in edges
+    assert 5.0 not in edges
+    # left side is preserved exactly
+    for x in [0.0, 1.0, 2.0, 3.0]:
+        assert x in edges
+    # the [2.0, 3.0] continuum bin is intact (no absorption)
+    assert any(np.isclose(widths, 1.0))
 
 
 def test_uniform_edges_with_peaks_bin_width_larger_than_range_keeps_two_edges():
