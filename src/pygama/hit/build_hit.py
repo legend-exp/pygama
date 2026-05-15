@@ -182,7 +182,9 @@ def build_hit(
                     multiplier = 2 ** np.arange(n_flags, dtype=flag_values.dtype)
                     flag_out = np.dot(flag_values, multiplier)
 
-                    outtbl_obj.add_field(high_lvl_flag, lgdo.Array(flag_out))
+                    aggr_col = lgdo.Array(flag_out)
+                    aggr_col.attrs["bit_names"] = ",".join(flags_list)
+                    outtbl_obj.add_field(high_lvl_flag, aggr_col)
 
             # remove or add columns according to "outputs" in the configuration
             # dictionary

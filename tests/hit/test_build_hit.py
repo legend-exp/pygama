@@ -139,6 +139,9 @@ def test_aggregation_outputs(dsp_test_file, tmp_dir):
         "is_valid_tmax",
     ]
 
+    assert obj["aggr1"].attrs["bit_names"] == "is_valid_rt,is_valid_t0,is_valid_tmax"
+    assert obj["aggr2"].attrs["bit_names"] == "is_valid_t0,is_valid_tmax"
+
     hit_df = lh5.read_as("ch1084803/hit", outfile, "pd")
 
     # aggr1 consists of 3 bits --> max number can be 7, aggr2 consists of 2 bits so max number can be 3
