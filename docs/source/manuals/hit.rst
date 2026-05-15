@@ -91,6 +91,40 @@ evaluated in a dependency-respecting order rather than strictly in JSON
 insertion order.  This dependency-based reordering is what allows forward
 references like this to be supported.
 
+Bit aggregations
+^^^^^^^^^^^^^^^^
+
+An optional ``aggregations`` block packs several boolean columns into a single
+integer column, with one bit per source column.  Each aggregation entry is a
+mapping from bit name to source-column name; bit ``i`` corresponds to the
+``i``-th entry in insertion order.  Example:
+
+.. code-block:: json
+
+    {
+      "outputs": ["aggr1"],
+      "operations": {
+        "is_valid_rt":   {"expression": "(tp_90-tp_10) > 96", "parameters": {}},
+        "is_valid_t0":   {"expression": "tp_0_est > 47000",   "parameters": {}},
+        "is_valid_tmax": {"expression": "tp_max < 120000",    "parameters": {}}
+      },
+      "aggregations": {
+        "aggr1": {
+          "bit0": "is_valid_rt",
+          "bit1": "is_valid_t0",
+          "bit2": "is_valid_tmax"
+        }
+      }
+    }
+
+The dtype of the aggregated column is the smallest unsigned integer that fits
+the number of bits (``uint8``, ``uint16``, ``uint32``, or ``uint64``).  The
+source-column names are persisted on disk as the ``bit_names`` LGDO attribute
+of the aggregated column (a comma-separated string in bit order), so the
+encoding can be recovered at read time.  Use
+:func:`~pygama.hit.aggregations.unpack_bitmask` to expand an aggregation back
+into an awkward record array with one boolean field per bit name.
+
 Per-table configuration
 ^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -117,5 +151,8 @@ API reference
    * - :func:`~pygama.hit.build_hit.build_hit`
      - Read DSP-tier LH5 tables and write calibrated hit-tier quantities by
        evaluating the supplied configuration expressions.
+   * - :func:`~pygama.hit.aggregations.unpack_bitmask`
+     - Expand a bit-aggregation column into an awkward record array with one
+       boolean field per bit name.
 
 For the complete parameter reference see :mod:`pygama.hit`.
