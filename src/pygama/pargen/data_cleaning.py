@@ -173,7 +173,7 @@ def get_mode_stdev(par_array) -> tuple:
             counts,
             bins,
             mode_guess=mean,
-            n_bins=20,
+            n_bins=min(20,len(bins)),
             cost_func="Least Squares",
             inflate_errors=False,
             gof_method="var",
