@@ -607,7 +607,7 @@ def get_survival_fraction(
 
     if display > 1:
         _fig, (ax1, ax2) = plt.subplots(1, 2)
-        bins = np.arange(fit_range[0], fit_range[1], 1) 
+        bins = np.arange(fit_range[0], fit_range[1], 1)
         ax1.hist(energy[(~nan_idxs) & (idxs)], bins=bins, histtype="step")
 
         ax2.hist(energy[(~nan_idxs) & (~idxs)], bins=bins, histtype="step")
