@@ -66,8 +66,9 @@ def noise_optimization(
     res_dict = {}
     if display > 0:
         dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
+        
         psd = np.mean(dsp_data["wf_psd"].values.nda, axis=0)
-        sample_us = float(dsp_data["wf_presum"].dt.nda[0]) / 1000
+        sample_us = float(tb_data["waveform"].dt.nda[0]) / 1000
         freq = np.linspace(0, (1 / sample_us) / 2, len(psd))
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
         ax.plot(freq, psd)
@@ -79,7 +80,10 @@ def noise_optimization(
         plot_dict = {}
         plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
         plt.close()
-
+    
+    if opt_dict.get("fft_field", "wf_psd") in dsp_proc_chain["outputs"]:
+        dsp_proc_chain["outputs"].remove(opt_dict.get("fft_field", "wf_psd"))
+        
     result_dict = {}
     ene_pars = list(opt_dict_par.keys())
     log.info("\nRunning optimization for %s", ene_pars)
