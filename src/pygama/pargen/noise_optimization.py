@@ -81,6 +81,7 @@ def noise_optimization(
         plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
         plt.close()
 
+    dsp_proc_chain = {**dsp_proc_chain, "outputs": dsp_proc_chain["outputs"].copy()}
     if opt_dict.get("fft_field", "wf_psd") in dsp_proc_chain["outputs"]:
         dsp_proc_chain["outputs"].remove(opt_dict.get("fft_field", "wf_psd"))
 
