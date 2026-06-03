@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=61.2",
+    "setuptools>=77",
     "setuptools_scm[toml]>=7",
 ]
 build-backend = "setuptools.build_meta"
@@ -15,11 +15,12 @@ maintainers = [
     { name = "The LEGEND collaboration" },
 ]
 readme = "README.md"
+license = "GPL-3.0"
+license-files = ["LICENSE"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: MacOS",
     "Operating System :: POSIX",
     "Operating System :: Unix",
@@ -90,9 +91,6 @@ pygama = "pygama.cli:pygama_cli"
 [tool.setuptools]
 include-package-data = true
 zip-safe = false
-license-files = [
-    "LICENSE",
-]
 
 [tool.setuptools.package-dir]
 "" = "src"
