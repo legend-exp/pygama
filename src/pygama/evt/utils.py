@@ -76,17 +76,14 @@ def get_lgdo_attrs(datainfo, channels, tier_name, field):
     if tier is None or tier.file is None:
         return {}
 
-    try:
-        with h5py.File(tier.file, "r") as f:
-            for ch in channels:
-                path = f"{ch.replace('/', '')}/{tier.group}/{field}"
-                if path not in f:
-                    continue
-                attrs = dict(f[path].attrs)
-                attrs.pop("datatype", None)
-                return attrs
-    except OSError:
-        pass
+    with h5py.File(tier.file, "r") as f:
+        for ch in channels:
+            path = f"{ch.replace('/', '')}/{tier.group}/{field}"
+            if path not in f:
+                continue
+            attrs = dict(f[path].attrs)
+            attrs.pop("datatype", None)
+            return attrs
     return {}
 
 
