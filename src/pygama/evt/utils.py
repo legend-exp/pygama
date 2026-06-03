@@ -9,6 +9,7 @@ import re
 from collections import namedtuple
 
 import awkward as ak
+import h5py
 import lh5
 import numpy as np
 from numpy.typing import NDArray
@@ -53,6 +54,41 @@ def copy_lgdo_attrs(obj):
     attrs = copy.copy(obj.attrs)
     attrs.pop("datatype")
     return attrs
+
+
+def get_lgdo_attrs(datainfo, channels, tier_name, field):
+    """Read LGDO attrs for a field from the first available channel in the LH5 file.
+
+    Uses a metadata-only h5py read — no data is loaded from disk.
+
+    Parameters
+    ----------
+    datainfo
+        input/output LH5 datainfo.
+    channels
+        flat list of channel strings (e.g. ``["ch1000000", "ch1000001"]``).
+    tier_name
+        name of the tier (e.g. ``"hit"``).
+    field
+        field name within the tier table.
+    """
+    tier = datainfo._asdict().get(tier_name)
+    if tier is None or tier.file is None:
+        return {}
+
+    for ch in channels:
+        ch_key = ch.replace("/", "")
+        path = f"{ch_key}/{tier.group}/{field}"
+        try:
+            with h5py.File(tier.file, "r") as f:
+                if path not in f:
+                    continue
+                attrs = dict(f[path].attrs)
+                attrs.pop("datatype", None)
+                return attrs
+        except Exception:
+            continue
+    return {}
 
 
 def get_tcm_id_by_pattern(table_id_fmt: str, ch: str) -> int:

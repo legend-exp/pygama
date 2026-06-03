@@ -70,6 +70,13 @@ def build_evt(
         - ``dtype`` defines the NumPy data type of the resulting data.
         - ``initial`` defines the initial/default value. Useful with some types
           of aggregators.
+        - ``lgdo_attrs`` defines LGDO attributes to attach to the output column.
+          When ``expression`` references a single lower-tier field (e.g.
+          ``hit.quality_flags``), any LGDO attributes stored on that source
+          field (such as ``bit_names``) are automatically forwarded to the evt
+          column. Attributes specified via ``lgdo_attrs`` take precedence over
+          forwarded ones. Forwarding is skipped for ``function`` mode and for
+          expressions that reference more than one field.
 
         For example:
 
@@ -278,6 +285,28 @@ def build_evt_cols(
     ):
         Path(datainfo.evt.file).unlink()
 
+    # Pre-compute source attrs for single-field aggregation operations.
+    # Done once here because attrs are file-level metadata, not per-chunk data.
+    # Excluded: function mode (result is unrelated to the referenced field).
+    lower_tiers = [k for k in datainfo._asdict() if k not in ("tcm", "evt")]
+    all_channels = list(itertools.chain.from_iterable(channels.values()))
+    op_source_attrs = {}
+    for _op_field, _op_v in config["operations"].items():
+        mode = _op_v.get("aggregation_mode", "")
+        if not mode or mode == "function":
+            continue
+        expr_fields = re.findall(
+            rf"({'|'.join(lower_tiers)}).([a-zA-Z_$][\w$]*)",
+            _op_v["expression"],
+        )
+        if len(expr_fields) == 1:
+            _tier_name, _field_name = expr_fields[0]
+            src_attrs = utils.get_lgdo_attrs(
+                datainfo, all_channels, _tier_name, _field_name
+            )
+            if src_attrs:
+                op_source_attrs[_op_field] = src_attrs
+
     for tcm_lh5 in lh5.LH5Iterator(
         datainfo.tcm.file,
         datainfo.tcm.group,
@@ -357,7 +386,11 @@ def build_evt_cols(
                     channel_mapping=channel_mapping,
                 )
 
-                # add attribute if present
+                # forward attrs pre-computed from the source lower-tier field
+                if field in op_source_attrs:
+                    obj.attrs |= op_source_attrs[field]
+
+                # add attribute if present (user attrs override source attrs)
                 if "lgdo_attrs" in v:
                     obj.attrs |= v["lgdo_attrs"]
 

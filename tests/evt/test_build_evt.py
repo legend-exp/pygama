@@ -397,6 +397,72 @@ def test_description_attr(files_config_nowrite):
     )
 
 
+@pytest.fixture
+def bitmask_files_config(tmp_path):
+    """Minimal hit + TCM LH5 pair where the hit field carries bit_names attrs."""
+    hit_file = str(tmp_path / "hit.lh5")
+    tcm_file = str(tmp_path / "tcm.lh5")
+
+    # 3 events, 1 channel (ch1000000 → table_id 1000000), 1 hit each
+    n = 3
+    flags = Array(np.array([0b001, 0b010, 0b101], dtype=np.uint8))
+    flags.attrs["bit_names"] = "rt,t0,tmax"
+    energy = Array(np.array([10.0, 20.0, 30.0], dtype=np.float32))
+    lh5.write(
+        Table(col_dict={"flags": flags, "energy": energy}), "ch1000000/hit", hit_file
+    )
+
+    # TCM: each event has exactly one hit from ch1000000
+    table_key = VectorOfVectors(
+        flattened_data=Array(np.full(n, 1000000, dtype=np.int32)),
+        cumulative_length=Array(np.arange(1, n + 1, dtype=np.uint32)),
+    )
+    row_in_table = VectorOfVectors(
+        flattened_data=Array(np.arange(n, dtype=np.int32)),
+        cumulative_length=Array(np.arange(1, n + 1, dtype=np.uint32)),
+    )
+    tcm_table = Table(col_dict={"table_key": table_key, "row_in_table": row_in_table})
+    lh5.write(tcm_table, "hardware_tcm_1", tcm_file)
+
+    return {
+        "tcm": (tcm_file, "hardware_tcm_1"),
+        "hit": (hit_file, "hit", "ch{}"),
+        "evt": (None, "evt"),
+    }
+
+
+def test_source_attrs_forwarding(bitmask_files_config):
+    config = {
+        "channels": {"all": ["ch1000000"]},
+        "outputs": ["flags", "combo", "flags_custom"],
+        "operations": {
+            # single field reference → bit_names forwarded from hit
+            "flags": {
+                "channels": "all",
+                "aggregation_mode": "first_at:hit.energy",
+                "expression": "hit.flags",
+            },
+            # multi-field expression → no forwarding (ambiguous source)
+            "combo": {
+                "channels": "all",
+                "aggregation_mode": "first_at:hit.energy",
+                "expression": "hit.flags | hit.flags",
+            },
+            # user lgdo_attrs override the forwarded source attrs
+            "flags_custom": {
+                "channels": "all",
+                "aggregation_mode": "first_at:hit.energy",
+                "expression": "hit.flags",
+                "lgdo_attrs": {"bit_names": "custom_a,custom_b"},
+            },
+        },
+    }
+    evt = build_evt(bitmask_files_config, config)
+    assert evt.flags.attrs.get("bit_names") == "rt,t0,tmax"
+    assert "bit_names" not in evt.combo.attrs
+    assert evt.flags_custom.attrs.get("bit_names") == "custom_a,custom_b"
+
+
 def test_buffered_build_evt(files_config_nowrite):
     evt1 = build_evt(
         files_config_nowrite,
