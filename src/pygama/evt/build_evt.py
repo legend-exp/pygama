@@ -296,7 +296,7 @@ def build_evt_cols(
         if not mode or mode == "function":
             continue
         expr_fields = re.findall(
-            rf"({'|'.join(lower_tiers)}).([a-zA-Z_$][\w$]*)",
+            rf"({'|'.join(re.escape(t) for t in lower_tiers)})\.([a-zA-Z_$][\w$]*)",
             _op_v["expression"],
         )
         if len(expr_fields) == 1:
