@@ -1,0 +1,24 @@
+{
+  "data_dir": "lh5/prod-ref-l200/generated/tier",
+  "tier_dirs": {
+    "raw": "/raw",
+    "dsp": "/dsp",
+    "hit": "/hit",
+    "tcm": "/tcm",
+    "evt": "/evt"
+  },
+  "file_format": {
+    "raw": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_raw.lh5",
+    "dsp": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_dsp.lh5",
+    "hit": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_hit.lh5",
+    "evt": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_evt.lh5",
+    "tcm": "/{type}/{period}/{run}/{exp}-{period}-{run}-{type}-{timestamp}-tier_tcm.lh5"
+  },
+  "table_format": {
+    "raw": "ch{ch:07d}/raw",
+    "dsp": "ch{ch:07d}/dsp",
+    "hit": "ch{ch:07d}/hit",
+    "evt": "{grp}/evt",
+    "tcm": "hardware_tcm_1"
+  }
+}
