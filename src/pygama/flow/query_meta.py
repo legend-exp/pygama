@@ -444,11 +444,17 @@ def query_meta(
             raise ValueError(msg)
 
         # Format and return results
-        result = ak.Array(records)
         if library == "ak":
-            pass
+            result = ak.Array(records)
         elif library == "pd":
-            result = ak.to_dataframe(result)
+            result = pd.json_normalize(records, sep='/')
+            cols = result.columns.str.split('/', expand=True)
+            # if columns are nested, they will be tuples; if nesting is uneven,
+            # some tuples may have NaN; replace with '' to get better behavior
+            if isinstance(cols[0], tuple):
+                result.columns = pd.MultiIndex.from_tuples(
+                    [[name if not pd.isna(name) else '' for name in c] for c in cols]
+                )
         elif library == "np":
             if group_chans:
                 msg = "library 'np' is not compatible with group_chans=True"

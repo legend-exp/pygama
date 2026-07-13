@@ -1,0 +1,22 @@
+{
+  "filedb": "$_/filedb-config.json",
+  "levels": {
+    "hit": {
+      "tiers": ["raw", "dsp", "hit"]
+    },
+    "tcm": {
+      "tiers": ["tcm"],
+      "parent": "hit",
+      "child": "evt",
+      "tcm_cols": {
+        "child_idx": "coin_idx",
+        "parent_tb": "table_key",
+        "parent_idx": "row_in_table"
+      }
+    },
+    "evt": {
+      "tiers": ["evt"]
+    }
+  },
+  "channel_map": {}
+}

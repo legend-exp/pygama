@@ -85,6 +85,8 @@ be provided with most dataprods! If you set the environment variable $REFPROD th
 the file will automatically be accessed from the referenced directory!
 """
 
+from .data_loader import DataLoader
+from .file_db import FileDB
 from .query_runs import query_runs, list_run_fields
 from .query_meta import query_meta
 from .build_iterator import build_iterator
@@ -93,6 +95,8 @@ from .query_evt import query_evt
 from .query_hist import query_hist
 
 __all__ = [
+    "DataLoader",
+    "FileDB",
     "query_runs",
     "query_meta",
     "query_data",
