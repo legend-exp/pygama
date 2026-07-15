@@ -212,82 +212,65 @@ def get_peak_fwhm_with_dt_corr(
     fit_range = (lower_bound, upper_bound)
     tol = None
     try:
-        (
-            energy_pars,
-            energy_err,
-            cov,
-            chisqr,
-            func,
-            _,
-            _,
-            _,
-        ) = pgc.unbinned_staged_energy_fit(
-            ct_energy[win_idxs],
-            func=func,
-            fit_range=fit_range,
-            guess_func=simple_guess,
-            tol=tol,
-            guess=guess,
-            allow_tail_drop=allow_tail_drop,
-            bin_width=bin_width,
-            display=display,
-        )
-        if display > 0:
-            plt.figure()
-            xs = np.arange(lower_bound, upper_bound, bin_width)
-            fit_hist, fit_bins, _ = pgh.get_hist(
-                ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
+        try:
+            (
+                energy_pars,
+                energy_err,
+                cov,
+                chisqr,
+                func,
+                _,
+                _,
+                _,
+            ) = pgc.unbinned_staged_energy_fit(
+                ct_energy[win_idxs],
+                func=func,
+                fit_range=fit_range,
+                guess_func=simple_guess,
+                tol=tol,
+                guess=guess,
+                allow_tail_drop=allow_tail_drop,
+                bin_width=bin_width,
+                display=display,
             )
-            plt.step(pgh.get_bin_centers(fit_bins), fit_hist)
-            plt.plot(xs, func.get_pdf(xs, *energy_pars))
-            plt.show()
+        except Exception as e:
+            msg = "staged energy fit failed"
+            raise RuntimeError(msg) from e
 
-        fwhm = func.get_fwfm(energy_pars, frac_max=frac_max)
+        try:
+            fwhm = func.get_fwfm(energy_pars, frac_max=frac_max)
 
-        xs = np.arange(lower_bound, upper_bound, 0.1)
-        y = func.get_pdf(xs, *energy_pars)
-        max_val = np.amax(y)
-        fwhm_o_max = fwhm / max_val
+            xs = np.arange(lower_bound, upper_bound, 0.1)
+            y = func.get_pdf(xs, *energy_pars)
+            max_val = np.amax(y)
+            fwhm_o_max = fwhm / max_val
+        except Exception as e:
+            msg = "fwhm evaluation failed"
+            raise RuntimeError(msg) from e
 
-        rng = np.random.default_rng(1)
-        # generate set of bootstrapped parameters
-        par_b = rng.multivariate_normal(energy_pars, cov, size=100)
-        y_max = np.array([func.get_pdf(xs, *p) for p in par_b])
-        maxs = np.nanmax(y_max, axis=1)
+        try:
+            rng = np.random.default_rng(1)
+            # generate set of bootstrapped parameters
+            par_b = rng.multivariate_normal(energy_pars, cov, size=100)
+            y_max = np.array([func.get_pdf(xs, *p) for p in par_b])
+            maxs = np.nanmax(y_max, axis=1)
 
-        y_b = np.zeros(len(par_b))
-        for i, p in enumerate(par_b):
-            try:
-                y_b[i] = func.get_fwfm(p, frac_max=frac_max)
-            except Exception as e:
-                log.debug(
-                    "bootstrap fwfm evaluation failed for sample %s, filling nan: %s",
-                    i,
-                    e,
-                )
-                y_b[i] = np.nan
-        fwhm_err = np.nanstd(y_b, axis=0)
-        fwhm_o_max_err = np.nanstd(y_b / maxs, axis=0)
-
-        if display > 1:
-            plt.figure()
-            plt.step(pgh.get_bin_centers(bins), hist)
-            for i in range(100):
-                plt.plot(xs, y_max[i, :])
-            plt.show()
-
-        if display > 0:
-            plt.figure()
-            hist, bins, _var = pgh.get_hist(
-                ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
-            )
-            plt.step(pgh.get_bin_centers(bins), hist)
-            plt.plot(xs, y, color="orange")
-            yerr_boot = np.nanstd(y_max, axis=0)
-            plt.fill_between(
-                xs, y - yerr_boot, y + yerr_boot, facecolor="C1", alpha=0.5
-            )
-            plt.show()
+            y_b = np.zeros(len(par_b))
+            for i, p in enumerate(par_b):
+                try:
+                    y_b[i] = func.get_fwfm(p, frac_max=frac_max)
+                except Exception as e:
+                    log.debug(
+                        "bootstrap fwfm evaluation failed for sample %s, filling nan: %s",
+                        i,
+                        e,
+                    )
+                    y_b[i] = np.nan
+            fwhm_err = np.nanstd(y_b, axis=0)
+            fwhm_o_max_err = np.nanstd(y_b / maxs, axis=0)
+        except Exception as e:
+            msg = "bootstrap fwhm uncertainty estimation failed"
+            raise RuntimeError(msg) from e
 
     except Exception as e:
         log.warning(
@@ -307,6 +290,49 @@ def get_peak_fwhm_with_dt_corr(
             np.nan,
             None,
         )
+
+    # display plots run outside the fit-guarding path so a plotting failure
+    # cannot turn a good fit into a nan result
+    if display > 0:
+        try:
+            plt.figure()
+            xs_plot = np.arange(lower_bound, upper_bound, bin_width)
+            fit_hist, fit_bins, _ = pgh.get_hist(
+                ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
+            )
+            plt.step(pgh.get_bin_centers(fit_bins), fit_hist)
+            plt.plot(xs_plot, func.get_pdf(xs_plot, *energy_pars))
+            plt.show()
+        except Exception as e:
+            log.debug("get_peak_fwhm_with_dt_corr: fit display plot failed: %s", e)
+
+    if display > 1:
+        try:
+            plt.figure()
+            plt.step(pgh.get_bin_centers(bins), hist)
+            for i in range(100):
+                plt.plot(xs, y_max[i, :])
+            plt.show()
+        except Exception as e:
+            log.debug(
+                "get_peak_fwhm_with_dt_corr: bootstrap display plot failed: %s", e
+            )
+
+    if display > 0:
+        try:
+            plt.figure()
+            hist, bins, _var = pgh.get_hist(
+                ct_energy, dx=bin_width, range=(lower_bound, upper_bound)
+            )
+            plt.step(pgh.get_bin_centers(bins), hist)
+            plt.plot(xs, y, color="orange")
+            yerr_boot = np.nanstd(y_max, axis=0)
+            plt.fill_between(
+                xs, y - yerr_boot, y + yerr_boot, facecolor="C1", alpha=0.5
+            )
+            plt.show()
+        except Exception as e:
+            log.debug("get_peak_fwhm_with_dt_corr: fill display plot failed: %s", e)
 
     if kev is True:
         fwhm *= peak / energy_pars["mu"]
