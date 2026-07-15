@@ -567,27 +567,33 @@ class HPGeCalibration:
         fit_dict = {}
 
         for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
-            try:
-                peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
-                wleft_i, wright_i = wwidth_i
-                euc_min = mode_guess - wleft_i
-                euc_max = mode_guess + wright_i
+            # cheap setup: compute the fit window before the guarded region so
+            # an early failure cannot leak stale binning into fit_dict
+            peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
+            wleft_i, wright_i = wwidth_i
+            euc_min = mode_guess - wleft_i
+            euc_max = mode_guess + wright_i
 
-                if self.uncal_is_int is True:
-                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
-                    )
-
-                energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
-                binw_1 = (euc_max - euc_min) / n_bins_i
-
-                x0 = get_hpge_energy_peak_par_guess(
-                    energies,
-                    func_i,
-                    (euc_min, euc_max),
-                    bin_width=binw_1,
-                    mode_guess=mode_guess,
+            if self.uncal_is_int is True:
+                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
                 )
+
+            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
+            binw_1 = (euc_max - euc_min) / n_bins_i
+
+            try:
+                try:
+                    x0 = get_hpge_energy_peak_par_guess(
+                        energies,
+                        func_i,
+                        (euc_min, euc_max),
+                        bin_width=binw_1,
+                        mode_guess=mode_guess,
+                    )
+                except Exception as e:
+                    msg = f"computing parameter guess failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
 
                 bin_width = (x0["sigma"]) * len(energies) ** (-1 / 3)
                 n_bins_i = int((euc_max - euc_min) / bin_width)
@@ -609,17 +615,21 @@ class HPGeCalibration:
                 mask[np.where(np.array(func_i.required_args()) == "n_bkg")[0]] = True
                 bounds = get_hpge_energy_bounds(func_i, x0)
 
-                pars_i, errs_i, cov_i = pgb.fit_binned(
-                    func_i.cdf_ext,
-                    hist,
-                    bins,
-                    var=var,
-                    guess=x0,
-                    cost_func="LL",
-                    extended=True,
-                    fixed=fixed,
-                    bounds=bounds,
-                )
+                try:
+                    pars_i, errs_i, cov_i = pgb.fit_binned(
+                        func_i.cdf_ext,
+                        hist,
+                        bins,
+                        var=var,
+                        guess=x0,
+                        cost_func="LL",
+                        extended=True,
+                        fixed=fixed,
+                        bounds=bounds,
+                    )
+                except Exception as e:
+                    msg = f"peak fit failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
                 valid_fit = True
 
                 csqr = pgb.goodness_of_fit(
@@ -683,7 +693,11 @@ class HPGeCalibration:
                 else:
                     valid_pk = True
 
-                mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+                try:
+                    mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+                except Exception as e:
+                    msg = f"extracting peak position failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
 
             except Exception as e:
                 if self.debug_mode:
@@ -763,29 +777,37 @@ class HPGeCalibration:
 
         # Now fit the E scale
         try:
-            pars, errs, cov = hpge_fit_energy_scale(
-                mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
-            )
+            try:
+                pars, errs, cov = hpge_fit_energy_scale(
+                    mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
+                )
+            except ValueError as e:
+                msg = "energy scale fit failed"
+                raise RuntimeError(msg) from e
 
             results_dict["pk_cal_pars"] = pars
             results_dict["pk_cal_errs"] = errs
             results_dict["pk_cal_cov"] = cov
 
             # Invert the E scale fit to get a calibration function
-            pars, errs, cov = hpge_fit_energy_cal_func(
-                mus,
-                mu_vars,
-                fitted_peaks_kev,
-                pars,
-                deg=self.deg,
-                fixed=self.fixed,
-            )
+            try:
+                pars, errs, cov = hpge_fit_energy_cal_func(
+                    mus,
+                    mu_vars,
+                    fitted_peaks_kev,
+                    pars,
+                    deg=self.deg,
+                    fixed=self.fixed,
+                )
+            except ValueError as e:
+                msg = "calibration function fit failed"
+                raise RuntimeError(msg) from e
             self.pars = np.array(pars)
             results_dict["calibration_parameters"] = pars
             results_dict["calibration_uncertainties"] = errs
             results_dict["calibration_covariance"] = cov
 
-        except ValueError as e:
+        except (ValueError, RuntimeError) as e:
             log.error(
                 "failed to fit enough peaks to get accurate calibration for %s: %s",
                 self.energy_param,
@@ -928,83 +950,89 @@ class HPGeCalibration:
         for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
             peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
             wleft_i, wright_i = wwidth_i
+            # cheap setup: compute the fit window before the guarded region so
+            # an early failure cannot leak stale binning into fit_dict
+            euc_min = mode_guess - wleft_i
+            euc_max = mode_guess + wright_i
+
+            if self.uncal_is_int is True:
+                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                )
+            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
+            binw_1 = (euc_max - euc_min) / n_bins_i
             try:
-                euc_min = mode_guess - wleft_i
-                euc_max = mode_guess + wright_i
+                try:
+                    if method == "unbinned":
+                        (
+                            pars_i,
+                            errs_i,
+                            cov_i,
+                            csqr_i,
+                            func_i,
+                            mask,
+                            valid_fit,
+                            _,
+                        ) = unbinned_staged_energy_fit(
+                            energies,
+                            func=func_i,
+                            fit_range=(euc_min, euc_max),
+                            guess_func=get_hpge_energy_peak_par_guess,
+                            bounds_func=get_hpge_energy_bounds,
+                            fixed_func=get_hpge_energy_fixed,
+                            allow_tail_drop=True,
+                            tail_weight=tail_weight,
+                            bin_width=binw_1 if use_bin_width_in_fit is True else None,
+                            guess_kwargs={"mode_guess": mode_guess},
+                            p_val_threshold=allowed_p_val,
+                        )
+                        if pars_i["n_sig"] < 100:
+                            valid_fit = False
+                        csqr = csqr_i
 
-                if self.uncal_is_int is True:
-                    euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                        x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
-                    )
-                energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
-                binw_1 = (euc_max - euc_min) / n_bins_i
-                if method == "unbinned":
-                    (
-                        pars_i,
-                        errs_i,
-                        cov_i,
-                        csqr_i,
-                        func_i,
-                        mask,
-                        valid_fit,
-                        _,
-                    ) = unbinned_staged_energy_fit(
-                        energies,
-                        func=func_i,
-                        fit_range=(euc_min, euc_max),
-                        guess_func=get_hpge_energy_peak_par_guess,
-                        bounds_func=get_hpge_energy_bounds,
-                        fixed_func=get_hpge_energy_fixed,
-                        allow_tail_drop=True,
-                        tail_weight=tail_weight,
-                        bin_width=binw_1 if use_bin_width_in_fit is True else None,
-                        guess_kwargs={"mode_guess": mode_guess},
-                        p_val_threshold=allowed_p_val,
-                    )
-                    if pars_i["n_sig"] < 100:
-                        valid_fit = False
-                    csqr = csqr_i
+                    else:
+                        hist, bins, var = pgh.get_hist(
+                            energies, bins=n_bins_i, range=(euc_min, euc_max)
+                        )
+                        binw_1 = (bins[-1] - bins[0]) / (len(bins) - 1)
+                        par_guesses = get_hpge_energy_peak_par_guess(
+                            hist, bins, var, func_i, mode_guess=mode_guess
+                        )
+                        bounds = get_hpge_energy_bounds(func_i, par_guesses)
+                        fixed, mask = get_hpge_energy_fixed(func_i)
 
-                else:
-                    hist, bins, var = pgh.get_hist(
-                        energies, bins=n_bins_i, range=(euc_min, euc_max)
-                    )
-                    binw_1 = (bins[-1] - bins[0]) / (len(bins) - 1)
-                    par_guesses = get_hpge_energy_peak_par_guess(
-                        hist, bins, var, func_i, mode_guess=mode_guess
-                    )
-                    bounds = get_hpge_energy_bounds(func_i, par_guesses)
-                    fixed, mask = get_hpge_energy_fixed(func_i)
+                        x0 = get_hpge_energy_peak_par_guess(
+                            energies, func_i, (euc_min, euc_max), bin_width=binw_1
+                        )
+                        fixed, mask = get_hpge_energy_fixed(func_i)
+                        bounds = get_hpge_energy_bounds(func_i, x0)
 
-                    x0 = get_hpge_energy_peak_par_guess(
-                        energies, func_i, (euc_min, euc_max), bin_width=binw_1
-                    )
-                    fixed, mask = get_hpge_energy_fixed(func_i)
-                    bounds = get_hpge_energy_bounds(func_i, x0)
+                        pars_i, errs_i, cov_i = pgb.fit_binned(
+                            func_i.get_pdf,
+                            hist,
+                            bins,
+                            var=var,
+                            guess=x0,
+                            cost_func=method,
+                            extended=True,
+                            fixed=fixed,
+                            bounds=bounds,
+                        )
+                        valid_fit = True
 
-                    pars_i, errs_i, cov_i = pgb.fit_binned(
-                        func_i.get_pdf,
-                        hist,
-                        bins,
-                        var=var,
-                        guess=x0,
-                        cost_func=method,
-                        extended=True,
-                        fixed=fixed,
-                        bounds=bounds,
-                    )
-                    valid_fit = True
-
-                    csqr = pgb.goodness_of_fit(
-                        hist,
-                        bins,
-                        None,
-                        func_i.get_pdf,
-                        pars_i,
-                        method="Pearson",
-                        scale_bins=True,
-                    )
-                    csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
+                        csqr = pgb.goodness_of_fit(
+                            hist,
+                            bins,
+                            None,
+                            func_i.get_pdf,
+                            pars_i,
+                            method="Pearson",
+                            scale_bins=True,
+                        )
+                        csqr = (csqr[0], csqr[1] + len(np.where(mask)[0]))
+                except Exception as e:
+                    msg = f"peak fit failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
 
                 if np.isnan(pars_i).any():
                     msg = f"fit at loc {mode_guess:g} returned nan parameters: {pars_i}"
@@ -1067,14 +1095,19 @@ class HPGeCalibration:
                 else:
                     valid_pk = True
 
-                if peak_param == "mu":
-                    mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
-
-                elif peak_param == "mode":
-                    mu, mu_err = func_i.get_mode(pars_i, cov=cov_i)
-                else:
-                    msg = f"unknown peak_param {peak_param!r}, expected 'mu' or 'mode'"
-                    raise ValueError(msg)
+                try:
+                    if peak_param == "mu":
+                        mu, mu_err = func_i.get_mu(pars_i, errors=errs_i)
+                    elif peak_param == "mode":
+                        mu, mu_err = func_i.get_mode(pars_i, cov=cov_i)
+                    else:
+                        msg = f"unknown peak_param {peak_param!r}, expected 'mu' or 'mode'"
+                        raise ValueError(msg)
+                except ValueError:
+                    raise
+                except Exception as e:
+                    msg = f"extracting peak position failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
 
             except Exception as e:
                 if self.debug_mode:
@@ -1157,29 +1190,37 @@ class HPGeCalibration:
 
         # Now fit the E scale
         try:
-            pars, errs, cov = hpge_fit_energy_scale(
-                mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
-            )
+            try:
+                pars, errs, cov = hpge_fit_energy_scale(
+                    mus, mu_vars, fitted_peaks_kev, deg=self.deg, fixed=self.fixed
+                )
+            except ValueError as e:
+                msg = "energy scale fit failed"
+                raise RuntimeError(msg) from e
 
             results_dict["pk_cal_pars"] = pars
             results_dict["pk_cal_errs"] = errs
             results_dict["pk_cal_cov"] = cov
 
             # Invert the E scale fit to get a calibration function
-            pars, errs, cov = hpge_fit_energy_cal_func(
-                mus,
-                mu_vars,
-                fitted_peaks_kev,
-                pars,
-                deg=self.deg,
-                fixed=self.fixed,
-            )
+            try:
+                pars, errs, cov = hpge_fit_energy_cal_func(
+                    mus,
+                    mu_vars,
+                    fitted_peaks_kev,
+                    pars,
+                    deg=self.deg,
+                    fixed=self.fixed,
+                )
+            except ValueError as e:
+                msg = "calibration function fit failed"
+                raise RuntimeError(msg) from e
             self.pars = np.array(pars)
             results_dict["calibration_parameters"] = pars
             results_dict["calibration_uncertainties"] = errs
             results_dict["calibration_covariance"] = cov
 
-        except ValueError as e:
+        except (ValueError, RuntimeError) as e:
             log.error(
                 "failed to fit enough peaks to get accurate calibration for %s: %s",
                 self.energy_param,
