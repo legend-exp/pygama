@@ -8,6 +8,7 @@ the standard mode to within float summation noise.
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from lgdo import Array, Table
 
 import pygama.math.distributions as pgf
@@ -62,6 +63,55 @@ def test_staged_fit_log_mode_agrees_with_standard():
     fwhm_std = hpge_peak_fwfm(pars_std[4], pars_std[5], pars_std[6])
     fwhm_log = hpge_peak_fwfm(pars_log[4], pars_log[5], pars_log[6])
     assert np.isclose(fwhm_log, fwhm_std, rtol=1e-4)
+
+
+def test_use_log_pdf_requires_log_pdf_ext():
+    class NoLogPdf:
+        pass
+
+    with pytest.raises(ValueError, match="log_pdf_ext"):
+        unbinned_staged_energy_fit(ENERGY, func=NoLogPdf(), use_log_pdf=True)
+
+
+def test_hpge_calibration_log_mode_agrees(lgnd_test_data):
+    data = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
+    )
+    import lh5
+
+    from pygama.pargen import energy_cal
+
+    energy = lh5.read_as("ch1104000/dsp/cuspEmax", data, "np")
+    glines = [860.564, 1592.53, 1620.50, 2103.53, 2614.50]
+    pk_pars = [(line, (20, 20), pgf.hpge_peak) for line in glines]
+
+    res = {}
+    for use_log in (False, True):
+        cal = energy_cal.HPGeCalibration(
+            "cuspEmax",
+            glines,
+            2615 / np.nanpercentile(energy, 99),
+            deg=0,
+            debug_mode=True,
+        )
+        cal.hpge_find_energy_peaks(energy)
+        cal.hpge_get_energy_peaks(energy)
+        cal.hpge_fit_energy_peaks(energy, peak_pars=pk_pars, use_log_pdf=use_log)
+        cal.get_energy_res_curve(
+            energy_cal.FWHMLinear, interp_energy_kev={"Qbb": 2039.0}
+        )
+        fit_results = cal.results["hpge_fit_energy_peaks"]
+        res[use_log] = (
+            np.array(cal.pars),
+            np.array(fit_results["pk_pos"], dtype=float),
+            fit_results["FWHMLinear"]["Qbb_fwhm_in_kev"],
+        )
+
+    pars_std, pos_std, qbb_std = res[False]
+    pars_log, pos_log, qbb_log = res[True]
+    assert np.allclose(pars_log, pars_std, rtol=1e-6)
+    assert np.allclose(pos_log, pos_std, rtol=1e-6)
+    assert np.isclose(qbb_log, qbb_std, rtol=1e-3)
 
 
 def test_fom_wiring_forwards_use_log_pdf():

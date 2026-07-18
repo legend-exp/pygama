@@ -337,6 +337,12 @@ def fom_fwhm_with_alpha_fit(
     tb_in,
     kwarg_dict,
     ctc_parameter,
+    nsteps=11,
+    idxs=None,
+    frac_max=0.2,
+    use_log_pdf=False,
+    display=0,
+):
     """
     Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
 
@@ -348,18 +354,6 @@ def fom_fwhm_with_alpha_fit(
     termination heuristic stops the sweep when the FWHM curve is clearly
     rising.  If *use_log_pdf* is ``True``, the underlying staged fits use
     ``iminuit``'s ``log=True`` mode for faster unbinned NLL evaluation.
-
-):
-    """
-    Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
-
-    Scans *nsteps* values of the charge-trapping coefficient alpha between
-    0 and 3.5x10^-6, fitting the peak at each step via
-    :func:`get_peak_fwhm_with_dt_corr`.  A degree-4 polynomial is fit to
-    the valid FWHM/max-ratio values to locate the optimal alpha, and the
-    peak is re-fit at that alpha to obtain the final FWHM in keV.  An early
-    termination heuristic stops the sweep when the FWHM curve is clearly
-    rising.
 
     Parameters
     ----------
@@ -379,6 +373,9 @@ def fom_fwhm_with_alpha_fit(
         events.
     frac_max
         Fractional height used to define the final FWHM.
+    use_log_pdf
+        Passed through to the staged fits; build the extended unbinned NLL
+        from the model's log-density (``iminuit`` ``log=True`` mode).
     display
         Verbosity level; values > 0 produce diagnostic plots.
 
@@ -577,6 +574,12 @@ def fom_fwhm_no_alpha_sweep(
     kwarg_dict,
     ctc_param=None,
     alpha=0,
+    idxs=None,
+    frac_max=0.5,
+    kev=True,
+    use_log_pdf=False,
+    display=0,
+):
     """
     Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
 
@@ -587,16 +590,6 @@ def fom_fwhm_no_alpha_sweep(
     correction is desired.  If *use_log_pdf* is ``True``, the underlying
     staged fit uses ``iminuit``'s ``log=True`` mode for faster unbinned NLL
     evaluation.
-
-):
-    """
-    Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
-
-    Applies a single drift-time correction with the given *alpha* and fits
-    the peak, returning a comprehensive set of fit quality metrics.  Used
-    when the optimal alpha is already known (e.g. from a prior
-    :func:`fom_fwhm_with_alpha_fit` call) or when no charge-trapping
-    correction is desired.
 
     Parameters
     ----------
@@ -619,6 +612,9 @@ def fom_fwhm_no_alpha_sweep(
         Fractional height used to define the FWHM.
     kev
         If ``True``, return the FWHM in keV rather than ADC units.
+    use_log_pdf
+        Passed through to the staged fit; build the extended unbinned NLL
+        from the model's log-density (``iminuit`` ``log=True`` mode).
     display
         Verbosity level; values > 0 produce diagnostic plots.
 

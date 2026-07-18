@@ -807,6 +807,7 @@ class HPGeCalibration:
         tail_weight=0,
         update_cal_pars=True,
         use_bin_width_in_fit=True,
+        use_log_pdf=False,
     ):
         """
         Fit the energy peaks specified using the given function.
@@ -834,6 +835,11 @@ class HPGeCalibration:
             Weight applied to the tail of the fit.
         update_cal_pars
             Whether to update the calibration parameters. Default is ``True``.
+        use_log_pdf
+            Build the unbinned fits from the model's log-density
+            (``iminuit`` ``log=True`` mode). Faster on large samples;
+            results can differ from the standard mode at machine-precision
+            level. Only used when *method* is ``"unbinned"``.
 
         Returns
         -------
@@ -960,6 +966,7 @@ class HPGeCalibration:
                         bin_width=binw_1 if use_bin_width_in_fit is True else None,
                         guess_kwargs={"mode_guess": mode_guess},
                         p_val_threshold=allowed_p_val,
+                        use_log_pdf=use_log_pdf,
                     )
                     if pars_i["n_sig"] < 100:
                         valid_fit = False
@@ -1497,6 +1504,7 @@ class HPGeCalibration:
         tail_weight=0,
         peak_param="mode",
         n_events=None,
+        use_log_pdf=False,
     ):
         """
         Run the complete HPGe energy calibration pipeline.
@@ -1523,6 +1531,10 @@ class HPGeCalibration:
             ``"mu"``).
         n_events
             Maximum number of events to use; ``None`` uses all.
+        use_log_pdf
+            Build the unbinned fits from the model's log-density
+            (``iminuit`` ``log=True`` mode); see
+            :meth:`hpge_fit_energy_peaks`.
         """
         log.debug("Find peaks and compute calibration curve for %s", self.energy_param)
         log.debug("Guess is %.3f", self.pars[1])
@@ -1537,6 +1549,7 @@ class HPGeCalibration:
             tail_weight=tail_weight,
             peak_param=peak_param,
             n_events=n_events,
+            use_log_pdf=use_log_pdf,
         )
         if len(self.peaks_kev) != len(got_peaks_kev):
             for _i, peak in enumerate(got_peaks_kev):
@@ -1576,6 +1589,7 @@ class HPGeCalibration:
                 tail_weight=tail_weight,
                 peak_param=peak_param,
                 n_events=n_events,
+                use_log_pdf=use_log_pdf,
             )
 
             if self.pars is None:
@@ -1599,7 +1613,7 @@ class HPGeCalibration:
             interp_energy_kev={"Qbb": 2039.0},
         )
 
-    def fit_calibrated_peaks(self, e_uncal, peak_pars):
+    def fit_calibrated_peaks(self, e_uncal, peak_pars, use_log_pdf=False):
         """
         Fit peaks using an existing calibration without updating the polynomial.
 
@@ -1614,10 +1628,19 @@ class HPGeCalibration:
             1-D array of uncalibrated energy values.
         peak_pars
             List of ``(peak_kev, (kev_lo, kev_hi), func)`` tuples.
+        use_log_pdf
+            Build the unbinned fits from the model's log-density
+            (``iminuit`` ``log=True`` mode); see
+            :meth:`hpge_fit_energy_peaks`.
         """
         log.debug("Fitting %s", self.energy_param)
         self.hpge_get_energy_peaks(e_uncal, update_cal_pars=False)
-        self.hpge_fit_energy_peaks(e_uncal, peak_pars=peak_pars, update_cal_pars=False)
+        self.hpge_fit_energy_peaks(
+            e_uncal,
+            peak_pars=peak_pars,
+            update_cal_pars=False,
+            use_log_pdf=use_log_pdf,
+        )
         self.get_energy_res_curve(
             FWHMLinear,
             interp_energy_kev={"Qbb": 2039.0},
@@ -1636,6 +1659,7 @@ class HPGeCalibration:
         tail_weight=0,
         peak_param="mode",
         n_events=None,
+        use_log_pdf=False,
     ):
         """
         Calibrate using a single prominent peak (degree-0 calibration).
@@ -1661,6 +1685,10 @@ class HPGeCalibration:
             Parameter used to extract the peak position.
         n_events
             Maximum number of events to use; ``None`` uses all.
+        use_log_pdf
+            Build the unbinned fits from the model's log-density
+            (``iminuit`` ``log=True`` mode); see
+            :meth:`hpge_fit_energy_peaks`.
         """
         log.debug("Find peaks and compute calibration curve for %s", self.energy_param)
         log.debug("Guess is %.3f", self.pars[1])
@@ -1681,6 +1709,7 @@ class HPGeCalibration:
             tail_weight=tail_weight,
             peak_param=peak_param,
             n_events=n_events,
+            use_log_pdf=use_log_pdf,
         )
         self.hpge_fit_energy_peaks(
             e_uncal,
@@ -1691,6 +1720,7 @@ class HPGeCalibration:
             peak_param=peak_param,
             n_events=n_events,
             update_cal_pars=False,
+            use_log_pdf=use_log_pdf,
         )
         self.get_energy_res_curve(
             FWHMLinear,
@@ -2616,17 +2646,16 @@ def unbinned_staged_energy_fit(
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
 
+    When ``use_log_pdf`` is true the extended unbinned NLL is built from the
+    model's ``log_pdf_ext`` with ``iminuit``'s ``log=True`` mode, which sums
+    the log-density directly instead of sorting per-event log values — much
+    faster on large samples, at the price of a slightly different floating
+    point summation (results can differ at machine-precision level).
     """
 
     if use_log_pdf and not hasattr(func, "log_pdf_ext"):
-        raise ValueError(
-            "use_log_pdf=True requires the model to implement log_pdf_ext(x, *pars)"
-        )
-
-    if fit_range is None:
-        fit_range = (np.nanmin(energy), np.nanmax(energy))
-
-    """
+        msg = "use_log_pdf=True requires the model to implement log_pdf_ext(x, *pars)"
+        raise ValueError(msg)
 
     if fit_range is None:
         fit_range = (np.nanmin(energy), np.nanmax(energy))
