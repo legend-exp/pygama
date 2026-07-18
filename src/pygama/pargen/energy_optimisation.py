@@ -337,11 +337,18 @@ def fom_fwhm_with_alpha_fit(
     tb_in,
     kwarg_dict,
     ctc_parameter,
-    nsteps=11,
-    idxs=None,
-    frac_max=0.2,
-    use_log_pdf=False,
-    display=0,
+    """
+    Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
+
+    Scans *nsteps* values of the charge-trapping coefficient alpha between
+    0 and 3.5x10^-6, fitting the peak at each step via
+    :func:`get_peak_fwhm_with_dt_corr`.  A degree-4 polynomial is fit to
+    the valid FWHM/max-ratio values to locate the optimal alpha, and the
+    peak is re-fit at that alpha to obtain the final FWHM in keV.  An early
+    termination heuristic stops the sweep when the FWHM curve is clearly
+    rising.  If *use_log_pdf* is ``True``, the underlying staged fits use
+    ``iminuit``'s ``log=True`` mode for faster unbinned NLL evaluation.
+
 ):
     """
     Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
