@@ -577,11 +577,17 @@ def fom_fwhm_no_alpha_sweep(
     kwarg_dict,
     ctc_param=None,
     alpha=0,
-    idxs=None,
-    frac_max=0.5,
-    kev=True,
-    use_log_pdf=False,
-    display=0,
+    """
+    Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
+
+    Applies a single drift-time correction with the given *alpha* and fits
+    the peak, returning a comprehensive set of fit quality metrics.  Used
+    when the optimal alpha is already known (e.g. from a prior
+    :func:`fom_fwhm_with_alpha_fit` call) or when no charge-trapping
+    correction is desired.  If *use_log_pdf* is ``True``, the underlying
+    staged fit uses ``iminuit``'s ``log=True`` mode for faster unbinned NLL
+    evaluation.
+
 ):
     """
     Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
