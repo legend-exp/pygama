@@ -2616,11 +2616,16 @@ def unbinned_staged_energy_fit(
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
 
-    When ``use_log_pdf`` is true the extended unbinned NLL is built from the
-    model's ``log_pdf_ext`` with ``iminuit``'s ``log=True`` mode, which sums
-    the log-density directly instead of sorting per-event log values — much
-    faster on large samples, at the price of a slightly different floating
-    point summation (results can differ at machine-precision level).
+    """
+
+    if use_log_pdf and not hasattr(func, "log_pdf_ext"):
+        raise ValueError(
+            "use_log_pdf=True requires the model to implement log_pdf_ext(x, *pars)"
+        )
+
+    if fit_range is None:
+        fit_range = (np.nanmin(energy), np.nanmax(energy))
+
     """
 
     if fit_range is None:
