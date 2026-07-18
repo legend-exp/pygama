@@ -2609,11 +2609,18 @@ def unbinned_staged_energy_fit(
     bin_width=None,
     lock_guess=False,
     p_val_threshold=10e-20,
+    use_log_pdf=False,
     display=0,
 ):
     """
     Unbinned fit to energy. This is different to the default fitting as
     it will try different fitting methods and choose the best. This is necessary for the lower statistics.
+
+    When ``use_log_pdf`` is true the extended unbinned NLL is built from the
+    model's ``log_pdf_ext`` with ``iminuit``'s ``log=True`` mode, which sums
+    the log-density directly instead of sorting per-event log values — much
+    faster on large samples, at the price of a slightly different floating
+    point summation (results can differ at machine-precision level).
     """
 
     if fit_range is None:
@@ -2698,7 +2705,12 @@ def unbinned_staged_energy_fit(
             bin_width=bin_width,
             **guess_kwargs if guess_kwargs is not None else {},
         )
-        c = cost.ExtendedUnbinnedNLL(energy, pgf.gauss_on_step.pdf_ext)
+        if use_log_pdf:
+            c = cost.ExtendedUnbinnedNLL(
+                energy, pgf.gauss_on_step.log_pdf_ext, log=True
+            )
+        else:
+            c = cost.ExtendedUnbinnedNLL(energy, pgf.gauss_on_step.pdf_ext)
         m = Minuit(c, *x0_notail)
         bounds = bounds_func(
             pgf.gauss_on_step,
@@ -2762,11 +2774,16 @@ def unbinned_staged_energy_fit(
             tail_weight=None,
             allow_tail_drop=False,
             bin_width=bin_width,
+            use_log_pdf=use_log_pdf,
         )
 
-        c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext) + TailPrior(
-            energy, func, tail_weight=tail_weight
-        )
+        if use_log_pdf:
+            c = cost.ExtendedUnbinnedNLL(energy, func.log_pdf_ext, log=True)
+        else:
+            c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext)
+        c = c + TailPrior(energy, func, tail_weight=tail_weight)
+    elif use_log_pdf:
+        c = cost.ExtendedUnbinnedNLL(energy, func.log_pdf_ext, log=True)
     else:
         c = cost.ExtendedUnbinnedNLL(energy, func.pdf_ext)
 
