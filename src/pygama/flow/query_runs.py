@@ -2,7 +2,7 @@ import os
 import re
 from collections.abc import Collection, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
-from contextlib import ExitStack
+from contextlib import chdir, ExitStack
 from copy import copy
 from pathlib import Path
 from rich.console import Console
@@ -150,38 +150,46 @@ def query_runs(
         if ignored_cycles is None:
             ignored_cycles = query_config.get("ignored_cycles", None)
 
-        cwd = Path.cwd()
+        stack.enter_context(chdir(tiers[0][1]))
 
-        try:
-            os.chdir(tiers[0][1])
+        # Get list of removed cycles if it exists
+        if ignored_cycles is not None:
+            if isinstance(ignored_cycles, str):
+                ignored_cycles = [ignored_cycles]
+            meta = TextDB(df_paths["metadata"], lazy=True)
+            removed = set()
+            for iclist in ignored_cycles:
+                removed |= set(get_recursive(meta, iclist))
+        else:
+            removed = {}
 
-            # Get list of removed cycles if it exists
-            if ignored_cycles is not None:
-                if isinstance(ignored_cycles, str):
-                    ignored_cycles = [ignored_cycles]
-                meta = TextDB(df_paths["metadata"], lazy=True)
-                removed = set()
-                for iclist in ignored_cycles:
-                    removed |= set(get_recursive(meta, iclist))
+        col_names = cycle_def.split("-")
+        records = []
+
+        if executor is None and processes:
+            executor = stack.enter_context(ProcessPoolExecutor(processes))
+
+        for dirpath, dirnames, files in os.walk(".", followlinks=True):
+            relpath = dirpath[2:]  # get rid of ./
+
+            # Prune subdirectories that are not in all tiers
+            for subdir in copy(dirnames):
+                if not all(Path(p, relpath, subdir).is_dir() for _, p in tiers[1:]):
+                    dirnames.remove(subdir)
+
+            if executor is None:
+                records += _get_run_records_loop(
+                    files,
+                    relpath,
+                    col_names,
+                    tiers,
+                    removed,
+                    runs,
+                )
             else:
-                removed = {}
-
-            col_names = cycle_def.split("-")
-            records = []
-
-            if executor is None and processes:
-                executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-            for dirpath, dirnames, files in os.walk(".", followlinks=True):
-                relpath = dirpath[2:]  # get rid of ./
-
-                # Prune subdirectories that are not in all tiers
-                for subdir in copy(dirnames):
-                    if not all(Path(p, relpath, subdir).is_dir() for _, p in tiers[1:]):
-                        dirnames.remove(subdir)
-
-                if executor is None:
-                    records += _get_run_records_loop(
+                records.append(
+                    executor.submit(
+                        _get_run_records_loop,
                         files,
                         relpath,
                         col_names,
@@ -189,58 +197,44 @@ def query_runs(
                         removed,
                         runs,
                     )
-                else:
-                    records.append(
-                        executor.submit(
-                            _get_run_records_loop,
-                            files,
-                            relpath,
-                            col_names,
-                            tiers,
-                            removed,
-                            runs,
-                        )
-                    )
-
-            # Format and return results
-            if executor is not None:
-                records = [r for recs in records for r in recs.result()]
-            records.sort(
-                key=lambda rec: (
-                    rec[sort_by]
-                    if isinstance(sort_by, str)
-                    else [rec[sb] for sb in sort_by]
                 )
+
+        # Format and return results
+        if executor is not None:
+            records = [r for recs in records for r in recs.result()]
+        records.sort(
+            key=lambda rec: (
+                rec[sort_by]
+                if isinstance(sort_by, str)
+                else [rec[sb] for sb in sort_by]
             )
-            result = ak.Array(records)
+        )
+        result = ak.Array(records)
 
-            if group_by is not None:
-                if isinstance(group_by, str):
-                    lengths = [np.cumsum(ak.run_lengths(result[group_by]))]
-                else:
-                    lengths = [np.cumsum(ak.run_lengths(result[f])) for f in group_by]
-                lengths = np.unique(np.concatenate([0, *lengths]))
-                result = ak.unflatten(result, lengths[1:] - lengths[:-1])
-                result = ak.Array(
-                    {
-                        f: ak.firsts(result[f])
-                        if ak.all(ak.all(result[f] == ak.firsts(result[f]), axis=1), axis=0)
-                        else result[f]
-                        for f in result.fields
-                    }
-                )
+        if group_by is not None:
+            if isinstance(group_by, str):
+                lengths = [np.cumsum(ak.run_lengths(result[group_by]))]
+            else:
+                lengths = [np.cumsum(ak.run_lengths(result[f])) for f in group_by]
+            lengths = np.unique(np.concatenate([0, *lengths]))
+            result = ak.unflatten(result, lengths[1:] - lengths[:-1])
+            result = ak.Array(
+                {
+                    f: ak.firsts(result[f])
+                    if ak.all(ak.all(result[f] == ak.firsts(result[f]), axis=1), axis=0)
+                    else result[f]
+                    for f in result.fields
+                }
+            )
 
-            if library == "ak":
-                return result
-            if library == "pd":
-                return ak.to_dataframe(result)
-            if library == "np":
-                return ak.to_numpy(result)
-            msg = "library must be 'ak', 'pd' or 'np'"
-            raise ValueError(msg)
-
-        finally:
-            os.chdir(cwd)
+        if library == "ak":
+            return result
+        if library == "pd":
+            return ak.to_dataframe(result)
+        if library == "np":
+            return ak.to_numpy(result)
+        msg = "library must be 'ak', 'pd' or 'np'"
+        raise ValueError(msg)
 
 
 def list_run_fields(
