@@ -584,8 +584,8 @@ def get_survival_fraction(
     mode: str = "greater",
     func=hpge_peak,
     fix_step=True,
-    use_log_pdf=False,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Function for calculating the survival fraction of a cut
@@ -799,7 +799,7 @@ def get_sf_sweep(
 ) -> tuple[pd.DataFrame, float, float]:
     """
     Function sweeping through cut values and calculating the survival fraction for each value
-    using a fit to the surviving and failing enegry distributions.
+    using a fit to the surviving and failing energy distributions.
     When *use_log_pdf* is true the unbinned NLL costs are built from the
     models' log-densities (``iminuit`` ``log=True`` mode).
 

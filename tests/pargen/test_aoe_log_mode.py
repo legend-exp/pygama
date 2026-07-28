@@ -7,15 +7,14 @@ import numpy as np
 from pygama.pargen.AoE_cal import unbinned_aoe_fit
 from pygama.pargen.survival_fractions import get_survival_fraction
 
-RNG = np.random.default_rng(2718)
-
 
 def test_unbinned_aoe_fit_log_mode_agrees():
+    rng = np.random.default_rng(2718)
     n = 20000
     aoe = np.concatenate(
         [
-            RNG.normal(0.0, 0.01, int(n * 0.9)),
-            -RNG.exponential(0.03, int(n * 0.1)),
+            rng.normal(0.0, 0.01, int(n * 0.9)),
+            -rng.exponential(0.03, int(n * 0.1)),
         ]
     )
 
@@ -41,19 +40,20 @@ def test_unbinned_aoe_fit_log_mode_agrees():
 
 
 def test_get_survival_fraction_log_mode_agrees():
+    rng = np.random.default_rng(31415)
     n_sig, n_bkg = 5000, 1000
     mu, sigma = 1592.5, 1.2
     energy = np.concatenate(
         [
-            RNG.normal(mu, sigma, n_sig),
-            RNG.uniform(mu - 30, mu + 30, n_bkg),
+            rng.normal(mu, sigma, n_sig),
+            rng.uniform(mu - 30, mu + 30, n_bkg),
         ]
     )
     # cut parameter correlated with nothing: signal survives ~90%, bkg ~50%
     cut_param = np.concatenate(
         [
-            RNG.normal(2.0, 1.0, n_sig),
-            RNG.normal(0.0, 1.0, n_bkg),
+            rng.normal(2.0, 1.0, n_sig),
+            rng.normal(0.0, 1.0, n_bkg),
         ]
     )
 
