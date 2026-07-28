@@ -126,8 +126,8 @@ def get_peak_fwhm_with_dt_corr(
     frac_max=0.5,
     bin_width=1,
     allow_tail_drop=False,
-    use_log_pdf=False,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Apply a drift-time correction and fit a peak, returning FWHM and fit quality.
@@ -166,13 +166,13 @@ def get_peak_fwhm_with_dt_corr(
     allow_tail_drop
         Passed through to the staged fit; allows the tail fraction to
         drop to zero.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
     use_log_pdf
         Passed through to the staged fit; build the extended unbinned NLL
         from the model's log-density (``iminuit`` ``log=True`` mode).
         Faster on large samples; results can differ from the standard mode
         at machine-precision level.
-    display
-        Verbosity level; values > 0 produce diagnostic plots.
 
     Returns
     -------
@@ -340,8 +340,8 @@ def fom_fwhm_with_alpha_fit(
     nsteps=11,
     idxs=None,
     frac_max=0.2,
-    use_log_pdf=False,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Figure-of-merit: FWHM minimised over a sweep of charge-trapping correction values.
@@ -373,11 +373,11 @@ def fom_fwhm_with_alpha_fit(
         events.
     frac_max
         Fractional height used to define the final FWHM.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
     use_log_pdf
         Passed through to the staged fits; build the extended unbinned NLL
         from the model's log-density (``iminuit`` ``log=True`` mode).
-    display
-        Verbosity level; values > 0 produce diagnostic plots.
 
     Returns
     -------
@@ -577,8 +577,8 @@ def fom_fwhm_no_alpha_sweep(
     idxs=None,
     frac_max=0.5,
     kev=True,
-    use_log_pdf=False,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Figure-of-merit: FWHM at a fixed (or pre-computed) alpha, no sweep.
@@ -612,11 +612,11 @@ def fom_fwhm_no_alpha_sweep(
         Fractional height used to define the FWHM.
     kev
         If ``True``, return the FWHM in keV rather than ADC units.
+    display
+        Verbosity level; values > 0 produce diagnostic plots.
     use_log_pdf
         Passed through to the staged fit; build the extended unbinned NLL
         from the model's log-density (``iminuit`` ``log=True`` mode).
-    display
-        Verbosity level; values > 0 produce diagnostic plots.
 
     Returns
     -------

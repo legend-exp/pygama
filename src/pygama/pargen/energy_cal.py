@@ -2639,8 +2639,8 @@ def unbinned_staged_energy_fit(
     bin_width=None,
     lock_guess=False,
     p_val_threshold=10e-20,
-    use_log_pdf=False,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Unbinned fit to energy. This is different to the default fitting as
