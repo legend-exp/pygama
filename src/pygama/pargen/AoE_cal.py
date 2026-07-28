@@ -352,6 +352,7 @@ def unbinned_aoe_fit(
     aoe: np.array,
     pdf=aoe_peak,
     display: int = 0,
+    use_log_pdf: bool = False,
 ) -> tuple(np.array, np.array):
     """
     Fitting function for A/E, first fits just a Gaussian before using the full pdf to fit
@@ -365,6 +366,12 @@ def unbinned_aoe_fit(
         PDF to fit to.
     display
         Verbosity level; 0 = silent, >1 = diagnostic plots.
+    use_log_pdf
+        Build the full-pdf extended unbinned NLL from the model's
+        ``log_pdf_ext`` (``iminuit`` ``log=True`` mode) — faster on large
+        samples, results differ at machine-precision level.  Ignored when
+        *pdf* has no ``log_pdf_ext``; the Gaussian/exgauss prefits (a
+        negligible share of the fit time) always use the standard mode.
 
     Returns
     -------
@@ -478,7 +485,12 @@ def unbinned_aoe_fit(
     )
 
     # Full fit using Gaussian signal with Gaussian tail background
-    c = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax) & (aoe > fmin)], pdf.pdf_ext)
+    if use_log_pdf and hasattr(pdf, "log_pdf_ext"):
+        c = cost.ExtendedUnbinnedNLL(
+            aoe[(aoe < fmax) & (aoe > fmin)], pdf.log_pdf_ext, log=True
+        )
+    else:
+        c = cost.ExtendedUnbinnedNLL(aoe[(aoe < fmax) & (aoe > fmin)], pdf.pdf_ext)
     m = Minuit(c, *x0)
     for arg, val in bounds.items():
         m.limits[arg] = val
@@ -753,6 +765,7 @@ def bimodal_dt_fit(
     pdf,
     debug_mode: bool = False,
     display: int = 0,
+    use_log_pdf: bool = False,
     **_kwargs,
 ) -> tuple[float, dict]:
     """
@@ -861,7 +874,10 @@ def bimodal_dt_fit(
             )
 
             aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp1)[aoe_param], pdf=pdf, display=display
+                final_df.query(aoe_grp1)[aoe_param],
+                pdf=pdf,
+                display=display,
+                use_log_pdf=use_log_pdf,
             )
             dt_res_dict["aoe_fit1"] = {
                 "pars": aoe_pars.to_dict(),
@@ -869,7 +885,10 @@ def bimodal_dt_fit(
             }
 
             aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp2)[aoe_param], pdf=pdf, display=display
+                final_df.query(aoe_grp2)[aoe_param],
+                pdf=pdf,
+                display=display,
+                use_log_pdf=use_log_pdf,
             )
             dt_res_dict["aoe_fit2"] = {
                 "pars": aoe_pars2.to_dict(),
@@ -1055,6 +1074,7 @@ class CalAoE:
         sigma_func: Callable = SigmaFit,
         compt_bands_width: float = 20,
         debug_mode: bool = False,
+        use_log_pdf: bool = False,
     ):
         """
         Parameters
@@ -1095,6 +1115,11 @@ class CalAoE:
             Width of the Compton bands in keV used for the energy correction.
         debug_mode
             If ``True``, re-raise exceptions from the A/E calibration steps instead of returning NaN.
+        use_log_pdf
+            Build the unbinned fits (A/E peak fits and survival-fraction
+            energy fits) from the models' log-densities (``iminuit``
+            ``log=True`` mode) — faster on large samples, results differ at
+            machine-precision level.
 
         """
         self.cal_dicts = cal_dicts if cal_dicts is not None else {}
@@ -1119,6 +1144,7 @@ class CalAoE:
         self.sigma_func = sigma_func
         self.compt_bands_width = compt_bands_width
         self.debug_mode = debug_mode
+        self.use_log_pdf = use_log_pdf
 
     def update_cal_dicts(self, update_dict):
         """
@@ -1195,6 +1221,7 @@ class CalAoE:
                             )[aoe_param],
                             pdf=self.pdf,
                             display=display,
+                            use_log_pdf=self.use_log_pdf,
                         )
                         self.timecorr_df = pd.concat(
                             [
@@ -1380,6 +1407,7 @@ class CalAoE:
                         )[aoe_param],
                         pdf=self.pdf,
                         display=display,
+                        use_log_pdf=self.use_log_pdf,
                     )
                     self.timecorr_df = pd.concat(
                         [
@@ -1513,6 +1541,7 @@ class CalAoE:
             pdf=self.pdf,
             debug_mode=self.debug_mode,
             display=display,
+            use_log_pdf=self.use_log_pdf,
         )
 
         data[out_param] = data[aoe_param] * (1 + self.alpha * data[self.dt_param])
@@ -1600,6 +1629,7 @@ class CalAoE:
                         )[aoe_param],
                         pdf=self.pdf,
                         display=display,
+                        use_log_pdf=self.use_log_pdf,
                     )
 
                     mean, mean_err = self.pdf.get_mu(pars, cov)
@@ -1744,6 +1774,7 @@ class CalAoE:
                     )[aoe_param],
                     pdf=self.pdf,
                     display=display,
+                    use_log_pdf=self.use_log_pdf,
                 )
             except Exception as e:
                 if self.debug_mode:
@@ -1884,6 +1915,7 @@ class CalAoE:
                 n_samples=40,
                 mode="greater",
                 debug_mode=self.debug_mode,
+                use_log_pdf=self.use_log_pdf,
             )
 
             valid_fits = self.cut_fits.query(
@@ -2028,6 +2060,7 @@ class CalAoE:
                             else None
                         ),
                         debug_mode=self.debug_mode,
+                        use_log_pdf=self.use_log_pdf,
                     )
 
                     cut_df = cut_df.query(
@@ -2136,6 +2169,7 @@ class CalAoE:
                             if self.dt_cut_param is not None
                             else None
                         ),
+                        use_log_pdf=self.use_log_pdf,
                     )
                     sfs = pd.concat(
                         [
