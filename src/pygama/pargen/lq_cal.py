@@ -565,7 +565,7 @@ class LQCal:
 
     def drift_time_correction(
         self,
-        df: pd.DataFrame(),
+        df: pd.DataFrame,
         lq_param,
         cal_energy_param: str,  # noqa: ARG002
         display: int = 0,  # noqa: ARG002
@@ -648,7 +648,7 @@ class LQCal:
 
     def get_cut_lq_dep(
         self,
-        df: pd.DataFrame(),
+        df: pd.DataFrame,
         lq_param: str,
         cal_energy_param: str,
         classifier_param: str = "LQ_Classifier",
