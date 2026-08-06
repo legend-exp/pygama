@@ -576,17 +576,18 @@ class LQCal:
 
     def drift_time_correction(
         self,
-        df: pd.DataFrame(),
+        df: pd.DataFrame,
         lq_param,
         cal_energy_param: str,  # noqa: ARG002
         display: int = 0,  # noqa: ARG002
+        out_param: str = "LQ_Corrected",
     ):
         """
         Remove the linear drift-time dependence from the LQ distribution.
 
         Fits a degree-1 polynomial to LQ vs. drift time for DEP events in
         a 6 keV window around 1592.5 keV.  Subtracts the fitted slope and
-        intercept to produce a corrected ``LQ_Corrected`` column centred at
+        intercept to produce a corrected column (*out_param*) centred at
         zero, and writes the calibration expression into :attr:`cal_dicts`.
 
         Parameters
@@ -600,6 +601,8 @@ class LQCal:
             Name of the calibrated energy column.
         display
             Verbosity level (currently unused).
+        out_param
+            Name of the output drift-time-corrected LQ column.
         """
 
         log.info("Starting LQ drift time correction")
@@ -648,7 +651,7 @@ class LQCal:
             self.dt_fit_pars = result
 
             try:
-                df["LQ_Corrected"] = (
+                 df[out_param] = (
                     df[lq_param]
                     - df[self.dt_param] * self.dt_fit_pars[0]
                     - self.dt_fit_pars[1]
@@ -656,6 +659,7 @@ class LQCal:
             except Exception as e:
                 msg = "applying LQ drift-time correction failed"
                 raise RuntimeError(msg) from e
+           
 
         except Exception as e:
             if self.debug_mode:
@@ -665,21 +669,28 @@ class LQCal:
 
         self.update_cal_dicts(
             {
-                "LQ_Corrected": {
-                    "expression": f"{lq_param} - dt_eff*a - b",
+                out_param: {
+                    "expression": f"{lq_param} - {self.dt_param}*a - b",
                     "parameters": {"a": self.dt_fit_pars[0], "b": self.dt_fit_pars[1]},
                 }
             }
         )
 
-    def get_cut_lq_dep(self, df: pd.DataFrame(), lq_param: str, cal_energy_param: str):
+    def get_cut_lq_dep(
+        self,
+        df: pd.DataFrame,
+        lq_param: str,
+        cal_energy_param: str,
+        classifier_param: str = "LQ_Classifier",
+        cut_param: str = "LQ_Cut",
+    ):
         """
         Determine the LQ cut value from the DEP distribution.
 
         Fits a Gaussian to the sideband-subtracted LQ distribution at the
         DEP (1592.5 keV).  The LQ values are normalised by the fitted σ to
-        produce ``LQ_Classifier``, and a fixed cut at 3 σ is applied
-        (``LQ_Cut``).  Both columns are added to *df* and the corresponding
+        produce *classifier_param*, and a fixed cut at 3 σ is applied
+        (*cut_param*).  Both columns are added to *df* and the corresponding
         calibration expressions are written into :attr:`cal_dicts`.
 
         Parameters
@@ -691,6 +702,10 @@ class LQCal:
             Name of the (drift-time-corrected) LQ parameter column.
         cal_energy_param
             Name of the calibrated energy column.
+        classifier_param
+            Name of the output normalised LQ classifier column.
+        cut_param
+            Name of the output boolean cut column.
         """  # noqa: RUF002
 
         log.info("Starting LQ Cut calculation")
@@ -709,11 +724,12 @@ class LQCal:
             self.cut_val = 3
 
             try:
-                df["LQ_Classifier"] = np.divide(df[lq_param].to_numpy(), pars[1])
-                df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
+                df[classifier_param] = np.divide(df[lq_param].to_numpy(), pars[1])
+                df[cut_param] = df[classifier_param] < self.cut_val
             except Exception as e:
                 msg = "applying LQ classifier/cut to data failed"
                 raise RuntimeError(msg) from e
+            
 
         except Exception as e:
             if self.debug_mode:
@@ -726,18 +742,18 @@ class LQCal:
 
         self.update_cal_dicts(
             {
-                "LQ_Classifier": {
+                classifier_param: {
                     "expression": f"({lq_param} / a)",
                     "parameters": {"a": pars[1]},
                 },
-                "LQ_Cut": {
-                    "expression": "(LQ_Classifier < a)",
+                cut_param: {
+                    "expression": f"({classifier_param} < a)",
                     "parameters": {"a": self.cut_val},
                 },
             }
         )
 
-    def calibrate(self, df, initial_lq_param):
+    def calibrate(self, df, initial_lq_param, suffix: str | None = None):
         """
         Run the full LQ calibration pipeline.
 
@@ -761,22 +777,41 @@ class LQCal:
             :attr:`dt_param`, and :attr:`selection_string`.
         initial_lq_param
             Name of the raw LQ parameter column in *df*.
+        suffix
+            Optional suffix appended to all output parameter names, separated
+            by an underscore (e.g. ``suffix="foo"`` produces
+            ``"LQ_Timecorr_foo"``, ``"LQ_Classifier_foo"``, etc.).  When
+            ``None`` (the default) the original names are used unchanged.
         """
 
-        self.lq_timecorr(df, initial_lq_param)
+        _n = (lambda base: f"{base}_{suffix}") if suffix else (lambda base: base)
+
+        timecorr_name = _n("LQ_Timecorr")
+        corrected_name = _n("LQ_Corrected")
+        classifier_name = _n("LQ_Classifier")
+        cut_name = _n("LQ_Cut")
+
+        self.lq_timecorr(df, initial_lq_param, output_name=timecorr_name)
         log.info("Finished LQ Time Correction")
 
         self.drift_time_correction(
-            df, lq_param="LQ_Timecorr", cal_energy_param=self.cal_energy_param
+            df,
+            lq_param=timecorr_name,
+            cal_energy_param=self.cal_energy_param,
+            out_param=corrected_name,
         )
         log.info("Finished LQ Drift Time Correction")
 
         self.get_cut_lq_dep(
-            df, lq_param="LQ_Corrected", cal_energy_param=self.cal_energy_param
+            df,
+            lq_param=corrected_name,
+            cal_energy_param=self.cal_energy_param,
+            classifier_param=classifier_name,
+            cut_param=cut_name,
         )
         log.info("Finished Calculating the LQ Cut Value")
 
-        final_lq_param = "LQ_Classifier"
+        final_lq_param = classifier_name
         peaks_of_interest = [1592.5, 2039, 2103.53, 2614.50]
         self.low_side_sf = pd.DataFrame()
         fit_widths = [(40, 25), (0, 0), (25, 40), (50, 50)]

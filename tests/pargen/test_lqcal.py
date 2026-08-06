@@ -45,3 +45,44 @@ def test_lq_cal(lgnd_test_data):
     assert (~np.isnan(lqcal.low_side_sf.loc[1592.50]["sf"])) & (
         lqcal.low_side_sf.loc[1592.50]["sf"] > 95
     )
+
+
+def test_lq_cal_suffix(lgnd_test_data):
+    # calibrating with a suffix must produce the suffixed output columns and
+    # calibration expressions, leaving the unsuffixed names untouched
+    data = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
+    )
+
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
+
+    data_df["cuspEmax_cal"] = data_df["cuspEmax"] * 0.155
+
+    cal_dict = {
+        "LQ_Ecorr_alt": {
+            "expression": "lq80/cuspEmax",
+            "parameters": {},
+        }
+    }
+
+    lqcal = lq.LQCal(
+        cal_dict,
+        "cuspEmax_cal",
+        "dt_eff",
+        lambda x: np.sqrt(1.5 + 0.1 * x),
+        selection_string="index==index",
+        cdf=gaussian,
+        debug_mode=True,
+    )
+
+    data_df["LQ_Ecorr_alt"] = np.divide(data_df["lq80"], data_df["cuspEmax"])
+
+    lqcal.calibrate(data_df, "LQ_Ecorr_alt", suffix="alt")
+    assert (lqcal.cut_val > 0) & (~np.isnan(lqcal.cut_val))
+
+    for name in ("LQ_Timecorr", "LQ_Corrected", "LQ_Classifier", "LQ_Cut"):
+        assert f"{name}_alt" in cal_dict
+        assert name not in cal_dict
+    assert "LQ_Classifier_alt" in data_df
+    assert "LQ_Cut_alt" in data_df
+    assert cal_dict["LQ_Cut_alt"]["expression"] == "(LQ_Classifier_alt < a)"
