@@ -540,7 +540,11 @@ class LQCal:
                             ),
                         ]
                     )
-                df[output_name] = df[lq_param] / pars["mu"]
+                try:
+                    df[output_name] = df[lq_param] / pars["mu"]
+                except Exception as e:
+                    msg = "applying single-run LQ time correction failed"
+                    raise RuntimeError(msg) from e
                 self.update_cal_dicts(
                     {
                         output_name: {
@@ -593,40 +597,58 @@ class LQCal:
 
         log.info("Starting LQ drift time correction")
         try:
-            pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[0]
+            try:
+                pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[
+                    0
+                ]
+            except Exception as e:
+                msg = "binned LQ fit at DEP failed"
+                raise RuntimeError(msg) from e
             mean = pars[0]
             sigma = pars[1]
 
-            dep_events = df.query(
-                f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
-            )
+            try:
+                dep_events = df.query(
+                    f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
+                )
 
-            dt_range = [
-                np.nanpercentile(dep_events[self.dt_param], 10),
-                np.nanpercentile(dep_events[self.dt_param], 95),
-            ]
+                dt_range = [
+                    np.nanpercentile(dep_events[self.dt_param], 10),
+                    np.nanpercentile(dep_events[self.dt_param], 95),
+                ]
 
-            lq_range = [mean - 2 * sigma, mean + 2 * sigma]
+                lq_range = [mean - 2 * sigma, mean + 2 * sigma]
 
-            self.lq_range = lq_range
-            self.dt_range = dt_range
+                self.lq_range = lq_range
+                self.dt_range = dt_range
 
-            final_df = dep_events.query(
-                f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
-            )
+                final_df = dep_events.query(
+                    f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
+                )
+            except Exception as e:
+                msg = "DEP event selection failed"
+                raise RuntimeError(msg) from e
 
-            result = linregress(
-                final_df[self.dt_param],
-                final_df[lq_param],
-                alternative="greater",
-            )
+            try:
+                result = linregress(
+                    final_df[self.dt_param],
+                    final_df[lq_param],
+                    alternative="greater",
+                )
+            except Exception as e:
+                msg = "drift-time linear regression failed"
+                raise RuntimeError(msg) from e
             self.dt_fit_pars = result
 
-            df["LQ_Corrected"] = (
-                df[lq_param]
-                - df[self.dt_param] * self.dt_fit_pars[0]
-                - self.dt_fit_pars[1]
-            )
+            try:
+                df["LQ_Corrected"] = (
+                    df[lq_param]
+                    - df[self.dt_param] * self.dt_fit_pars[0]
+                    - self.dt_fit_pars[1]
+                )
+            except Exception as e:
+                msg = "applying LQ drift-time correction failed"
+                raise RuntimeError(msg) from e
 
         except Exception as e:
             if self.debug_mode:
@@ -666,17 +688,25 @@ class LQCal:
 
         log.info("Starting LQ Cut calculation")
         try:
-            pars, errs, hist, bins = binned_lq_fit(
-                df, lq_param, cal_energy_param, peak=1592.5
-            )
+            try:
+                pars, errs, hist, bins = binned_lq_fit(
+                    df, lq_param, cal_energy_param, peak=1592.5
+                )
+            except Exception as e:
+                msg = "binned LQ fit at DEP failed"
+                raise RuntimeError(msg) from e
 
             self.cut_fit_pars = pars
             self.cut_fit_errs = errs
             self.fit_hist = (hist, bins)
             self.cut_val = 3
 
-            df["LQ_Classifier"] = np.divide(df[lq_param].to_numpy(), pars[1])
-            df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
+            try:
+                df["LQ_Classifier"] = np.divide(df[lq_param].to_numpy(), pars[1])
+                df["LQ_Cut"] = df["LQ_Classifier"] < self.cut_val
+            except Exception as e:
+                msg = "applying LQ classifier/cut to data failed"
+                raise RuntimeError(msg) from e
 
         except Exception as e:
             if self.debug_mode:
@@ -748,7 +778,11 @@ class LQCal:
         log.info("Calculating peak survival fractions")
         for i, peak in enumerate(peaks_of_interest):
             try:
-                select_df = df.query(f"{self.selection_string}")
+                try:
+                    select_df = df.query(f"{self.selection_string}")
+                except Exception as e:
+                    msg = "event selection failed"
+                    raise RuntimeError(msg) from e
                 fwhm = self.eres_func(peak)
                 if peak == 2039:
                     emin = 2 * fwhm
@@ -757,14 +791,18 @@ class LQCal:
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
-                    cut_df, sf, sf_err = compton_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[final_lq_param].to_numpy(),
-                        self.cut_val,
-                        cut_range=(0, 5),
-                        n_samples=30,
-                        mode="less",
-                    )
+                    try:
+                        cut_df, sf, sf_err = compton_sf_sweep(
+                            peak_df[self.cal_energy_param].to_numpy(),
+                            peak_df[final_lq_param].to_numpy(),
+                            self.cut_val,
+                            cut_range=(0, 5),
+                            n_samples=30,
+                            mode="less",
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
@@ -778,17 +816,21 @@ class LQCal:
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{fit_range[0]})&({self.cal_energy_param}<{fit_range[1]})"
                     )
-                    cut_df, sf, sf_err = get_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[final_lq_param].to_numpy(),
-                        self.cut_val,
-                        peak,
-                        fwhm,
-                        fit_range=fit_range,
-                        cut_range=(0, 5),
-                        n_samples=30,
-                        mode="less",
-                    )
+                    try:
+                        cut_df, sf, sf_err = get_sf_sweep(
+                            peak_df[self.cal_energy_param].to_numpy(),
+                            peak_df[final_lq_param].to_numpy(),
+                            self.cut_val,
+                            peak,
+                            fwhm,
+                            fit_range=fit_range,
+                            cut_range=(0, 5),
+                            n_samples=30,
+                            mode="less",
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,

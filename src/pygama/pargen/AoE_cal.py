@@ -791,47 +791,55 @@ def bimodal_dt_fit(
     dt_res_dict = {}
     alpha = 0
     try:
-        dep_events = data.query(
-            f"{fit_selection}&{cal_energy_param}>1582&{cal_energy_param}<1602&{cal_energy_param}=={cal_energy_param}&{aoe_param}=={aoe_param}"
-        )
+        try:
+            dep_events = data.query(
+                f"{fit_selection}&{cal_energy_param}>1582&{cal_energy_param}<1602&{cal_energy_param}=={cal_energy_param}&{aoe_param}=={aoe_param}"
+            )
 
-        hist, bins, var = pgh.get_hist(
-            dep_events[aoe_param],
-            bins=500,
-        )
-        bin_cs = (bins[1:] + bins[:-1]) / 2
-        mu = bin_cs[np.argmax(hist)]
-        aoe_range = [mu * 0.9, mu * 1.1]
+            hist, bins, var = pgh.get_hist(
+                dep_events[aoe_param],
+                bins=500,
+            )
+            bin_cs = (bins[1:] + bins[:-1]) / 2
+            mu = bin_cs[np.argmax(hist)]
+            aoe_range = [mu * 0.9, mu * 1.1]
 
-        dt_range = [
-            np.nanpercentile(dep_events[dt_param], 1),
-            np.nanpercentile(dep_events[dt_param], 99),
-        ]
+            dt_range = [
+                np.nanpercentile(dep_events[dt_param], 1),
+                np.nanpercentile(dep_events[dt_param], 99),
+            ]
 
-        dt_res_dict["final_selection"] = (
-            f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{dt_param}>{dt_range[0]}&{dt_param}<{dt_range[1]}&{dt_param}=={dt_param}"
-        )
+            dt_res_dict["final_selection"] = (
+                f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}&{dt_param}>{dt_range[0]}&{dt_param}<{dt_range[1]}&{dt_param}=={dt_param}"
+            )
 
-        final_df = dep_events.query(dt_res_dict["final_selection"])
+            final_df = dep_events.query(dt_res_dict["final_selection"])
+        except Exception as e:
+            msg = "DEP event selection failed"
+            raise RuntimeError(msg) from e
 
-        hist, bins, var = pgh.get_hist(
-            final_df[dt_param],
-            dx=32,
-            range=(
-                np.nanmin(final_df[dt_param]),
-                np.nanmax(final_df[dt_param]),
-            ),
-        )
+        try:
+            hist, bins, var = pgh.get_hist(
+                final_df[dt_param],
+                dx=32,
+                range=(
+                    np.nanmin(final_df[dt_param]),
+                    np.nanmax(final_df[dt_param]),
+                ),
+            )
 
-        bcs = pgh.get_bin_centers(bins)
-        mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
-        pk_pars, _pk_covs = pgc.hpge_fit_energy_peak_tops(
-            hist,
-            bins,
-            var=var,
-            peak_locs=mus,
-            n_to_fit=5,
-        )
+            bcs = pgh.get_bin_centers(bins)
+            mus = bcs[pgc.get_i_local_maxima(hist / (np.sqrt(var) + 10**-99), 2)]
+            pk_pars, _pk_covs = pgc.hpge_fit_energy_peak_tops(
+                hist,
+                bins,
+                var=var,
+                peak_locs=mus,
+                n_to_fit=5,
+            )
+        except Exception as e:
+            msg = "drift-time peak-top fit failed"
+            raise RuntimeError(msg) from e
 
         mus = pk_pars[:, 0]
         sigmas = pk_pars[:, 1]
@@ -860,17 +868,25 @@ def bimodal_dt_fit(
                 f"{dt_param}>{mus[1] - 2 * sigmas[1]} & {dt_param}<{mus[1] + 2 * sigmas[1]}"
             )
 
-            aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp1)[aoe_param], pdf=pdf, display=display
-            )
+            try:
+                aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
+                    final_df.query(aoe_grp1)[aoe_param], pdf=pdf, display=display
+                )
+            except Exception as e:
+                msg = "A/E fit of drift-time population 1 failed"
+                raise RuntimeError(msg) from e
             dt_res_dict["aoe_fit1"] = {
                 "pars": aoe_pars.to_dict(),
                 "errs": aoe_errs.to_dict(),
             }
 
-            aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
-                final_df.query(aoe_grp2)[aoe_param], pdf=pdf, display=display
-            )
+            try:
+                aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
+                    final_df.query(aoe_grp2)[aoe_param], pdf=pdf, display=display
+                )
+            except Exception as e:
+                msg = "A/E fit of drift-time population 2 failed"
+                raise RuntimeError(msg) from e
             dt_res_dict["aoe_fit2"] = {
                 "pars": aoe_pars2.to_dict(),
                 "errs": aoe_errs2.to_dict(),
@@ -1029,6 +1045,40 @@ def mcdrift(
     alpha = -principal[0] / principal[1] / 1000.0
     log.info("dtcorr (MCD) successful alpha: %s", alpha)
     return alpha, {"alpha": alpha}
+
+
+def _fit_dispersion_vs_energy(model, x, y, yerr):
+    """Weighted soft-L1 Minuit fit of a mean- or sigma-vs-energy model.
+
+    Shared by the mean and sigma stages of :meth:`CalAoE.energy_correction`.
+
+    Parameters
+    ----------
+    model
+        Model class exposing ``guess`` and ``func`` (e.g. :class:`Pol1`,
+        :class:`SigmaFit`).
+    x, y, yerr
+        Compton-band energies, fitted means/sigmas, and their uncertainties.
+
+    Returns
+    -------
+    m, pars, errs, csqr, dof, p_val
+        The Minuit object, its best-fit values and errors, and the chi-square,
+        degrees of freedom and p-value of the fit.
+    """
+    p0 = model.guess(x, y, yerr)
+    c = cost.LeastSquares(x, y, yerr, model.func)
+    c.loss = "soft_l1"
+    m = Minuit(c, *p0)
+    m.simplex()
+    m.migrad()
+    m.hesse()
+    pars = m.values  # noqa: PD011
+    errs = m.errors
+    csqr = np.sum(((y - model.func(x, *pars)) ** 2) / yerr)
+    dof = len(y) - len(pars)
+    p_val = chi2.sf(csqr, dof)
+    return m, pars, errs, csqr, dof, p_val
 
 
 class CalAoE:
@@ -1429,7 +1479,11 @@ class CalAoE:
                             ),
                         ]
                     )
-                df[output_name] = df[aoe_param] / pars["mu"]
+                try:
+                    df[output_name] = df[aoe_param] / pars["mu"]
+                except Exception as e:
+                    msg = "applying single-run A/E time correction failed"
+                    raise RuntimeError(msg) from e
                 self.update_cal_dicts(
                     {
                         output_name: {
@@ -1589,7 +1643,11 @@ class CalAoE:
             dtype=float,
         )
         try:
-            select_df = data.query(f"{self.fit_selection} & {aoe_param}>0")
+            try:
+                select_df = data.query(f"{self.fit_selection} & {aoe_param}>0")
+            except Exception as e:
+                msg = "compton band event selection failed"
+                raise RuntimeError(msg) from e
 
             # Fit each compton band
             for band in compt_bands:
@@ -1665,71 +1723,44 @@ class CalAoE:
             self.energy_corr_res_dict["n_of_valid_fits"] = len(valid_fits)
             log.info("%s compton bands fit successfully", len(valid_fits))
             # Fit mus against energy
-            p0_mu = self.mean_func.guess(
-                valid_fits.index, valid_fits["mean"], valid_fits["mean_err"]
-            )
-            c_mu = cost.LeastSquares(
-                valid_fits.index,
-                valid_fits["mean"],
-                valid_fits["mean_err"],
-                self.mean_func.func,
-            )
-            c_mu.loss = "soft_l1"
-            m_mu = Minuit(c_mu, *p0_mu)
-            m_mu.simplex()
-            m_mu.migrad()
-            m_mu.hesse()
-
-            mu_pars = m_mu.values  # noqa: PD011
-            mu_errs = m_mu.errors
-
-            csqr_mu = np.sum(
+            try:
                 (
-                    (
-                        valid_fits["mean"]
-                        - self.mean_func.func(valid_fits.index, *mu_pars)
-                    )
-                    ** 2
+                    m_mu,
+                    mu_pars,
+                    mu_errs,
+                    csqr_mu,
+                    dof_mu,
+                    p_val_mu,
+                ) = _fit_dispersion_vs_energy(
+                    self.mean_func,
+                    valid_fits.index,
+                    valid_fits["mean"],
+                    valid_fits["mean_err"],
                 )
-                / valid_fits["mean_err"]
-            )
-            dof_mu = len(valid_fits["mean"]) - len(mu_pars)
-            p_val_mu = chi2.sf(csqr_mu, dof_mu)
-            self.mean_fit_obj = m_mu
+                self.mean_fit_obj = m_mu
+            except Exception as e:
+                msg = "mean-vs-energy fit failed"
+                raise RuntimeError(msg) from e
 
             # Fit sigma against energy
-            p0_sig = self.sigma_func.guess(
-                valid_fits.index, valid_fits["sigma"], valid_fits["sigma_err"]
-            )
-            c_sig = cost.LeastSquares(
-                valid_fits.index,
-                valid_fits["sigma"],
-                valid_fits["sigma_err"],
-                self.sigma_func.func,
-            )
-            c_sig.loss = "soft_l1"
-            m_sig = Minuit(c_sig, *p0_sig)
-            m_sig.simplex()
-            m_sig.migrad()
-            m_sig.hesse()
-
-            sig_pars = m_sig.values  # noqa: PD011
-            sig_errs = m_sig.errors
-
-            csqr_sig = np.sum(
+            try:
                 (
-                    (
-                        valid_fits["sigma"]
-                        - self.sigma_func.func(valid_fits.index, *sig_pars)
-                    )
-                    ** 2
+                    m_sig,
+                    sig_pars,
+                    sig_errs,
+                    csqr_sig,
+                    dof_sig,
+                    p_val_sig,
+                ) = _fit_dispersion_vs_energy(
+                    self.sigma_func,
+                    valid_fits.index,
+                    valid_fits["sigma"],
+                    valid_fits["sigma_err"],
                 )
-                / valid_fits["sigma_err"]
-            )
-            dof_sig = len(valid_fits["sigma"]) - len(sig_pars)
-            p_val_sig = chi2.sf(csqr_sig, dof_sig)
-
-            self.SigmaFit_obj = m_sig
+                self.SigmaFit_obj = m_sig
+            except Exception as e:
+                msg = "sigma-vs-energy fit failed"
+                raise RuntimeError(msg) from e
 
             # Get DEP fit
             n_sigma = 4
@@ -1755,12 +1786,16 @@ class CalAoE:
                 )
                 dep_pars, dep_err, _ = return_nans(self.pdf)
 
-            data[corrected_param] = data[aoe_param] / self.mean_func.func(
-                data[self.cal_energy_param], *mu_pars
-            )
-            data[classifier_param] = (data[corrected_param] - 1) / self.sigma_func.func(
-                data[self.cal_energy_param], *sig_pars
-            )
+            try:
+                data[corrected_param] = data[aoe_param] / self.mean_func.func(
+                    data[self.cal_energy_param], *mu_pars
+                )
+                data[classifier_param] = (
+                    data[corrected_param] - 1
+                ) / self.sigma_func.func(data[self.cal_energy_param], *sig_pars)
+            except Exception as e:
+                msg = "applying A/E energy correction to data failed"
+                raise RuntimeError(msg) from e
             log.info("Finished A/E energy successful")
             log.info("mean pars are %s", mu_pars.to_dict())
             log.info("sigma pars are %s", sig_pars.to_dict())
@@ -1864,63 +1899,79 @@ class CalAoE:
         min_range, max_range = ranges
         erange = (peak - min_range, peak + max_range)
         try:
-            select_df = data.query(
-                f"{self.fit_selection}&({self.cal_energy_param} > {erange[0]}) & ({self.cal_energy_param} < {erange[1]})"
-            )
+            try:
+                select_df = data.query(
+                    f"{self.fit_selection}&({self.cal_energy_param} > {erange[0]}) & ({self.cal_energy_param} < {erange[1]})"
+                )
+            except Exception as e:
+                msg = "event selection query failed"
+                raise RuntimeError(msg) from e
 
             # if dep_correct is True:
             #     peak_aoe = (select_df[aoe_param] / dep_mu(select_df[self.cal_energy_param])) - 1
             #     peak_aoe = select_df[aoe_param] / sig_func(select_df[self.cal_energy_param])
 
-            self.cut_fits, _, _ = get_sf_sweep(
-                select_df[self.cal_energy_param],
-                select_df[aoe_param],
-                None,
-                peak,
-                self.eres_func(peak),
-                fit_range=erange,
-                data_mask=None,
-                cut_range=(-8, 0),
-                n_samples=40,
-                mode="greater",
-                debug_mode=self.debug_mode,
-            )
+            try:
+                self.cut_fits, _, _ = get_sf_sweep(
+                    select_df[self.cal_energy_param],
+                    select_df[aoe_param],
+                    None,
+                    peak,
+                    self.eres_func(peak),
+                    fit_range=erange,
+                    data_mask=None,
+                    cut_range=(-8, 0),
+                    n_samples=40,
+                    mode="greater",
+                    debug_mode=self.debug_mode,
+                )
+            except Exception as e:
+                msg = "survival-fraction sweep failed"
+                raise RuntimeError(msg) from e
 
-            valid_fits = self.cut_fits.query(
-                f"sf_err<{(1.5 * np.nanpercentile(self.cut_fits['sf_err'], 85))}&sf_err==sf_err"
-            )
+            try:
+                valid_fits = self.cut_fits.query(
+                    f"sf_err<{(1.5 * np.nanpercentile(self.cut_fits['sf_err'], 85))}&sf_err==sf_err"
+                )
 
-            c = cost.LeastSquares(
-                valid_fits.index,
-                valid_fits["sf"],
-                valid_fits["sf_err"],
-                SigmoidFit.func,
-            )
-            c.loss = "soft_l1"
-            m1 = Minuit(
-                c,
-                *SigmoidFit.guess(
-                    valid_fits.index, valid_fits["sf"], valid_fits["sf_err"]
-                ),
-            )
-            m1.simplex().migrad()
-            xs = np.arange(
-                np.nanmin(valid_fits.index), np.nanmax(valid_fits.index), 0.01
-            )
-            p = SigmoidFit.func(xs, *m1.values)  # noqa: PD011
-            self.cut_fit = {
-                "function": SigmoidFit.__name__,
-                "pars": m1.values.to_dict(),  # noqa: PD011
-                "errs": m1.errors.to_dict(),
-            }
-            self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * dep_acc)))], 3)
+                c = cost.LeastSquares(
+                    valid_fits.index,
+                    valid_fits["sf"],
+                    valid_fits["sf_err"],
+                    SigmoidFit.func,
+                )
+                c.loss = "soft_l1"
+                m1 = Minuit(
+                    c,
+                    *SigmoidFit.guess(
+                        valid_fits.index, valid_fits["sf"], valid_fits["sf_err"]
+                    ),
+                )
+                m1.simplex().migrad()
+                xs = np.arange(
+                    np.nanmin(valid_fits.index), np.nanmax(valid_fits.index), 0.01
+                )
+                p = SigmoidFit.func(xs, *m1.values)  # noqa: PD011
+                self.cut_fit = {
+                    "function": SigmoidFit.__name__,
+                    "pars": m1.values.to_dict(),  # noqa: PD011
+                    "errs": m1.errors.to_dict(),
+                }
+                self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * dep_acc)))], 3)
+            except Exception as e:
+                msg = "sigmoid fit of survival-fraction curve failed"
+                raise RuntimeError(msg) from e
             log.info("Cut found at %s", self.low_cut_val)
 
-            data[output_cut_param] = data[aoe_param] > self.low_cut_val
-            if self.dt_cut_param is not None:
-                data[output_cut_param] = (
-                    data[output_cut_param] & (data[self.dt_cut_param])
-                )
+            try:
+                data[output_cut_param] = data[aoe_param] > self.low_cut_val
+                if self.dt_cut_param is not None:
+                    data[output_cut_param] = (
+                        data[output_cut_param] & (data[self.dt_cut_param])
+                    )
+            except Exception as e:
+                msg = "applying A/E cut to data failed"
+                raise RuntimeError(msg) from e
         except Exception as e:
             if self.debug_mode:
                 raise
@@ -1975,9 +2026,13 @@ class CalAoE:
 
         for i, peak in enumerate(peaks):
             try:
-                select_df = data.query(
-                    f"{self.selection_string}&{aoe_param}=={aoe_param}"
-                )
+                try:
+                    select_df = data.query(
+                        f"{self.selection_string}&{aoe_param}=={aoe_param}"
+                    )
+                except Exception as e:
+                    msg = "event selection failed"
+                    raise RuntimeError(msg) from e
                 fwhm = self.eres_func(peak)
                 if peak == 2039:
                     emin = 2 * fwhm
@@ -1986,19 +2041,23 @@ class CalAoE:
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
-                    cut_df, sf, sf_err = compton_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        cut_range=cut_range,
-                        n_samples=n_samples,
-                        mode=mode,
-                        data_mask=(
-                            peak_df[self.dt_cut_param].to_numpy()
-                            if self.dt_cut_param is not None
-                            else None
-                        ),
-                    )
+                    try:
+                        cut_df, sf, sf_err = compton_sf_sweep(
+                            peak_df[self.cal_energy_param].to_numpy(),
+                            peak_df[aoe_param].to_numpy(),
+                            self.low_cut_val,
+                            cut_range=cut_range,
+                            n_samples=n_samples,
+                            mode=mode,
+                            data_mask=(
+                                peak_df[self.dt_cut_param].to_numpy()
+                                if self.dt_cut_param is not None
+                                else None
+                            ),
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
                     sfs = pd.concat(
                         [
                             sfs,
@@ -2012,23 +2071,27 @@ class CalAoE:
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
-                    cut_df, sf, sf_err = get_sf_sweep(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        peak,
-                        fwhm,
-                        fit_range=fit_range,
-                        cut_range=cut_range,
-                        n_samples=n_samples,
-                        mode=mode,
-                        data_mask=(
-                            peak_df[self.dt_cut_param].to_numpy()
-                            if self.dt_cut_param is not None
-                            else None
-                        ),
-                        debug_mode=self.debug_mode,
-                    )
+                    try:
+                        cut_df, sf, sf_err = get_sf_sweep(
+                            peak_df[self.cal_energy_param].to_numpy(),
+                            peak_df[aoe_param].to_numpy(),
+                            self.low_cut_val,
+                            peak,
+                            fwhm,
+                            fit_range=fit_range,
+                            cut_range=cut_range,
+                            n_samples=n_samples,
+                            mode=mode,
+                            data_mask=(
+                                peak_df[self.dt_cut_param].to_numpy()
+                                if self.dt_cut_param is not None
+                                else None
+                            ),
+                            debug_mode=self.debug_mode,
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
 
                     cut_df = cut_df.query(
                         f"sf_err<5*{np.nanpercentile(cut_df['sf_err'], 50)}& sf_err==sf_err & sf<=100"
@@ -2097,17 +2160,21 @@ class CalAoE:
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
 
-                    sf_dict = compton_sf(
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        self.high_cut_val,
-                        mode=mode,
-                        data_mask=(
-                            peak_df[self.dt_cut_param].to_numpy()
-                            if self.dt_cut_param is not None
-                            else None
-                        ),
-                    )
+                    try:
+                        sf_dict = compton_sf(
+                            peak_df[aoe_param].to_numpy(),
+                            self.low_cut_val,
+                            self.high_cut_val,
+                            mode=mode,
+                            data_mask=(
+                                peak_df[self.dt_cut_param].to_numpy()
+                                if self.dt_cut_param is not None
+                                else None
+                            ),
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
                     sf = sf_dict["sf"]
                     sf_err = sf_dict["sf_err"]
                     sfs = pd.concat(
@@ -2122,21 +2189,25 @@ class CalAoE:
                     peak_df = data.query(
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
-                    sf, sf_err, _, _ = get_survival_fraction(
-                        peak_df[self.cal_energy_param].to_numpy(),
-                        peak_df[aoe_param].to_numpy(),
-                        self.low_cut_val,
-                        peak,
-                        fwhm,
-                        fit_range=fit_range,
-                        mode=mode,
-                        high_cut=self.high_cut_val,
-                        data_mask=(
-                            peak_df[self.dt_cut_param].to_numpy()
-                            if self.dt_cut_param is not None
-                            else None
-                        ),
-                    )
+                    try:
+                        sf, sf_err, _, _ = get_survival_fraction(
+                            peak_df[self.cal_energy_param].to_numpy(),
+                            peak_df[aoe_param].to_numpy(),
+                            self.low_cut_val,
+                            peak,
+                            fwhm,
+                            fit_range=fit_range,
+                            mode=mode,
+                            high_cut=self.high_cut_val,
+                            data_mask=(
+                                peak_df[self.dt_cut_param].to_numpy()
+                                if self.dt_cut_param is not None
+                                else None
+                            ),
+                        )
+                    except Exception as e:
+                        msg = "survival-fraction fit failed"
+                        raise RuntimeError(msg) from e
                     sfs = pd.concat(
                         [
                             sfs,
