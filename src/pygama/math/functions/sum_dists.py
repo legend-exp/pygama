@@ -17,6 +17,7 @@ A class that creates the sum of distributions, with methods for scipy computed :
 from __future__ import annotations
 
 import inspect
+from weakref import WeakKeyDictionary
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -169,6 +170,19 @@ def copy_signature(signature_to_copy, obj_to_copy_to):
 
     wrapper.__signature__ = signature_to_copy
     return wrapper
+
+
+# methods that get a signature built from x_shapes / extended_shapes on access
+_X_SHAPE_METHODS = frozenset(("get_pdf", "get_cdf", "cdf_ext"))
+_EXTENDED_SHAPE_METHODS = frozenset(("pdf_norm", "pdf_ext", "log_pdf_ext", "cdf_norm"))
+
+# smallest positive normal float: the zero-protection iminuit itself adds
+# before taking logarithms in its NLL cost functions
+_TINY_FLOAT = np.finfo(float).tiny
+
+# per-instance cache of the signature-carrying wrappers; keyed weakly so
+# instances stay picklable/deepcopy-able and can be garbage collected
+_signature_wrapper_cache: WeakKeyDictionary = WeakKeyDictionary()
 
 
 class SumDists(rv_continuous):
@@ -465,7 +479,8 @@ class SumDists(rv_continuous):
                 2:
             ]  # chop off x_lo, x_hi from the shapes to actually pass to get_cdf
 
-        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *params))
+        cdf = self.get_cdf(np.array([x_lo, x_hi]), *params)
+        norm = cdf[1] - cdf[0]
 
         if norm == 0:
             return np.full_like(x, np.inf)
@@ -489,7 +504,8 @@ class SumDists(rv_continuous):
                 2:
             ]  # chop off x_lo, x_hi from the shapes to actually pass to get_cdf
 
-        norm = np.diff(self.get_cdf(np.array([x_lo, x_hi]), *params))
+        cdf = self.get_cdf(np.array([x_lo, x_hi]), *params)
+        norm = cdf[1] - cdf[0]
 
         if norm == 0:
             return np.full_like(x, np.inf)
@@ -525,17 +541,10 @@ class SumDists(rv_continuous):
         )
 
         # sig = areas[0] + areas[1] # this is a hack, it performs faster but may not *always* be true
-        sig = (
-            areas[0]
-            * fracs[0]
-            * np.diff(
-                pdf_exts[0].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[0]])
-            )[0]
-            + areas[1]
-            * fracs[1]
-            * np.diff(
-                pdf_exts[1].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[1]])
-            )[0]
+        cdf_0 = pdf_exts[0].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[0]])
+        cdf_1 = pdf_exts[1].get_cdf(np.array([x_lo, x_hi]), *params[self.par_idxs[1]])
+        sig = areas[0] * fracs[0] * (cdf_0[1] - cdf_0[0]) + areas[1] * fracs[1] * (
+            cdf_1[1] - cdf_1[0]
         )
 
         if self.components:
@@ -549,6 +558,22 @@ class SumDists(rv_continuous):
         ) + areas[1] * fracs[1] * pdf_exts[1].get_pdf(x, *params[self.par_idxs[1]])
 
         return sig, probs
+
+    def log_pdf_ext(self, x, *params):
+        """
+        Log-density counterpart of :func:`pdf_ext` for extended unbinned NLL
+        fits with ``iminuit.cost.ExtendedUnbinnedNLL(..., log=True)``.
+
+        Returns the integral of the density over the fit range together with
+        ``log(density + tiny)``, where ``tiny`` is the smallest positive
+        normal float — the same zero-protection ``iminuit`` applies
+        internally when it takes the logarithm itself.  Letting ``iminuit``
+        sum the log-density directly skips its accuracy-motivated sort of the
+        per-event log values, which dominates the cost of each NLL evaluation
+        for large samples.
+        """
+        sig, probs = self.pdf_ext(x, *params)
+        return sig, np.log(probs + _TINY_FLOAT)
 
     def cdf_ext(self, x, *params):
         """
@@ -752,26 +777,35 @@ class SumDists(rv_continuous):
     def __getattribute__(self, attr):
         """
         Necessary to overload this so that Iminuit can use inspect.signature to get the correct parameter names
-        """
-        value = object.__getattribute__(self, attr)
 
-        if attr in ["get_pdf", "get_cdf", "cdf_ext"]:
-            params = [
-                inspect.Parameter(param, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                for param in self.x_shapes
-            ]
-            value = copy_signature(inspect.Signature(params), value)
-        if (
-            attr
-            in [
-                "pdf_norm",
-                "pdf_ext",
-                "cdf_norm",
-            ]
-        ):  # Set these to include the x_lo, x_hi at the correct positions since these always need those params
-            params = [
-                inspect.Parameter(param, inspect.Parameter.POSITIONAL_OR_KEYWORD)
-                for param in self.extended_shapes
-            ]
-            value = copy_signature(inspect.Signature(params), value)
-        return value
+        The signature-carrying wrappers are built once per instance and cached:
+        constructing :class:`inspect.Signature` objects on every attribute
+        access dominates the runtime of scalar-heavy code paths (unbinned NLL
+        fits, FWHM root-finding).  The wrapper closes over the bound method, so
+        runtime state such as ``self.components`` is still honoured at call
+        time.  ``x_shapes``/``extended_shapes`` are fixed after ``__init__``,
+        so the cache never needs invalidating.
+        """
+        if attr in _X_SHAPE_METHODS or attr in _EXTENDED_SHAPE_METHODS:
+            cache = _signature_wrapper_cache.get(self)
+            if cache is None:
+                cache = {}
+                _signature_wrapper_cache[self] = cache
+            wrapper = cache.get(attr)
+            if wrapper is None:
+                value = object.__getattribute__(self, attr)
+                shapes = (
+                    self.x_shapes
+                    if attr in _X_SHAPE_METHODS
+                    # extended shapes include x_lo, x_hi at the correct
+                    # positions since these methods always need those params
+                    else self.extended_shapes
+                )
+                params = [
+                    inspect.Parameter(param, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+                    for param in shapes
+                ]
+                wrapper = copy_signature(inspect.Signature(params), value)
+                cache[attr] = wrapper
+            return wrapper
+        return object.__getattribute__(self, attr)

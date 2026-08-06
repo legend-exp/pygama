@@ -325,6 +325,7 @@ class LQCal:
         cdf: callable = gaussian,
         selection_string: str = "is_valid_cal&is_not_pulser",
         debug_mode=False,
+        use_log_pdf: bool = False,
     ):
         """
         Parameters
@@ -346,6 +347,11 @@ class LQCal:
         debug_mode
             If ``True``, exceptions are re-raised instead of being caught
             and logged.
+        use_log_pdf
+            Build the survival-fraction unbinned NLL fits from the models'
+            log-densities (``iminuit`` ``log=True`` mode) — faster on large
+            samples, results differ at machine-precision level.  The LQ
+            calibration's own fits are binned and unaffected.
         """
 
         self.cal_dicts = cal_dicts
@@ -355,6 +361,7 @@ class LQCal:
         self.cdf = cdf
         self.selection_string = selection_string
         self.debug_mode = debug_mode
+        self.use_log_pdf = use_log_pdf
 
     def update_cal_dicts(self, update_dict):
         """
@@ -827,10 +834,12 @@ class LQCal:
                             cut_range=(0, 5),
                             n_samples=30,
                             mode="less",
+                            use_log_pdf=self.use_log_pdf,
                         )
                     except Exception as e:
                         msg = "survival-fraction fit failed"
                         raise RuntimeError(msg) from e
+                    
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
