@@ -529,3 +529,121 @@ def test_build_evt_independent_of_buffer_len(
         checked += 1
 
     assert checked > 0
+
+
+@pytest.fixture(scope="module")
+def sparse_channel_config(tmp_path_factory):
+    """Two channels, one of which fires only in the last events of the file.
+
+    The real test data has a handful of channels that all fire in nearly every
+    event, which makes a channel's event numbers coincide with its row numbers
+    and hides any confusion between the two. Here ``ch1000001`` fires only in
+    events 40-49, so its rows are 0-9 while its events are 40-49.
+    """
+    d = tmp_path_factory.mktemp("sparse")
+    n_events, first_b = 50, 40
+
+    keys, rows, a_row, b_row = [], [], 0, 0
+    for event in range(n_events):
+        k, r = [1000000], [a_row]
+        a_row += 1
+        if event >= first_b:
+            k.append(1000001)
+            r.append(b_row)
+            b_row += 1
+        keys.append(k)
+        rows.append(r)
+
+    lh5.write(
+        Table(
+            {
+                "table_key": VectorOfVectors(ak.Array(keys)),
+                "row_in_table": VectorOfVectors(ak.Array(rows)),
+            }
+        ),
+        "hardware_tcm_1",
+        str(d / "tcm.lh5"),
+        wo_mode="of",
+    )
+
+    # ch1000001 always has the smaller sorter value, so wherever it fires it
+    # must win the first_at aggregation
+    # ``neg_tp_0_est`` is the negated sorter, so the same channel wins whether
+    # the aggregation takes the smallest or the largest value
+    lh5.write(
+        Table(
+            {
+                "tp_0_est": Array(np.full(a_row, 100.0)),
+                "neg_tp_0_est": Array(np.full(a_row, -100.0)),
+                "timestamp": Array(np.arange(a_row, dtype=float)),
+            }
+        ),
+        "ch1000000/dsp",
+        str(d / "dsp.lh5"),
+        wo_mode="of",
+    )
+    lh5.write(
+        Table(
+            {
+                "tp_0_est": Array(np.full(b_row, 10.0)),
+                "neg_tp_0_est": Array(np.full(b_row, -10.0)),
+                "timestamp": Array(np.full(b_row, 999.0)),
+            }
+        ),
+        "ch1000001/dsp",
+        str(d / "dsp.lh5"),
+        wo_mode="a",
+    )
+    for i, (ch, n) in enumerate((("ch1000000", a_row), ("ch1000001", b_row))):
+        lh5.write(
+            Table({"e": Array(np.ones(n))}),
+            f"{ch}/hit",
+            str(d / "hit.lh5"),
+            wo_mode="of" if i == 0 else "a",
+        )
+
+    files_config = {
+        "tcm": (str(d / "tcm.lh5"), "hardware_tcm_1"),
+        "dsp": (str(d / "dsp.lh5"), "dsp", "ch{}"),
+        "hit": (str(d / "hit.lh5"), "hit", "ch{}"),
+        "evt": (None, "evt"),
+    }
+    expected = np.concatenate(
+        [np.arange(first_b, dtype=float), np.full(n_events - first_b, 999.0)]
+    )
+    return files_config, expected
+
+
+@pytest.mark.parametrize("buffer_len", [10**6, 7, 1])
+@pytest.mark.parametrize("mode", ["first_at", "last_at"])
+def test_first_last_at_uses_sparse_channel(sparse_channel_config, mode, buffer_len):
+    """first_at/last_at must pick the winning channel however sparse it is.
+
+    Regression test: the aggregator used to finish each channel with a pandas
+    ``.loc`` assignment, which aligns the right-hand side *by index label*. The
+    labels were event numbers and the right-hand index was the channel's hit
+    positions, so for a sparse channel the two disagreed and the values were
+    dropped (silently becoming NaN). It also made the result depend on where
+    the chunk boundaries fell.
+    """
+    files_config, expected = sparse_channel_config
+    # ch1000001 has the smaller sorter value, so it wins first_at; the negated
+    # column makes it the largest, so it wins last_at too and one set of
+    # expectations covers both branches
+    sorter = "dsp.tp_0_est" if mode == "first_at" else "dsp.neg_tp_0_est"
+
+    config = {
+        "channels": {"geds_on": ["ch1000000", "ch1000001"]},
+        "outputs": ["t"],
+        "operations": {
+            "t": {
+                "channels": "geds_on",
+                "aggregation_mode": f"{mode}:{sorter}",
+                "expression": "dsp.timestamp",
+                "initial": -1,
+            }
+        },
+    }
+    got = build_evt(files_config, config=config, buffer_len=buffer_len).t.view_as("np")
+    assert not np.isnan(got).any()
+    assert np.array_equal(got, expected)
