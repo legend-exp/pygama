@@ -73,9 +73,7 @@ def _fake_psd_run_one_dsp(record, fft_field="wf_psd"):
     """A run_one_dsp stand-in whose 'PSD' is the batch's own waveform values."""
 
     def fake(tb_data, dsp_proc_chain, db_dict=None):  # noqa: ARG001
-        record.append(
-            {"outputs": dsp_proc_chain["outputs"].copy(), "n": len(tb_data)}
-        )
+        record.append({"outputs": dsp_proc_chain["outputs"].copy(), "n": len(tb_data)})
         if dsp_proc_chain["outputs"] == [fft_field]:
             vals = tb_data["waveform"].values.nda.astype(np.float32)
             return {fft_field: SimpleNamespace(values=SimpleNamespace(nda=vals))}
