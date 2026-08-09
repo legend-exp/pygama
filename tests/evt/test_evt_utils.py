@@ -78,5 +78,5 @@ def test_make_numpy_full_promotes_to_hold_both():
 
 def test_make_numpy_full_accepts_python_types():
     """``evaluate_to_first_or_last`` passes ``type(default_value)`` as the dtype."""
-    assert utils.make_numpy_full(2, 0, type(0)).dtype == np.dtype(int)
-    assert utils.make_numpy_full(2, 0.0, type(0.0)).dtype == np.dtype(float)
+    assert utils.make_numpy_full(2, 0, int).dtype == np.dtype(int)
+    assert utils.make_numpy_full(2, 0.0, float).dtype == np.dtype(float)
