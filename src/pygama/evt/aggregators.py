@@ -69,8 +69,7 @@ def evaluate_to_first_or_last(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         # evaluate at channel
         if ch not in channels_skip:
@@ -95,6 +94,7 @@ def evaluate_to_first_or_last(
                 length=len(res),
                 ch=ch,
                 idx_ch=idx_ch,
+                cache=getattr(tcm, "cache", None),
             )
 
             # find if sorter is in hit or dsp
@@ -114,11 +114,6 @@ def evaluate_to_first_or_last(
                 raise ValueError(msg)
 
             ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
-
-            evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.table_key)),
-                ak.sum(tcm.table_key == table_id, axis=1),
-            )
 
             if is_first:
                 if ch == channels[0]:
@@ -191,8 +186,7 @@ def evaluate_to_scalar(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(
@@ -215,11 +209,7 @@ def evaluate_to_scalar(
                 length=len(res),
                 ch=ch,
                 idx_ch=idx_ch,
-            )
-
-            evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.table_key)),
-                ak.sum(tcm.table_key == table_id, axis=1),
+                cache=getattr(tcm, "cache", None),
             )
 
             # switch through modes
@@ -283,19 +273,16 @@ def evaluate_at_channel(
 
     out = utils.make_numpy_full(len(ch_comp.nda), default_value, type(default_value))
 
+    hit_tables = utils.table_names(datainfo, "hit", getattr(tcm, "cache", None))
+
     for table_id in np.unique(ch_comp.nda.astype(int)):
         table_name = utils.get_table_name_by_pattern(table_id_fmt, table_id)
         # skip default value
-        if table_name not in lh5.ls(datainfo.hit.file):
+        if table_name not in hit_tables:
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
-
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
@@ -362,9 +349,7 @@ def evaluate_at_channel_vov(
     type_name = None
     for table_id in ch_comp_channels:
         table_name = utils.get_table_name_by_pattern(datainfo.hit.table_fmt, table_id)
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, _, evt_ids_ch = utils.channel_indices(tcm, table_id)
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
@@ -455,12 +440,7 @@ def evaluate_to_aoesa(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
-
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(
@@ -489,6 +469,7 @@ def evaluate_to_aoesa(
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
+            cache=getattr(tcm, "cache", None),
         )
 
         out[evt_ids_ch, i] = np.where(limarr, res, out[evt_ids_ch, i])

@@ -472,3 +472,60 @@ def test_buffered_build_evt(files_config_nowrite):
         files_config_nowrite, config=f"{config_dir}/basic-evt-config.yaml", buffer_len=1
     )
     assert (evt1.energy.flattened_data.nda == evt2.energy.flattened_data.nda).all()
+
+
+# Fields that legitimately -- or at least knowingly -- vary with the chunk
+# size, and so cannot take part in the comparison below.
+#
+# ``keep_at_ch`` results already varied before any caching was added:
+# evaluate_at_channel writes its result at every event in which the channel
+# fired (``out[evt_ids_ch] = res``) rather than only at the events ch_comp
+# selects, so whether a channel is evaluated at all depends on it appearing in
+# the current chunk's ch_comp. No production evt config uses keep_at_ch; they
+# use keep_at_idx, which goes through evaluate_at_channel_vov and does restrict
+# by ch_comp.
+#
+# ``tcm.index`` is by construction an offset into the flattened TCM of the
+# chunk being processed, so its value is chunk-relative. It is consumed by
+# keep_at_idx within the same chunk, which is self-consistent; production
+# configs keep such fields as ``_``-prefixed intermediates and never write
+# them out.
+_KEEP_AT_CH_FIELDS = {"aoe", "is_aoe_rejected", "is_usable_aoe", "is_saturated"}
+_TCM_INDEX_FIELDS = {"energy_idx"}
+_CHUNK_DEPENDENT_FIELDS = _KEEP_AT_CH_FIELDS | _TCM_INDEX_FIELDS
+
+
+@pytest.mark.parametrize("buffer_len", [1, 7, 10**4])
+@pytest.mark.parametrize(
+    "config_file",
+    ["query-test-evt-config.json", "vov-test-evt-config.json"],
+)
+def test_build_evt_independent_of_buffer_len(
+    files_config_nowrite, config_file, buffer_len
+):
+    """Chunking must not be observable in the output.
+
+    Per-chunk state (cached lower-tier columns, cached per-channel TCM
+    indices) is only valid for the chunk it was built from, so a stale entry
+    would show up here as a column that changes with the chunk size. Between
+    them the two configs cover every aggregation mode used by the production
+    evt configs: sum, any, all, first_at, last_at, gather and keep_at_idx.
+    """
+    config = f"{config_dir}/{config_file}"
+    ref = build_evt(files_config_nowrite, config=config, buffer_len=10**6)
+    evt = build_evt(files_config_nowrite, config=config, buffer_len=buffer_len)
+
+    assert sorted(ref.keys()) == sorted(evt.keys())
+    checked = 0
+    for field in ref:
+        if field in _CHUNK_DEPENDENT_FIELDS:
+            continue
+        a = ak.flatten(ref[field].view_as("ak"), axis=None).to_numpy()
+        b = ak.flatten(evt[field].view_as("ak"), axis=None).to_numpy()
+        assert a.dtype == b.dtype, field
+        # NaN is a legitimate value here (unfilled defaults), so it has to
+        # compare equal to itself
+        assert np.array_equal(a, b, equal_nan=a.dtype.kind == "f"), field
+        checked += 1
+
+    assert checked > 0
