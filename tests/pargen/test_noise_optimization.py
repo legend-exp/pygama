@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import matplotlib
+import matplotlib as mpl
 import numpy as np
 import pytest
 from lgdo import Table, WaveformTable
 
 from pygama.pargen import noise_optimization as noise_optimization_module
 
-matplotlib.use("Agg", force=True)
+mpl.use("Agg", force=True)
 
 
 def test_noise_optimization_does_not_mutate_outputs(monkeypatch):
