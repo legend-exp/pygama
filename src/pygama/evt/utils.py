@@ -134,7 +134,24 @@ def channel_indices(tcm, table_id):
     to. Served from ``tcm.cache`` when there is one — every aggregator needs
     these for every operation, and recomputing them is a full jagged reduction
     over the chunk.
+
+    Raises
+    ------
+    ValueError
+        If *table_id* is ``None``, i.e. the channel name did not match the
+        table format.  :func:`get_tcm_id_by_pattern` returns ``None`` for those,
+        and callers that mean to skip them must filter on it (as
+        :func:`~pygama.evt.build_evt.build_evt` does) rather than pass the
+        ``None`` through.
     """
+    if table_id is None:
+        msg = (
+            "cannot locate hits for a channel whose name does not match the "
+            "table format (get_tcm_id_by_pattern returned None); filter such "
+            "channels out or correct the channel name in the config"
+        )
+        raise ValueError(msg)
+
     cache = getattr(tcm, "cache", None)
     if cache is not None:
         return cache.channel_indices(tcm, table_id)
