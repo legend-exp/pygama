@@ -27,7 +27,9 @@ def test_noise_optimization_does_not_mutate_outputs(monkeypatch):
         noise_optimization_module, "simple_gaussian_fit", fake_simple_gaussian_fit
     )
 
-    dsp_proc_chain = {"outputs": ["wf_psd", "energy"]}
+    # extra unread outputs (wf_presum, bl_mean) and two optimisation entries
+    # sharing one ene_str: the grid runs must request exactly ["energy"]
+    dsp_proc_chain = {"outputs": ["wf_psd", "energy", "wf_presum", "bl_mean"]}
     noise_optimization_module.noise_optimization(
         tb_data=object(),
         dsp_proc_chain=dsp_proc_chain,
@@ -39,10 +41,15 @@ def test_noise_optimization_does_not_mutate_outputs(monkeypatch):
             "step_val": 1,
             "optimization": {
                 "trap": {
-                    "dict_str": "trap",
+                    "dict_str": "etrap",
                     "filter_par": "rise",
                     "ene_str": "energy",
-                }
+                },
+                "cusp": {
+                    "dict_str": "cusp",
+                    "filter_par": "sigma",
+                    "ene_str": "energy",
+                },
             },
             "perform_fit": True,
             "dx": 1,
@@ -52,7 +59,7 @@ def test_noise_optimization_does_not_mutate_outputs(monkeypatch):
         _lh5_path="",
     )
 
-    assert dsp_proc_chain["outputs"] == ["wf_psd", "energy"]
+    assert dsp_proc_chain["outputs"] == ["wf_psd", "energy", "wf_presum", "bl_mean"]
     assert outputs_seen == [["energy"], ["energy"]]
 
 

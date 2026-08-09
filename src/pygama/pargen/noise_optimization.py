@@ -112,9 +112,12 @@ def noise_optimization(
         plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
         plt.close()
 
-    dsp_proc_chain = {**dsp_proc_chain, "outputs": dsp_proc_chain["outputs"].copy()}
-    if opt_dict.get("fft_field", "wf_psd") in dsp_proc_chain["outputs"]:
-        dsp_proc_chain["outputs"].remove(opt_dict.get("fft_field", "wf_psd"))
+    # the grid-search loop only ever reads the ene_str fields, so request just
+    # those: dspeed then skips every unused output buffer -- most notably
+    # wf_presum, a waveform-length output (~160 MB at the production 10k
+    # events) that was otherwise reallocated on every grid point
+    ene_outputs = list(dict.fromkeys(cfg["ene_str"] for cfg in opt_dict_par.values()))
+    dsp_proc_chain = {**dsp_proc_chain, "outputs": ene_outputs}
 
     result_dict = {}
     ene_pars = list(opt_dict_par.keys())
