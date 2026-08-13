@@ -244,7 +244,9 @@ def query_meta(
         else:
             run_records = ak.Array(runs)
         if len(run_records) == 0:
-            msg = "no run records were found"
+            msg = f"No run records were found for \"{runs}\". If your query seems correct, "\
+            "try setting tiers argument to omit tiers with no files. Call query_runs "\
+            "with join = \"outer\" to identify tiers with no files!"
             raise ValueError(msg)
 
         # set up the status bar
