@@ -1,19 +1,19 @@
+from __future__ import annotations
+
 from collections.abc import Collection, Mapping
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor
 from contextlib import ExitStack
 from inspect import signature
 from pathlib import Path
 
 import awkward as ak
 import hist
-import numpy as np
 import pandas as pd
-from . import query_meta, query_runs
-from .utils import parse_query_paths
 from rich.console import Console
 from rich.status import Status
 
-from . import build_iterator
+from . import build_iterator, query_meta, query_runs
+from .utils import _setup_executor, _setup_spinner, parse_query_paths
 
 
 def query_hist(
@@ -23,8 +23,8 @@ def query_hist(
     entries: str,
     *,
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
-    processes: Executor | int = None,
-    executor: Executor = None,
+    processes: int | None = None,
+    executor: Executor | None = None,
     progress: Status | Console | bool = True,
     **kwargs,
 ):
@@ -153,36 +153,21 @@ def query_hist(
     entries_fields = parse_query_paths(entries)
 
     with ExitStack() as stack:
-        if processes is None and isinstance(executor, Executor):
-            processes = executor._max_workers
-
-        if executor is None and isinstance(processes, int):
-            executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
+        processes, executor = _setup_executor(stack, processes, executor)
+        status = _setup_spinner(stack, progress)
 
         # split kwargs up based on which function they should feed into
         bi_kwargs = {}
         hist_kwargs = {}
-        for k in kwargs:
+        for k, kwarg in kwargs.items():
             if (
                 k in signature(build_iterator).parameters
                 or k in signature(query_meta).parameters
                 or k in signature(query_runs).parameters
             ):
-                bi_kwargs[k] = kwargs[k]
+                bi_kwargs[k] = kwarg
             else:
-                hist_kwargs[k] = kwargs[k]
+                hist_kwargs[k] = kwarg
 
         lh5_it, alias_map = build_iterator(
             {f for f, _, _ in field_info + entries_fields},
@@ -196,9 +181,9 @@ def query_hist(
             **bi_kwargs,
         )
 
-        for (_, alias, path), a in zip(field_info, ax):
+        for (_, alias, path), a in zip(field_info, ax, strict=False):
             # add lh5 fields to alias map
-            if not path in alias_map:
+            if path not in alias_map:
                 alias_map[path] = alias if alias is not None else path
             if not a.label:
                 a.label = alias_map.get(path)
@@ -206,7 +191,7 @@ def query_hist(
         if status:
             status.update("Filling histogram...", spinner="betaWave")
 
-        ret = lh5_it.hist(
+        return lh5_it.hist(
             ax,
             where=entries,
             keys=[alias_map[path] for _, _, path in field_info],
@@ -215,5 +200,3 @@ def query_hist(
             progress=status.console if status else None,
             **hist_kwargs,
         )
-
-    return ret

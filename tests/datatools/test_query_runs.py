@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pygama.flow import list_run_fields
+from pygama.datatools import list_run_fields
 
 
 def test_list_run_fields():

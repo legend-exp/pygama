@@ -1,18 +1,25 @@
-import os
+from __future__ import annotations
+
 from collections.abc import Collection, Mapping
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor
 from contextlib import ExitStack
 from pathlib import Path
 
 import awkward as ak
 import numpy as np
 import pandas as pd
-from dbetto import Props
-from . import query_runs
-from .utils import format_vars, parse_query_paths
 from lh5 import LH5Iterator
 from rich.console import Console
 from rich.status import Status
+
+from . import query_runs
+from .utils import (
+    _read_dataflow_config,
+    _setup_executor,
+    _setup_spinner,
+    parse_query_paths,
+)
+
 
 def query_evt(
     fields: Collection[str],
@@ -20,12 +27,12 @@ def query_evt(
     events: str,
     *,
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
-    tiers: Collection[str] = None,
-    tables: Mapping[str,str] = None,
+    tiers: Collection[str] | None = None,
+    tables: Mapping[str, str] | None = None,
     return_query_vals: bool = False,
-    processes: Executor | int = None,
-    executor: Executor = None,
-    library: str = None,
+    processes: Executor | int | None = None,
+    executor: Executor | None = None,
+    library: str | None = None,
     progress: Status | Console | bool = True,
     **kwargs,
 ):
@@ -114,48 +121,23 @@ def query_evt(
     kwargs
         see :meth:`query_runs`
     """
-    if isinstance(dataflow_config, (Path, str)):
-        df_config = Props.read_from(
-            os.path.expandvars(dataflow_config), subst_pathvar=True
-        )
-    elif isinstance(dataflow_config, Mapping):
-        df_config = dataflow_config
-    else:
-        msg = "dataflow_config must be a str, Path, or Mapping"
-        raise ValueError(msg)
-    df_paths = df_config["paths"]
-    query_config = df_config.get("query", {})
 
     field_info = [parse_query_paths(f, fullmatch=True) for f in fields]
     events_fields = parse_query_paths(events)
     all_paths = {path for _, _, path in field_info + events_fields}
 
     with ExitStack() as stack:
-        if processes is None and isinstance(executor, Executor):
-            processes = executor._max_workers
-
-        if executor is None and isinstance(processes, int):
-            executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
+        processes, executor = _setup_executor(stack, processes, executor)
+        status = _setup_spinner(stack, progress)
+        df_config, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
         # Query (or convert) run_records
         if runs is None or isinstance(runs, str):
             run_records = query_runs(
                 runs,
                 dataflow_config=df_config,
-                progress = status,
-                tiers = tiers,
+                progress=status,
+                tiers=tiers,
                 **kwargs,
             )
         else:
@@ -183,9 +165,11 @@ def query_evt(
             tier_dir = df_paths[f"tier_{tier}"]
             lh5_files = [
                 [f"{relpath}/{cycle}-tier_{tier}.lh5"]
-                for relpath, cycle in zip(run_records["relpath"], run_records["cycle"])
+                for relpath, cycle in zip(
+                    run_records["relpath"], run_records["cycle"], strict=True
+                )
             ]
-            groups = [ [tables[tier]] ]*len(lh5_files)
+            groups = [[tables[tier]]] * len(lh5_files)
 
             new_it = LH5Iterator(
                 lh5_files,
@@ -209,7 +193,7 @@ def query_evt(
         if status:
             status.update("Querying data...")
 
-        tb_out = lh5_it.query(
+        return lh5_it.query(
             events,
             fields=fields if not return_query_vals else None,
             processes=processes,
@@ -217,5 +201,3 @@ def query_evt(
             library=library,
             progress=status.console if status else None,
         )
-
-        return tb_out

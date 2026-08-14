@@ -1,19 +1,20 @@
+from __future__ import annotations
+
 import os
 import re
 from collections.abc import Collection, Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
-from contextlib import chdir, ExitStack
+from contextlib import ExitStack, chdir
 from copy import copy
 from pathlib import Path
-from rich.console import Console
-from rich.status import Status
 
 import awkward as ak
 import numpy as np
-import pandas as pd
-from dbetto import Props, TextDB
+from dbetto import TextDB
+from rich.console import Console
+from rich.status import Status
 
-from .utils import get_recursive
+from .utils import _read_dataflow_config, _setup_executor, _setup_spinner, get_recursive
 
 
 def query_runs(
@@ -24,7 +25,7 @@ def query_runs(
     sort_by: str | Collection[str] = "cycle",
     cycle_def: str | None = None,
     tiers: str | Collection[str] | Mapping[str, str] | None = None,
-    join: str = 'inner',
+    join: str = "inner",
     ignored_cycles: str | Collection[str] | None = None,
     processes: int | None = None,
     executor: Executor | None = None,
@@ -116,29 +117,9 @@ def query_runs(
         or:class:`rich.Console`
     """
     with ExitStack() as stack:
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
-
-        if isinstance(dataflow_config, (Path, str)):
-            df_config = Props.read_from(
-                os.path.expandvars(dataflow_config), subst_pathvar=True
-            )
-        elif isinstance(dataflow_config, Mapping):
-            df_config = dataflow_config
-        else:
-            msg = "dataflow_config must be a str, Path, or Mapping"
-            raise ValueError(msg)
-        df_paths = df_config.get("paths")
-        query_config = df_config.get("query", {})
+        _, executor = _setup_executor(stack, processes, executor)
+        _setup_spinner(stack, progress)
+        _, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
         if cycle_def is None:
             if "cycle_def" not in query_config:
@@ -159,15 +140,15 @@ def query_runs(
         if ignored_cycles is None:
             ignored_cycles = query_config.get("ignored_cycles", None)
 
-        if join == 'inner':
+        if join == "inner":
             this_tier = tier_list[0]
             other_tiers = tier_list[1:]
-        elif join == 'outer':
+        elif join == "outer":
             this_tier = tier_list[0]
             other_tiers = []
         elif this_tier := next((t for t in tier_list if f"tier_{join}" == t[0]), False):
             # if join is a tier name, find the matching entry in tiers
-            other_tiers = [t for t in tier_list if t != this_tier ]
+            other_tiers = [t for t in tier_list if t != this_tier]
         else:
             msg = f"invalid join argument {join}"
             raise ValueError(msg)
@@ -194,9 +175,11 @@ def query_runs(
             relpath = dirpath[2:]  # get rid of ./
 
             # Prune subdirectories that are not in all tiers
-            if join == 'inner':
+            if join == "inner":
                 for subdir in copy(dirnames):
-                    if not all(Path(p, relpath, subdir).is_dir() for _, p in other_tiers):
+                    if not all(
+                        Path(p, relpath, subdir).is_dir() for _, p in other_tiers
+                    ):
                         dirnames.remove(subdir)
 
             if executor is None:
@@ -206,7 +189,7 @@ def query_runs(
                     col_names,
                     this_tier,
                     other_tiers,
-                    join == 'inner',
+                    join == "inner",
                     removed,
                     runs,
                 )
@@ -219,7 +202,7 @@ def query_runs(
                         col_names,
                         this_tier,
                         other_tiers,
-                        join == 'inner',
+                        join == "inner",
                         removed,
                         runs,
                     )
@@ -229,32 +212,36 @@ def query_runs(
             records = [r for recs in records for r in recs.result()]
 
         # If outer join, recursively query other tiers and perform outer join
-        if join == 'outer' and len(tiers)>1:
+        if join == "outer" and len(tiers) > 1:
             other = query_runs(
-                runs = runs,
-                dataflow_config = dataflow_config,
-                group_by = None,
-                sort_by = sort_by,
-                tiers = tiers[1:],
-                join = 'outer',
-                ignored_cycles = ignored_cycles,
-                processes = processes,
-                executor = executor,
-                library = 'pd',
-                progress = status,
+                runs=runs,
+                dataflow_config=dataflow_config,
+                group_by=None,
+                sort_by=sort_by,
+                tiers=tiers[1:],
+                join="outer",
+                ignored_cycles=ignored_cycles,
+                processes=processes,
+                executor=executor,
+                library="pd",
+                progress=progress,
             )
 
             if len(other) == 0:
-                records = [ r | {f"tier_{t}": None for t in tiers[1:]} for r in records ]
+                records = [r | {f"tier_{t}": None for t in tiers[1:]} for r in records]
             elif len(records) == 0:
-                records = [ r | {f"tier_{this_tier}": None} for r in other ]
+                records = [r | {f"tier_{this_tier}": None} for r in other]
             else:
-                records = pd.merge(
-                    ak.to_dataframe(records),
-                    other,
-                    on = ["cycle", "relpath"] + col_names,
-                    how = "outer"
-                ).where(records.notna(), None).to_dict(orient='records')
+                records = (
+                    ak.to_dataframe(records)
+                    .merge(
+                        other,
+                        on=["cycle", "relpath", *col_names],
+                        how="outer",
+                    )
+                    .where(records.notna(), None)
+                    .to_dict(orient="records")
+                )
 
         # Format and return results
         records.sort(
@@ -291,6 +278,7 @@ def query_runs(
         msg = "library must be 'ak', 'pd' or 'np'"
         raise ValueError(msg)
 
+
 def list_run_fields(
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
     cycle_def: str | None = None,
@@ -322,17 +310,7 @@ def list_run_fields(
         - List of tier names/single tier name. Paths will be found in ``dataflow_config["paths"]``
         - ``None``: read from ``dataflow_config``; if ``tiers`` entry not found, use ``"raw"``
     """
-    if isinstance(dataflow_config, (Path, str)):
-        df_config = Props.read_from(
-            os.path.expandvars(dataflow_config), subst_pathvar=True
-        )
-    elif isinstance(dataflow_config, Mapping):
-        df_config = dataflow_config
-    else:
-        msg = "dataflow_config must be a str, Path, or Mapping"
-        raise ValueError(msg)
-    df_paths = df_config.get("paths")
-    query_config = df_config.get("query", {})
+    _, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
     if cycle_def is None:
         if "cycle_def" not in query_config:
@@ -350,7 +328,8 @@ def list_run_fields(
     else:
         tiers = [(f"tier_{t}", df_paths[f"tier_{t}"]) for t in tiers]
 
-    return {"relpath", "cycle"} | set(cycle_def.split("-")) | set(t[0] for t in tiers)
+    return {"relpath", "cycle"} | set(cycle_def.split("-")) | {t[0] for t in tiers}
+
 
 def _get_run_records_loop(
     files: list[str],

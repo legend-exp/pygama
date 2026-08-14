@@ -1,7 +1,9 @@
-import os
+from __future__ import annotations
+
+import logging
 import sys
 from collections.abc import Collection, Mapping
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor
 from contextlib import ExitStack
 from copy import copy
 
@@ -12,17 +14,25 @@ else:
 from pathlib import Path
 
 import awkward as ak
+import legendmeta
 import numpy as np
 import pandas as pd
+from dbetto import TextDB
+from legendmeta import MetadataRepository
 from rich.console import Console
 from rich.status import Status
 
-from dbetto import Props, TextDB
-import legendmeta
-from legendmeta import MetadataRepository
+from .query_runs import query_runs
+from .utils import (
+    _read_dataflow_config,
+    _setup_executor,
+    _setup_spinner,
+    format_vars,
+    get_recursive,
+    parse_query_paths,
+)
 
-from . import query_runs
-from .utils import get_recursive, format_vars, parse_query_paths
+log = logging.getLogger(__name__)
 
 
 def query_meta(
@@ -200,35 +210,9 @@ def query_meta(
         see :meth:`query_runs`
     """
     with ExitStack() as stack:
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
-
-        if processes is None and isinstance(executor, Executor):
-            processes = executor._max_workers
-
-        if executor is None and isinstance(processes, int):
-            executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-        if isinstance(dataflow_config, (Path, str)):
-            df_config = Props.read_from(
-                os.path.expandvars(dataflow_config), subst_pathvar=True
-            )
-        elif isinstance(dataflow_config, Mapping):
-            df_config = dataflow_config
-        else:
-            msg = "dataflow_config must be a str, Path, or Mapping"
-            raise ValueError(msg)
-        df_paths = df_config["paths"]
-        query_config = df_config.get("query", {})
+        processes, executor = _setup_executor(stack, processes, executor)
+        status = _setup_spinner(stack, progress)
+        df_config, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
         # Query (or convert) run_records
         if runs is None or isinstance(runs, str):
@@ -244,9 +228,11 @@ def query_meta(
         else:
             run_records = ak.Array(runs)
         if len(run_records) == 0:
-            msg = f"No run records were found for \"{runs}\". If your query seems correct, "\
-            "try setting tiers argument to omit tiers with no files. Call query_runs "\
-            "with join = \"outer\" to identify tiers with no files!"
+            msg = (
+                f'No run records were found for "{runs}". If your query seems correct, '
+                "try setting tiers argument to omit tiers with no files. Call query_runs "
+                'with join = "outer" to identify tiers with no files!'
+            )
             raise ValueError(msg)
 
         # set up the status bar
@@ -298,7 +284,11 @@ def query_meta(
                 col_name_map[path] = alias
 
             # path can only be aliased to a single name
-            elif path in col_name_map and alias is not None and alias != col_name_map[path]:
+            elif (
+                path in col_name_map
+                and alias is not None
+                and alias != col_name_map[path]
+            ):
                 msg = f"{path} assigned multiple alias names ({alias}, {col_name_map[path]})"
                 raise ValueError(msg)
 
@@ -370,7 +360,7 @@ def query_meta(
             raise ValueError(msg)
 
         for t in tiers:
-            if not f"par_{t}" in df_paths:
+            if f"par_{t}" not in df_paths:
                 continue
 
             if not any(v.split(".")[0] == f"@par_{t}" for v in col_name_map):
@@ -380,7 +370,7 @@ def query_meta(
             try:
                 db = TextDB(df_paths[f"par_{t}"], lazy=True)
                 db_list[f"@par_{t}"] = par_db_config | {"db": db}
-            except (ValueError) as e:
+            except ValueError as e:
                 msg = f"{df_paths[f'par_{t}']} not found for par_{t}"
                 raise ValueError(msg) from e
 
@@ -449,13 +439,13 @@ def query_meta(
         if library == "ak":
             result = ak.Array(records)
         elif library == "pd":
-            result = pd.json_normalize(records, sep='/')
-            cols = result.columns.str.split('/', expand=True)
+            result = pd.json_normalize(records, sep="/")
+            cols = result.columns.str.split("/", expand=True)
             # if columns are nested, they will be tuples; if nesting is uneven,
             # some tuples may have NaN; replace with '' to get better behavior
             if isinstance(cols[0], tuple):
                 result.columns = pd.MultiIndex.from_tuples(
-                    [[name if not pd.isna(name) else '' for name in c] for c in cols]
+                    [[name if not pd.isna(name) else "" for name in c] for c in cols]
                 )
         elif library == "np":
             if group_chans:

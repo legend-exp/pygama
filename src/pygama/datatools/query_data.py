@@ -1,17 +1,17 @@
+from __future__ import annotations
+
 from collections.abc import Collection, Mapping
-from concurrent.futures import Executor, ProcessPoolExecutor
+from concurrent.futures import Executor
 from contextlib import ExitStack
 from pathlib import Path
 
 import awkward as ak
-import numpy as np
 import pandas as pd
-
-from .utils import parse_query_paths
 from rich.console import Console
 from rich.status import Status
 
 from . import build_iterator
+from .utils import _setup_executor, _setup_spinner, parse_query_paths
 
 
 def query_data(
@@ -23,9 +23,9 @@ def query_data(
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
     return_query_vals: bool = False,
     return_alias_map: bool = False,
-    processes: Executor | int = None,
-    executor: Executor = None,
-    library: str = None,
+    processes: int | None = None,
+    executor: Executor | None = None,
+    library: str | None = None,
     progress: Status | Console | bool = True,
     **kwargs,
 ):
@@ -143,23 +143,8 @@ def query_data(
     entries_fields = parse_query_paths(entries)
 
     with ExitStack() as stack:
-        if processes is None and isinstance(executor, Executor):
-            processes = executor._max_workers
-
-        if executor is None and isinstance(processes, int):
-            executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
+        processes, executor = _setup_executor(stack, processes, executor)
+        status = _setup_spinner(stack, progress)
 
         lh5_it, alias_map = build_iterator(
             {f for f, _, _ in field_info + entries_fields},

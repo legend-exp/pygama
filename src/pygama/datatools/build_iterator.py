@@ -1,4 +1,5 @@
-import os
+from __future__ import annotations
+
 from collections.abc import Collection, Mapping
 from contextlib import ExitStack
 from pathlib import Path
@@ -6,13 +7,14 @@ from pathlib import Path
 import awkward as ak
 import numpy as np
 import pandas as pd
-from dbetto import Props
-from pygama.flow.query_runs import list_run_fields
-from . import query_meta
-from .utils import format_vars, parse_query_paths
 from lh5 import LH5Iterator
 from rich.console import Console
 from rich.status import Status
+
+from .query_meta import query_meta
+from .query_runs import list_run_fields
+from .utils import _read_dataflow_config, _setup_spinner, format_vars, parse_query_paths
+
 
 def build_iterator(
     fields: Collection[str],
@@ -20,8 +22,8 @@ def build_iterator(
     channels: str | ak.Array | Mapping[str, np.ndarray] | pd.DataFrame,
     *,
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
-    tiers: Collection[str] = None,
-    tables: Mapping[str, str] = None,
+    tiers: Collection[str] | None = None,
+    tables: Mapping[str, str] | None = None,
     return_alias_map: bool = False,
     progress: Status | Console | bool = True,
     **query_meta_kwargs,
@@ -81,32 +83,16 @@ def build_iterator(
         additional keyword arguments for :meth:`query_meta` and :meth:`query_runs`
     """
     with ExitStack() as stack:
-        # set up the status bar
-        if isinstance(progress, Status):
-            progress.update("Querying runs...")
-            # start spinner in context if not already started
-            status = progress if progress._live.is_started else stack.enter_context(progress)
-        elif isinstance(progress, Console):
-            status = stack.enter_context(progress.status("Querying runs...", spinner="betaWave"))
-        elif progress:
-            status = stack.enter_context(Status("Querying runs...", spinner="betaWave"))
-        else:
-            status = None
-
-        if isinstance(dataflow_config, (Path, str)):
-            df_config = Props.read_from(
-                os.path.expandvars(dataflow_config), subst_pathvar=True
-            )
-        elif isinstance(dataflow_config, Mapping):
-            df_config = dataflow_config
-        else:
-            raise ValueError("dataflow_config must be a str, Path, or Mapping")
-        df_paths = df_config["paths"]
-        query_config = df_config.get("query", {})
+        status = _setup_spinner(stack, progress)
+        df_config, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
         # identify fields we need to get from the metadata
         field_names = [parse_query_paths(f, fullmatch=True) for f in fields]
-        run_fields = list_run_fields(dataflow_config=df_config, tiers=tiers, cycle_def=query_meta_kwargs.get("cycle_def"))
+        run_fields = list_run_fields(
+            dataflow_config=df_config,
+            tiers=tiers,
+            cycle_def=query_meta_kwargs.get("cycle_def"),
+        )
         run_fields = {f for f, _, path in field_names if path in run_fields}
         meta_fields = {f for f, _, path in field_names if path[0] == "@"}
 
@@ -147,7 +133,9 @@ def build_iterator(
             tier_dir = df_paths[f"tier_{tier}"]
             lh5_files = [
                 [f"{relpath}/{cycle}-tier_{tier}.lh5"]
-                for relpath, cycle in zip(run_data["relpath"], run_data["cycle"])
+                for relpath, cycle in zip(
+                    run_data["relpath"], run_data["cycle"], strict=True
+                )
             ]
             tab_format = tables[tier]
             tab_fields = []
@@ -157,18 +145,18 @@ def build_iterator(
                 tab_fields.append(alias_map[path])
             if len(tab_fields) > 0:
                 tab_vals = ak.Array(
-                    {
-                        f: ar
-                        for f, ar in zip(
+                    dict(
+                        zip(
                             tab_fields,
                             ak.broadcast_arrays(*[run_data[f] for f in tab_fields]),
+                            strict=True,
                         )
-                    }
+                    )
                 )
                 groups = [
                     [
-                        tab_format.format(**{f: v for f, v in zip(rec.fields, vals)})
-                        for vals in zip(*[rec[f] for f in rec.fields])
+                        tab_format.format(**dict(zip(rec.fields, vals, strict=True)))
+                        for vals in zip(*[rec[f] for f in rec.fields], strict=True)
                     ]
                     for rec in tab_vals
                 ]
