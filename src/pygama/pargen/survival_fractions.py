@@ -408,6 +408,115 @@ def fail_pdf_hpge(
     )
 
 
+def log_pass_pdf_gos(
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,
+    hstep2,  # noqa: ARG001
+):
+    """Log-density counterpart of :func:`pass_pdf_gos` for ``iminuit``'s
+    ``log=True`` mode; same explicit signature (``iminuit`` introspects it)."""
+    return gauss_on_step.log_pdf_ext(
+        x, x_lo, x_hi, n_sig * epsilon_sig, mu, sigma, n_bkg * epsilon_bkg, hstep1
+    )
+
+
+def log_fail_pdf_gos(
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    hstep1,  # noqa: ARG001
+    hstep2,
+):
+    """Log-density counterpart of :func:`fail_pdf_gos` for ``iminuit``'s
+    ``log=True`` mode; same explicit signature (``iminuit`` introspects it)."""
+    return gauss_on_step.log_pdf_ext(
+        x,
+        x_lo,
+        x_hi,
+        n_sig * (1 - epsilon_sig),
+        mu,
+        sigma,
+        n_bkg * (1 - epsilon_bkg),
+        hstep2,
+    )
+
+
+def log_pass_pdf_hpge(
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    htail,
+    tau,
+    hstep1,
+    hstep2,  # noqa: ARG001
+):
+    """Log-density counterpart of :func:`pass_pdf_hpge` for ``iminuit``'s
+    ``log=True`` mode; same explicit signature (``iminuit`` introspects it)."""
+    return hpge_peak.log_pdf_ext(
+        x,
+        x_lo,
+        x_hi,
+        n_sig * epsilon_sig,
+        mu,
+        sigma,
+        htail,
+        tau,
+        n_bkg * epsilon_bkg,
+        hstep1,
+    )
+
+
+def log_fail_pdf_hpge(
+    x,
+    x_lo,
+    x_hi,
+    n_sig,
+    epsilon_sig,
+    n_bkg,
+    epsilon_bkg,
+    mu,
+    sigma,
+    htail,
+    tau,
+    hstep1,  # noqa: ARG001
+    hstep2,
+):
+    """Log-density counterpart of :func:`fail_pdf_hpge` for ``iminuit``'s
+    ``log=True`` mode; same explicit signature (``iminuit`` introspects it)."""
+    return hpge_peak.log_pdf_ext(
+        x,
+        x_lo,
+        x_hi,
+        n_sig * (1 - epsilon_sig),
+        mu,
+        sigma,
+        htail,
+        tau,
+        n_bkg * (1 - epsilon_bkg),
+        hstep2,
+    )
+
+
 def update_guess(func, parguess, energies):
     """
     Update the signal and background event-count guesses from data.
@@ -476,10 +585,14 @@ def get_survival_fraction(
     func=hpge_peak,
     fix_step=True,
     display=0,
+    use_log_pdf=False,
 ):
     """
     Function for calculating the survival fraction of a cut
     using a fit to the surviving and failing energy distributions.
+    When *use_log_pdf* is true the unbinned NLL costs are built from the
+    models' log-densities (``iminuit`` ``log=True`` mode) — faster on large
+    samples, results differ at machine-precision level.
 
     Parameters
     ----------
@@ -569,6 +682,7 @@ def get_survival_fraction(
             bounds_func=get_bounds,
             guess_kwargs={"peak": peak, "eres": eres_pars},
             fit_range=fit_range,
+            use_log_pdf=use_log_pdf,
         )
 
     guess_pars_surv = copy.deepcopy(pars)
@@ -604,13 +718,27 @@ def get_survival_fraction(
         parguess.update({"htail": pars["htail"], "tau": pars["tau"]})
 
     if func == hpge_peak:
+        pass_pdf, fail_pdf = (
+            (log_pass_pdf_hpge, log_fail_pdf_hpge)
+            if use_log_pdf
+            else (pass_pdf_hpge, fail_pdf_hpge)
+        )
         lh = cost.ExtendedUnbinnedNLL(
-            energy[(~nan_idxs) & (pass_idxs)], pass_pdf_hpge
-        ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (fail_idxs)], fail_pdf_hpge)
+            energy[(~nan_idxs) & (pass_idxs)], pass_pdf, log=use_log_pdf
+        ) + cost.ExtendedUnbinnedNLL(
+            energy[(~nan_idxs) & (fail_idxs)], fail_pdf, log=use_log_pdf
+        )
     elif func == gauss_on_step:
+        pass_pdf, fail_pdf = (
+            (log_pass_pdf_gos, log_fail_pdf_gos)
+            if use_log_pdf
+            else (pass_pdf_gos, fail_pdf_gos)
+        )
         lh = cost.ExtendedUnbinnedNLL(
-            energy[(~nan_idxs) & (pass_idxs)], pass_pdf_gos
-        ) + cost.ExtendedUnbinnedNLL(energy[(~nan_idxs) & (fail_idxs)], fail_pdf_gos)
+            energy[(~nan_idxs) & (pass_idxs)], pass_pdf, log=use_log_pdf
+        ) + cost.ExtendedUnbinnedNLL(
+            energy[(~nan_idxs) & (fail_idxs)], fail_pdf, log=use_log_pdf
+        )
 
     else:
         msg = (
@@ -667,10 +795,13 @@ def get_sf_sweep(
     mode="greater",
     fit_range=None,
     debug_mode=False,
+    use_log_pdf=False,
 ) -> tuple[pd.DataFrame, float, float]:
     """
     Function sweeping through cut values and calculating the survival fraction for each value
-    using a fit to the surviving and failing enegry distributions.
+    using a fit to the surviving and failing energy distributions.
+    When *use_log_pdf* is true the unbinned NLL costs are built from the
+    models' log-densities (``iminuit`` ``log=True`` mode).
 
     Parameters
     ----------
@@ -730,6 +861,7 @@ def get_sf_sweep(
         bounds_func=get_bounds,
         guess_kwargs={"peak": peak, "eres": eres_pars},
         fit_range=fit_range,
+        use_log_pdf=use_log_pdf,
     )
 
     for cut_val in cut_vals:
@@ -745,6 +877,7 @@ def get_sf_sweep(
                 mode=mode,
                 pars=pars,
                 func=func,
+                use_log_pdf=use_log_pdf,
             )
             out_df = pd.concat(
                 [out_df, pd.DataFrame([{"cut_val": cut_val, "sf": sf, "sf_err": err}])]
@@ -771,6 +904,7 @@ def get_sf_sweep(
             mode=mode,
             pars=pars,
             func=func,
+            use_log_pdf=use_log_pdf,
         )
     else:
         sf = None

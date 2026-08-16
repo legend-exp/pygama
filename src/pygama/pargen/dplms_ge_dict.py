@@ -48,7 +48,10 @@ def dplms_ge_dict(
     par_dsp
         Dictionary with db parameters for dsp processing
     dplms_dict
-        Dictionary with various parameters
+        Dictionary with various parameters.  Optional key ``use_log_pdf``
+        (default False): build the FOM's unbinned fits from the model's
+        log-density (``iminuit`` ``log=True`` mode) — faster on large
+        samples, results differ at machine-precision level.
     fom_func
         Function for peak fits
 
@@ -140,10 +143,29 @@ def dplms_ge_dict(
     coeff_keys = list(dp_coeffs.keys())
     lists = [dp_coeffs[key] for key in dp_coeffs]
 
+    use_log_pdf = dplms_dict.get("use_log_pdf", False)
+
     prod = list(itertools.product(*lists))
     grid_dict = {}
     min_fom = float("inf")
     min_idx = None
+
+    # signal selection and the signal-shape matrices depend only on the rt
+    # (risetime percentile) and pt (pile-up threshold) coefficients, so cache
+    # them: for grids that only vary nm/za/pl/ft they are computed once
+    sel_matrix_cache = {}
+
+    def selection_and_matrices(coeff_values):
+        key = (
+            coeff_values.get("rt", dplms_dict["dp_def"]["rt"]),
+            coeff_values.get("pt", dplms_dict["dp_def"]["pt"]),
+        )
+        if key not in sel_matrix_cache:
+            sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
+            wfs = dsp_cal[wf_field].nda[sel_dict["idxs"], :]
+            matrices = signal_matrices(wfs, dplms_dict["length"], decay_const)
+            sel_matrix_cache[key] = (sel_dict, matrices, len(wfs))
+        return sel_matrix_cache[key]
 
     for i, values in enumerate(prod):
         coeff_values = dict(zip(coeff_keys, values, strict=False))
@@ -154,11 +176,10 @@ def dplms_ge_dict(
 
         grid_dict[i] = coeff_values
 
-        sel_dict = signal_selection(dsp_cal, dplms_dict, coeff_values)
-        wfs = dsp_cal[wf_field].nda[sel_dict["idxs"], :]
-        log.info("... %s signals after signal selection", len(wfs))
+        sel_dict, matrices, n_wfs = selection_and_matrices(coeff_values)
+        log.info("... %s signals after signal selection", n_wfs)
 
-        ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
+        ref, rmat, pmat, fmat = matrices
 
         t_tmp = time.time()
         nm_coeff = coeff_values["nm"]
@@ -192,6 +213,7 @@ def dplms_ge_dict(
                 ctc_par,
                 idxs=np.where(~np.isnan(dsp_opt[ctc_par].nda))[0],
                 frac_max=0.5,
+                use_log_pdf=use_log_pdf,
             )
         except Exception as e:
             log.debug(
@@ -294,10 +316,10 @@ def dplms_ge_dict(
         alpha = 0
 
     # filter synthesis
-    sel_dict = signal_selection(dsp_cal, dplms_dict, best_case_values)
+    sel_dict, matrices, _ = selection_and_matrices(best_case_values)
     idxs = sel_dict["idxs"]
     wfs = dsp_cal[wf_field].nda[idxs, :]
-    ref, rmat, pmat, fmat = signal_matrices(wfs, dplms_dict["length"], decay_const)
+    ref, rmat, pmat, fmat = matrices
 
     x, _y, _refy = filter_synthesis(
         ref,
@@ -496,7 +518,7 @@ def is_not_pile_up(
     Returns
     -------
     idxs
-        Per-event mask; True means the event is pile-up free.
+        Per-event boolean mask; True means the event is pile-up free.
     llow
         Lower boundary of the accepted peak band (samples).
     lupp
@@ -516,14 +538,16 @@ def is_not_pile_up(
 
     llow, lupp = bin_edges[idx_low], bin_edges[idx_upp]
 
-    idxs = []
-    for n, nn in zip(peak_pos, peak_pos_neg, strict=False):
-        condition1 = np.count_nonzero(n > 0) == 1
-        condition2 = (
-            np.count_nonzero((n > 0) & ((n < llow) | (n > lupp) & (n < size))) == 0
+    pos = peak_pos > 0
+    condition1 = np.count_nonzero(pos, axis=1) == 1
+    condition2 = (
+        np.count_nonzero(
+            pos & ((peak_pos < llow) | (peak_pos > lupp) & (peak_pos < size)), axis=1
         )
-        condition3 = np.count_nonzero(nn > 0) == 0
-        idxs.append(condition1 and condition2 and condition3)
+        == 0
+    )
+    condition3 = np.count_nonzero(peak_pos_neg > 0, axis=1) == 0
+    idxs = condition1 & condition2 & condition3
     return idxs, llow, lupp
 
 
