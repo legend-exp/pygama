@@ -243,3 +243,35 @@ class TestStageTags:
             )
         assert np.isnan(cal.dt_fit_pars).all()
         assert "binned LQ fit at DEP failed" in caplog.text
+
+    def test_hpge_fit_energy_peaks_tags_fit_window(self, monkeypatch, caplog):
+        rng = np.random.default_rng(0)
+        energies = np.concatenate(
+            [
+                rng.uniform(100, 26000, 20000),
+                rng.normal(26145, 10, 10000),
+            ]
+        ).round()
+        cal = energy_cal.HPGeCalibration(
+            "energy", [2614.5], 2614.5 / 26145, deg=0, uncal_is_int=True
+        )
+        cal.hpge_get_energy_peaks(energies)
+
+        def boom(*_args, **_kwargs):
+            msg = "synthetic binning blowup"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(energy_cal.pgh, "better_int_binning", boom)
+
+        with caplog.at_level(logging.DEBUG, logger="pygama.pargen.energy_cal"):
+            cal.hpge_fit_energy_peaks(
+                energies, peak_pars=[(2614.5, (20, 20), pgd.hpge_peak)]
+            )
+
+        # the setup failure is contained by the per-peak fallback: the loop
+        # completes, the peak is recorded as invalid with nan binning, and the
+        # failing stage is named
+        pk_dict = cal.results["hpge_fit_energy_peaks"]["peak_parameters"][2614.5]
+        assert pk_dict["validity"] is False
+        assert np.isnan(pk_dict["bin_width"])
+        assert "computing fit window failed" in caplog.text

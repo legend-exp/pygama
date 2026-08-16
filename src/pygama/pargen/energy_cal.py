@@ -567,22 +567,30 @@ class HPGeCalibration:
         fit_dict = {}
 
         for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
-            # cheap setup: compute the fit window before the guarded region so
-            # an early failure cannot leak stale binning into fit_dict
+            # the fit window is computed per-iteration before the guarded
+            # region so a failure cannot leak stale binning into fit_dict; the
+            # fallible parts (binning, selection) stay inside the per-peak
+            # fallback below
             peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
             wleft_i, wright_i = wwidth_i
             euc_min = mode_guess - wleft_i
             euc_max = mode_guess + wright_i
-
-            if self.uncal_is_int is True:
-                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
-                )
-
-            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
-            binw_1 = (euc_max - euc_min) / n_bins_i
+            binw_1 = np.nan
 
             try:
+                try:
+                    if self.uncal_is_int is True:
+                        euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                            x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                        )
+                    energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][
+                        :n_events
+                    ]
+                    binw_1 = (euc_max - euc_min) / n_bins_i
+                except Exception as e:
+                    msg = f"computing fit window failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
+
                 try:
                     x0 = get_hpge_energy_peak_par_guess(
                         energies,
@@ -950,18 +958,27 @@ class HPGeCalibration:
         for i_peak, uncal_peak_par in enumerate(uncal_peak_pars):
             peak_kev, mode_guess, wwidth_i, n_bins_i, func_i = uncal_peak_par
             wleft_i, wright_i = wwidth_i
-            # cheap setup: compute the fit window before the guarded region so
-            # an early failure cannot leak stale binning into fit_dict
+            # the fit window is computed per-iteration before the guarded
+            # region so a failure cannot leak stale binning into fit_dict; the
+            # fallible parts (binning, selection) stay inside the per-peak
+            # fallback below
             euc_min = mode_guess - wleft_i
             euc_max = mode_guess + wright_i
-
-            if self.uncal_is_int is True:
-                euc_min, euc_max, n_bins_i = pgh.better_int_binning(
-                    x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
-                )
-            energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][:n_events]
-            binw_1 = (euc_max - euc_min) / n_bins_i
+            binw_1 = np.nan
             try:
+                try:
+                    if self.uncal_is_int is True:
+                        euc_min, euc_max, n_bins_i = pgh.better_int_binning(
+                            x_lo=euc_min, x_hi=euc_max, n_bins=n_bins_i
+                        )
+                    energies = e_uncal[(e_uncal > euc_min) & (e_uncal < euc_max)][
+                        :n_events
+                    ]
+                    binw_1 = (euc_max - euc_min) / n_bins_i
+                except Exception as e:
+                    msg = f"computing fit window failed at loc {mode_guess:g}"
+                    raise RuntimeError(msg) from e
+
                 try:
                     if method == "unbinned":
                         (
