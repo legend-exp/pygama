@@ -651,7 +651,7 @@ class LQCal:
             self.dt_fit_pars = result
 
             try:
-                 df[out_param] = (
+                df[out_param] = (
                     df[lq_param]
                     - df[self.dt_param] * self.dt_fit_pars[0]
                     - self.dt_fit_pars[1]
@@ -659,7 +659,6 @@ class LQCal:
             except Exception as e:
                 msg = "applying LQ drift-time correction failed"
                 raise RuntimeError(msg) from e
-           
 
         except Exception as e:
             if self.debug_mode:
@@ -729,7 +728,6 @@ class LQCal:
             except Exception as e:
                 msg = "applying LQ classifier/cut to data failed"
                 raise RuntimeError(msg) from e
-            
 
         except Exception as e:
             if self.debug_mode:
@@ -874,7 +872,6 @@ class LQCal:
                     except Exception as e:
                         msg = "survival-fraction fit failed"
                         raise RuntimeError(msg) from e
-                    
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,

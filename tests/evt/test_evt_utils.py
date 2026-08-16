@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import types
+
+import awkward as ak
 import lh5
 import numpy as np
+import pytest
 from lgdo import Array
 
 from pygama.evt import utils
@@ -78,5 +82,31 @@ def test_make_numpy_full_promotes_to_hold_both():
 
 def test_make_numpy_full_accepts_python_types():
     """``evaluate_to_first_or_last`` passes ``type(default_value)`` as the dtype."""
-    assert utils.make_numpy_full(2, 0, type(0)).dtype == np.dtype(int)
-    assert utils.make_numpy_full(2, 0.0, type(0.0)).dtype == np.dtype(float)
+    assert utils.make_numpy_full(2, 0, int).dtype == np.dtype(int)
+    assert utils.make_numpy_full(2, 0.0, float).dtype == np.dtype(float)
+
+
+def test_channel_indices_rejects_an_unresolved_table_id():
+    """A channel name that does not match the table format must fail clearly.
+
+    ``get_tcm_id_by_pattern`` returns ``None`` for such names, and both the
+    cached and uncached paths would otherwise die inside awkward with an
+    opaque "None conversion/promotion is disabled" TypeError.
+    """
+    tcm = types.SimpleNamespace(
+        table_key=ak.Array([[1, 2], [3]]),
+        row_in_table=ak.Array([[0, 1], [2]]),
+    )
+
+    # uncached path
+    with pytest.raises(ValueError, match="does not match the table format"):
+        utils.channel_indices(tcm, None)
+
+    # and with a cache attached, so both routes agree
+    tcm.cache = utils.EvtCache()
+    with pytest.raises(ValueError, match="does not match the table format"):
+        utils.channel_indices(tcm, None)
+
+    # a resolvable id still works
+    assert utils.get_tcm_id_by_pattern("ch{}", "ch3") == 3
+    assert utils.get_tcm_id_by_pattern("ch{}", "not-a-channel") is None

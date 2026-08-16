@@ -883,15 +883,15 @@ def bimodal_dt_fit(
 
             try:
                 aoe_pars, aoe_errs, _, _ = unbinned_aoe_fit(
-                                final_df.query(aoe_grp1)[aoe_param],
-                                pdf=pdf,
-                                display=display,
-                                use_log_pdf=use_log_pdf,
-                            )
+                    final_df.query(aoe_grp1)[aoe_param],
+                    pdf=pdf,
+                    display=display,
+                    use_log_pdf=use_log_pdf,
+                )
             except Exception as e:
                 msg = "A/E fit of drift-time population 1 failed"
                 raise RuntimeError(msg) from e
-            
+
             dt_res_dict["aoe_fit1"] = {
                 "pars": aoe_pars.to_dict(),
                 "errs": aoe_errs.to_dict(),
@@ -899,15 +899,15 @@ def bimodal_dt_fit(
 
             try:
                 aoe_pars2, aoe_errs2, _, _ = unbinned_aoe_fit(
-                                final_df.query(aoe_grp2)[aoe_param],
-                                pdf=pdf,
-                                display=display,
-                                use_log_pdf=use_log_pdf,
-                            )
+                    final_df.query(aoe_grp2)[aoe_param],
+                    pdf=pdf,
+                    display=display,
+                    use_log_pdf=use_log_pdf,
+                )
             except Exception as e:
                 msg = "A/E fit of drift-time population 2 failed"
                 raise RuntimeError(msg) from e
-            
+
             dt_res_dict["aoe_fit2"] = {
                 "pars": aoe_pars2.to_dict(),
                 "errs": aoe_errs2.to_dict(),

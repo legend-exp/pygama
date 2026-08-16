@@ -25,6 +25,30 @@ from pygama.pargen.utils import require_config_keys
 log = logging.getLogger(__name__)
 
 
+def _batched_mean_psd(tb_data, dsp_proc_chain, par_dsp, fft_field, batch_size):
+    """Mean PSD over *tb_data*, processed in slices of *batch_size* waveforms.
+
+    Only *fft_field* is requested from the proc chain, so dspeed builds just
+    the subgraph it needs and the energy-filter outputs are skipped entirely.
+    The single full-table, full-output run this replaces was the memory peak
+    of the whole optimisation (~2 GB for 10k waveforms of 32k samples).
+    """
+    fft_chain = {**dsp_proc_chain, "outputs": [fft_field]}
+    psd_sum = None
+    n = 0
+    for start in range(0, len(tb_data), batch_size):
+        batch_psd = run_one_dsp(
+            tb_data[start : start + batch_size], fft_chain, db_dict=par_dsp
+        )[fft_field].values.nda
+        s = batch_psd.sum(axis=0, dtype=np.float64)
+        psd_sum = s if psd_sum is None else psd_sum + s
+        n += len(batch_psd)
+    if n == 0:
+        msg = "no waveforms to compute the FFT plot from"
+        raise ValueError(msg)
+    return psd_sum / n
+
+
 def noise_optimization(
     tb_data: lgdo.Table,
     dsp_proc_chain: dict,
@@ -45,7 +69,10 @@ def noise_optimization(
     par_dsp
         Dictionary with default DSP parameters.
     opt_dict
-        Dictionary with parameters for the optimisation.
+        Dictionary with parameters for the optimisation.  The optional key
+        ``fft_field`` (default ``wf_psd``) names the PSD output of the proc
+        chain; ``fft_batch_size`` (default 1000) sets how many waveforms are
+        processed per batch when computing the FFT plot for ``display > 0``.
     _lh5_path
         Name of the channel to process (LH5 group name in raw files).
     display
@@ -86,9 +113,14 @@ def noise_optimization(
 
     res_dict = {}
     if display > 0:
-        dsp_data = run_one_dsp(tb_data, dsp_proc_chain, db_dict=par_dsp)
-        psd = np.mean(dsp_data["wf_psd"].values.nda, axis=0)
-        sample_us = float(dsp_data["wf_presum"].dt.nda[0]) / 1000
+        fft_field = opt_dict.get("fft_field", "wf_psd")
+        batch_size = int(opt_dict.get("fft_batch_size", 1000))
+        if batch_size < 1:
+            msg = f"fft_batch_size must be positive, got {batch_size}"
+            raise ValueError(msg)
+
+        psd = _batched_mean_psd(tb_data, dsp_proc_chain, par_dsp, fft_field, batch_size)
+        sample_us = float(tb_data["waveform"].dt.nda[0]) / 1000
         freq = np.linspace(0, (1 / sample_us) / 2, len(psd))
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
         ax.plot(freq, psd)
@@ -100,6 +132,13 @@ def noise_optimization(
         plot_dict = {}
         plot_dict["nopt"] = {"fft": {"frequency": freq, "psd": psd, "fig": fig}}
         plt.close()
+
+    # the grid-search loop only ever reads the ene_str fields, so request just
+    # those: dspeed then skips every unused output buffer -- most notably
+    # wf_presum, a waveform-length output (~160 MB at the production 10k
+    # events) that was otherwise reallocated on every grid point
+    ene_outputs = list(dict.fromkeys(cfg["ene_str"] for cfg in opt_dict_par.values()))
+    dsp_proc_chain = {**dsp_proc_chain, "outputs": ene_outputs}
 
     result_dict = {}
     ene_pars = list(opt_dict_par.keys())

@@ -32,9 +32,10 @@ def readd_attrs(final_table, input_table):
 
 
 def _concat_tables(tbls):
-    out_tbl = tbls[0].view_as("ak")
-    for tbl in tbls[1:]:
-        out_tbl = ak.concatenate([out_tbl, tbl.view_as("ak")], axis=0)
+    # one concatenate over the whole list, not a pairwise fold: the latter
+    # recopies the accumulated result for every chunk, which is quadratic in
+    # the chunk count and doubles peak memory
+    out_tbl = ak.concatenate([tbl.view_as("ak") for tbl in tbls], axis=0)
     out_tbl = Table(col_dict=out_tbl)
     readd_attrs(out_tbl, tbls[0])
     return out_tbl
