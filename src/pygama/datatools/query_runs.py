@@ -118,8 +118,8 @@ def query_runs(
     """
     with ExitStack() as stack:
         _, executor = _setup_executor(stack, processes, executor)
-        _setup_spinner(stack, progress)
-        _, df_paths, query_config = _read_dataflow_config(dataflow_config)
+        progress = _setup_spinner(stack, progress)
+        dataflow_config, df_paths, query_config = _read_dataflow_config(dataflow_config)
 
         if cycle_def is None:
             if "cycle_def" not in query_config:
