@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Collection, Mapping
-from concurrent.futures import Executor, ProcessPoolExecutor
-from contextlib import ExitStack, chdir
+from concurrent.futures import Executor
+from contextlib import ExitStack
 from copy import copy
 from pathlib import Path
 
@@ -169,7 +169,9 @@ def query_runs(
         records = []
 
         for dirpath, dirnames, files in os.walk(base_path, followlinks=True):
-            relpath = os.path.relpath(dirpath, base_path)  # get rid of base_path and the following slash
+            relpath = os.path.relpath(
+                dirpath, base_path
+            )  # get rid of base_path and the following slash
 
             # Prune subdirectories that are not in all tiers
             if join == "inner":
