@@ -472,3 +472,178 @@ def test_buffered_build_evt(files_config_nowrite):
         files_config_nowrite, config=f"{config_dir}/basic-evt-config.yaml", buffer_len=1
     )
     assert (evt1.energy.flattened_data.nda == evt2.energy.flattened_data.nda).all()
+
+
+# Fields that legitimately -- or at least knowingly -- vary with the chunk
+# size, and so cannot take part in the comparison below.
+#
+# ``keep_at_ch`` results already varied before any caching was added:
+# evaluate_at_channel writes its result at every event in which the channel
+# fired (``out[evt_ids_ch] = res``) rather than only at the events ch_comp
+# selects, so whether a channel is evaluated at all depends on it appearing in
+# the current chunk's ch_comp. No production evt config uses keep_at_ch; they
+# use keep_at_idx, which goes through evaluate_at_channel_vov and does restrict
+# by ch_comp.
+#
+# ``tcm.index`` is by construction an offset into the flattened TCM of the
+# chunk being processed, so its value is chunk-relative. It is consumed by
+# keep_at_idx within the same chunk, which is self-consistent; production
+# configs keep such fields as ``_``-prefixed intermediates and never write
+# them out.
+_KEEP_AT_CH_FIELDS = {"aoe", "is_aoe_rejected", "is_usable_aoe", "is_saturated"}
+_TCM_INDEX_FIELDS = {"energy_idx"}
+_CHUNK_DEPENDENT_FIELDS = _KEEP_AT_CH_FIELDS | _TCM_INDEX_FIELDS
+
+
+@pytest.mark.parametrize("buffer_len", [1, 7, 10**4])
+@pytest.mark.parametrize(
+    "config_file",
+    ["query-test-evt-config.json", "vov-test-evt-config.json"],
+)
+def test_build_evt_independent_of_buffer_len(
+    files_config_nowrite, config_file, buffer_len
+):
+    """Chunking must not be observable in the output.
+
+    Per-chunk state (cached lower-tier columns, cached per-channel TCM
+    indices) is only valid for the chunk it was built from, so a stale entry
+    would show up here as a column that changes with the chunk size. Between
+    them the two configs cover every aggregation mode used by the production
+    evt configs: sum, any, all, first_at, last_at, gather and keep_at_idx.
+    """
+    config = f"{config_dir}/{config_file}"
+    ref = build_evt(files_config_nowrite, config=config, buffer_len=10**6)
+    evt = build_evt(files_config_nowrite, config=config, buffer_len=buffer_len)
+
+    assert sorted(ref.keys()) == sorted(evt.keys())
+    checked = 0
+    for field in ref:
+        if field in _CHUNK_DEPENDENT_FIELDS:
+            continue
+        a = ak.flatten(ref[field].view_as("ak"), axis=None).to_numpy()
+        b = ak.flatten(evt[field].view_as("ak"), axis=None).to_numpy()
+        assert a.dtype == b.dtype, field
+        # NaN is a legitimate value here (unfilled defaults), so it has to
+        # compare equal to itself
+        assert np.array_equal(a, b, equal_nan=a.dtype.kind == "f"), field
+        checked += 1
+
+    assert checked > 0
+
+
+@pytest.fixture(scope="module")
+def sparse_channel_config(tmp_path_factory):
+    """Two channels, one of which fires only in the last events of the file.
+
+    The real test data has a handful of channels that all fire in nearly every
+    event, which makes a channel's event numbers coincide with its row numbers
+    and hides any confusion between the two. Here ``ch1000001`` fires only in
+    events 40-49, so its rows are 0-9 while its events are 40-49.
+    """
+    d = tmp_path_factory.mktemp("sparse")
+    n_events, first_b = 50, 40
+
+    keys, rows, a_row, b_row = [], [], 0, 0
+    for event in range(n_events):
+        k, r = [1000000], [a_row]
+        a_row += 1
+        if event >= first_b:
+            k.append(1000001)
+            r.append(b_row)
+            b_row += 1
+        keys.append(k)
+        rows.append(r)
+
+    lh5.write(
+        Table(
+            {
+                "table_key": VectorOfVectors(ak.Array(keys)),
+                "row_in_table": VectorOfVectors(ak.Array(rows)),
+            }
+        ),
+        "hardware_tcm_1",
+        str(d / "tcm.lh5"),
+        wo_mode="of",
+    )
+
+    # ch1000001 always has the smaller sorter value, so wherever it fires it
+    # must win the first_at aggregation
+    # ``neg_tp_0_est`` is the negated sorter, so the same channel wins whether
+    # the aggregation takes the smallest or the largest value
+    lh5.write(
+        Table(
+            {
+                "tp_0_est": Array(np.full(a_row, 100.0)),
+                "neg_tp_0_est": Array(np.full(a_row, -100.0)),
+                "timestamp": Array(np.arange(a_row, dtype=float)),
+            }
+        ),
+        "ch1000000/dsp",
+        str(d / "dsp.lh5"),
+        wo_mode="of",
+    )
+    lh5.write(
+        Table(
+            {
+                "tp_0_est": Array(np.full(b_row, 10.0)),
+                "neg_tp_0_est": Array(np.full(b_row, -10.0)),
+                "timestamp": Array(np.full(b_row, 999.0)),
+            }
+        ),
+        "ch1000001/dsp",
+        str(d / "dsp.lh5"),
+        wo_mode="a",
+    )
+    for i, (ch, n) in enumerate((("ch1000000", a_row), ("ch1000001", b_row))):
+        lh5.write(
+            Table({"e": Array(np.ones(n))}),
+            f"{ch}/hit",
+            str(d / "hit.lh5"),
+            wo_mode="of" if i == 0 else "a",
+        )
+
+    files_config = {
+        "tcm": (str(d / "tcm.lh5"), "hardware_tcm_1"),
+        "dsp": (str(d / "dsp.lh5"), "dsp", "ch{}"),
+        "hit": (str(d / "hit.lh5"), "hit", "ch{}"),
+        "evt": (None, "evt"),
+    }
+    expected = np.concatenate(
+        [np.arange(first_b, dtype=float), np.full(n_events - first_b, 999.0)]
+    )
+    return files_config, expected
+
+
+@pytest.mark.parametrize("buffer_len", [10**6, 7, 1])
+@pytest.mark.parametrize("mode", ["first_at", "last_at"])
+def test_first_last_at_uses_sparse_channel(sparse_channel_config, mode, buffer_len):
+    """first_at/last_at must pick the winning channel however sparse it is.
+
+    Regression test: the aggregator used to finish each channel with a pandas
+    ``.loc`` assignment, which aligns the right-hand side *by index label*. The
+    labels were event numbers and the right-hand index was the channel's hit
+    positions, so for a sparse channel the two disagreed and the values were
+    dropped (silently becoming NaN). It also made the result depend on where
+    the chunk boundaries fell.
+    """
+    files_config, expected = sparse_channel_config
+    # ch1000001 has the smaller sorter value, so it wins first_at; the negated
+    # column makes it the largest, so it wins last_at too and one set of
+    # expectations covers both branches
+    sorter = "dsp.tp_0_est" if mode == "first_at" else "dsp.neg_tp_0_est"
+
+    config = {
+        "channels": {"geds_on": ["ch1000000", "ch1000001"]},
+        "outputs": ["t"],
+        "operations": {
+            "t": {
+                "channels": "geds_on",
+                "aggregation_mode": f"{mode}:{sorter}",
+                "expression": "dsp.timestamp",
+                "initial": -1,
+            }
+        },
+    }
+    got = build_evt(files_config, config=config, buffer_len=buffer_len).t.view_as("np")
+    assert not np.isnan(got).any()
+    assert np.array_equal(got, expected)

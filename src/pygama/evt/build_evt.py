@@ -4,6 +4,7 @@ This module implements routines to build the `evt` tier.
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import itertools
 import logging
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import awkward as ak
+import h5py
 import lh5
 import numpy as np
 from lgdo import Array, ArrayOfEqualSizedArrays, Table, VectorOfVectors
@@ -277,13 +279,53 @@ def build_evt_cols(
     if not isinstance(datainfo, utils.DataInfo):
         datainfo = utils.make_files_config(datainfo)
 
-    evt_tables = []
     if (
         datainfo.evt.file is not None
         and wo_mode == "of"
         and Path(datainfo.evt.file).exists()
     ):
         Path(datainfo.evt.file).unlink()
+
+    # Take ownership of the input files for the whole run. Every lower-tier
+    # read otherwise reopens the file, and there is one such read per
+    # (chunk, operation, channel) -- hundreds of thousands of opens for a
+    # calibration file. lh5.ls/lh5.read accept an open handle directly.
+    stack = contextlib.ExitStack()
+    with stack:
+        datainfo = _open_input_tiers(datainfo, stack)
+        cache = utils.EvtCache()
+        return _build_evt_cols(
+            datainfo, config, channels, wo_mode, buffer_len, channel_mapping, cache
+        )
+
+
+def _open_input_tiers(datainfo, stack):
+    """Replace each per-channel input tier's path with an open HDF5 handle.
+
+    `evt` is the output, and `tcm` is streamed by :class:`lh5.LH5Iterator`,
+    which takes a path — both keep theirs.
+    """
+    opened = {}
+    for name, tier in datainfo._asdict().items():
+        if name in ("evt", "tcm") or tier.file is None:
+            continue
+        if isinstance(tier.file, h5py.Group):  # caller already opened it
+            continue
+        handle = stack.enter_context(h5py.File(str(tier.file), "r"))
+        opened[name] = tier._replace(file=handle)
+    return datainfo._replace(**opened) if opened else datainfo
+
+
+def _build_evt_cols(
+    datainfo,
+    config,
+    channels,
+    wo_mode,
+    buffer_len,
+    channel_mapping,
+    cache,
+) -> None | Table:
+    evt_tables = []
 
     # Pre-compute source attrs for single-field aggregation operations.
     # Done once here because attrs are file-level metadata, not per-chunk data.
@@ -314,9 +356,11 @@ def build_evt_cols(
         field_mask=["table_key", "row_in_table"],
     ):
         # load tcm data from disk
+        cache.new_chunk()
         tcm = utils.TCMData(
             table_key=tcm_lh5.table_key.view_as("ak"),
             row_in_table=tcm_lh5.row_in_table.view_as("ak"),
+            cache=cache,
         )
 
         # get number of events in file (ask the TCM)

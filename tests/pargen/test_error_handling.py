@@ -8,7 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import pygama.math.distributions as pgd
 import pygama.pargen.data_cleaning as dc
+import pygama.pargen.energy_optimisation as eo
+import pygama.pargen.lq_cal as lqc
 import pygama.pargen.survival_fractions as sf
 from pygama.pargen import dsp_optimize, energy_cal
 from pygama.pargen.utils import load_data, require_config_keys
@@ -188,3 +191,87 @@ class TestLoadData:
             load_data(
                 ["dummy.lh5"], "dsp", {"energy_cal": {"parameters": {}}}, {"energy"}
             )
+
+
+class TestStageTags:
+    """A failing internal stage is named in the fallback log line."""
+
+    def test_get_peak_fwhm_with_dt_corr_tags_staged_fit(self, monkeypatch, caplog):
+        def boom(*_args, **_kwargs):
+            msg = "synthetic fit blowup"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(eo.pgc, "unbinned_staged_energy_fit", boom)
+
+        rng = np.random.default_rng(0)
+        energies = rng.normal(2039, 5, 5000)
+        dt = np.zeros_like(energies)
+        with caplog.at_level(
+            logging.WARNING, logger="pygama.pargen.energy_optimisation"
+        ):
+            result = eo.get_peak_fwhm_with_dt_corr(
+                energies, 0, dt, pgd.hpge_peak, 2039, (20, 20)
+            )
+        # fit failed -> nan tuple, and the failing stage is named
+        assert np.isnan(result[0])
+        assert result[-1] is None
+        assert "staged energy fit failed" in caplog.text
+
+    def test_lq_drift_time_correction_tags_binned_fit(self, monkeypatch, caplog):
+        def boom(*_args, **_kwargs):
+            msg = "synthetic binned fit blowup"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(lqc, "binned_lq_fit", boom)
+
+        cal = lqc.LQCal(
+            cal_dicts={"foo": {}},
+            cal_energy_param="e_cal",
+            dt_param="dt",
+            eres_func=lambda _e: 1.0,
+        )
+        df = pd.DataFrame(
+            {
+                "LQ_Timecorr": [0.0, 1.0],
+                "e_cal": [1592.5, 1592.5],
+                "dt": [0.0, 1.0],
+            }
+        )
+        with caplog.at_level(logging.ERROR, logger="pygama.pargen.lq_cal"):
+            cal.drift_time_correction(
+                df, lq_param="LQ_Timecorr", cal_energy_param="e_cal"
+            )
+        assert np.isnan(cal.dt_fit_pars).all()
+        assert "binned LQ fit at DEP failed" in caplog.text
+
+    def test_hpge_fit_energy_peaks_tags_fit_window(self, monkeypatch, caplog):
+        rng = np.random.default_rng(0)
+        energies = np.concatenate(
+            [
+                rng.uniform(100, 26000, 20000),
+                rng.normal(26145, 10, 10000),
+            ]
+        ).round()
+        cal = energy_cal.HPGeCalibration(
+            "energy", [2614.5], 2614.5 / 26145, deg=0, uncal_is_int=True
+        )
+        cal.hpge_get_energy_peaks(energies)
+
+        def boom(*_args, **_kwargs):
+            msg = "synthetic binning blowup"
+            raise RuntimeError(msg)
+
+        monkeypatch.setattr(energy_cal.pgh, "better_int_binning", boom)
+
+        with caplog.at_level(logging.DEBUG, logger="pygama.pargen.energy_cal"):
+            cal.hpge_fit_energy_peaks(
+                energies, peak_pars=[(2614.5, (20, 20), pgd.hpge_peak)]
+            )
+
+        # the setup failure is contained by the per-peak fallback: the loop
+        # completes, the peak is recorded as invalid with nan binning, and the
+        # failing stage is named
+        pk_dict = cal.results["hpge_fit_energy_peaks"]["peak_parameters"][2614.5]
+        assert pk_dict["validity"] is False
+        assert np.isnan(pk_dict["bin_width"])
+        assert "computing fit window failed" in caplog.text

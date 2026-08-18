@@ -7,7 +7,6 @@ from __future__ import annotations
 import awkward as ak
 import lh5
 import numpy as np
-import pandas as pd
 from lgdo import types
 
 from . import utils
@@ -61,83 +60,94 @@ def evaluate_to_first_or_last(
     if not isinstance(datainfo, utils.DataInfo):
         datainfo = utils.make_files_config(datainfo)
 
-    sort_df = None
+    # winning value per event, and the sorter value that won it. Both are
+    # indexed by event and assigned positionally: a channel's hits are numbered
+    # 0..n-1 while the events it fired in are arbitrary, and confusing the two
+    # silently drops values for any channel that does not fire in nearly every
+    # event.
+    out = None
+    best = None
 
     for ch in channels:
         table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
         if table_id is None:
             continue
 
+        if ch in channels_skip:
+            continue
+
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         # evaluate at channel
-        if ch not in channels_skip:
-            res = utils.get_data_at_channel(
-                datainfo=datainfo,
-                ch=ch,
-                tcm=tcm,
-                expr=expr,
-                field_list=field_list,
-                pars_dict=pars_dict,
-            )
+        res = utils.get_data_at_channel(
+            datainfo=datainfo,
+            ch=ch,
+            tcm=tcm,
+            expr=expr,
+            field_list=field_list,
+            pars_dict=pars_dict,
+        )
 
-            if sort_df is None:
-                # define dimension of output array
-                out = utils.make_numpy_full(n_rows, default_value, res.dtype)
-                sort_df = pd.DataFrame({"sort_field": np.zeros(len(out)), "res": out})
+        if out is None:
+            # define dimension of output array
+            out = utils.make_numpy_full(n_rows, default_value, res.dtype)
+            # nothing seen yet, so any real hit must win
+            best = np.full(n_rows, np.inf if is_first else -np.inf)
 
-            # get mask from query
-            limarr = utils.get_mask_from_query(
-                datainfo=datainfo,
-                query=query,
-                length=len(res),
-                ch=ch,
-                idx_ch=idx_ch,
-            )
+        # get mask from query
+        limarr = utils.get_mask_from_query(
+            datainfo=datainfo,
+            query=query,
+            length=len(res),
+            ch=ch,
+            idx_ch=idx_ch,
+            cache=getattr(tcm, "cache", None),
+        )
 
-            # find if sorter is in hit or dsp
-            sort_field = lh5.read_as(
-                f"{ch}/{sorter[0]}/{sorter[1]}",
-                (
-                    datainfo.hit.file
-                    if f"{datainfo.hit.group}" == sorter[0]
-                    else datainfo.dsp.file
-                ),
-                idx=idx_ch,
-                library="np",
-            )
+        # find if sorter is in hit or dsp
+        sort_field = lh5.read_as(
+            f"{ch}/{sorter[0]}/{sorter[1]}",
+            (
+                datainfo.hit.file
+                if f"{datainfo.hit.group}" == sorter[0]
+                else datainfo.dsp.file
+            ),
+            idx=idx_ch,
+            library="np",
+        )
 
-            if sort_field.ndim > 1:
-                msg = f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array"
-                raise ValueError(msg)
+        if sort_field.ndim > 1:
+            msg = f"sorter '{sorter[0]}/{sorter[1]}' must be a 1D array"
+            raise ValueError(msg)
 
-            ch_df = pd.DataFrame({"sort_field": sort_field, "res": res})
+        if is_first:
+            better = (sort_field < best[evt_ids_ch]) & limarr
+        else:
+            better = (sort_field > best[evt_ids_ch]) & limarr
 
-            evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.table_key)),
-                ak.sum(tcm.table_key == table_id, axis=1),
-            )
+        sel = np.nonzero(better)[0]
+        if sel.size == 0:
+            continue
 
-            if is_first:
-                if ch == channels[0]:
-                    sort_df["sort_field"] = np.inf
-                ids = (
-                    ch_df.sort_field.to_numpy()
-                    < sort_df.sort_field[evt_ids_ch].to_numpy()
-                ) & (limarr)
-            else:
-                ids = (
-                    ch_df.sort_field.to_numpy()
-                    > sort_df.sort_field[evt_ids_ch].to_numpy()
-                ) & (limarr)
+        # a channel can have several hits in the same event, and fancy-index
+        # assignment keeps the last write: order the writes so the winning hit
+        # is the one that lands last
+        order = np.argsort(sort_field[sel], kind="stable")
+        sel = sel[order[::-1]] if is_first else sel[order]
 
-            sort_df.loc[evt_ids_ch[ids], list(sort_df.columns)] = ch_df.loc[
-                ids, list(sort_df.columns)
-            ]
+        rows = evt_ids_ch[sel]
+        out[rows] = res[sel]
+        best[rows] = sort_field[sel]
 
-    return types.Array(nda=sort_df.res.to_numpy())
+    if out is None:
+        msg = (
+            "no channel could be evaluated, so the output dtype is unknown "
+            f"(channels={list(channels)}, skipped={list(channels_skip)})"
+        )
+        raise ValueError(msg)
+
+    return types.Array(nda=out)
 
 
 def evaluate_to_scalar(
@@ -191,8 +201,7 @@ def evaluate_to_scalar(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(
@@ -215,11 +224,7 @@ def evaluate_to_scalar(
                 length=len(res),
                 ch=ch,
                 idx_ch=idx_ch,
-            )
-
-            evt_ids_ch = np.repeat(
-                np.arange(0, len(tcm.table_key)),
-                ak.sum(tcm.table_key == table_id, axis=1),
+                cache=getattr(tcm, "cache", None),
             )
 
             # switch through modes
@@ -283,19 +288,16 @@ def evaluate_at_channel(
 
     out = utils.make_numpy_full(len(ch_comp.nda), default_value, type(default_value))
 
+    hit_tables = utils.table_names(datainfo, "hit", getattr(tcm, "cache", None))
+
     for table_id in np.unique(ch_comp.nda.astype(int)):
         table_name = utils.get_table_name_by_pattern(table_id_fmt, table_id)
         # skip default value
-        if table_name not in lh5.ls(datainfo.hit.file):
+        if table_name not in hit_tables:
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
-
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
@@ -362,9 +364,7 @@ def evaluate_at_channel_vov(
     type_name = None
     for table_id in ch_comp_channels:
         table_name = utils.get_table_name_by_pattern(datainfo.hit.table_fmt, table_id)
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, _, evt_ids_ch = utils.channel_indices(tcm, table_id)
         if (table_name in channels) and (table_name not in channels_skip):
             res = utils.get_data_at_channel(
                 datainfo=datainfo,
@@ -455,12 +455,7 @@ def evaluate_to_aoesa(
             continue
 
         # get index list for this channel to be loaded
-        chan_tcm_indexs = ak.flatten(tcm.table_key) == table_id
-        idx_ch = ak.flatten(tcm.row_in_table)[chan_tcm_indexs].to_numpy()
-
-        evt_ids_ch = np.repeat(
-            np.arange(0, len(tcm.table_key)), ak.sum(tcm.table_key == table_id, axis=1)
-        )
+        _, idx_ch, evt_ids_ch = utils.channel_indices(tcm, table_id)
 
         if ch not in channels_skip:
             res = utils.get_data_at_channel(
@@ -489,6 +484,7 @@ def evaluate_to_aoesa(
             length=len(res),
             ch=ch,
             idx_ch=idx_ch,
+            cache=getattr(tcm, "cache", None),
         )
 
         out[evt_ids_ch, i] = np.where(limarr, res, out[evt_ids_ch, i])
