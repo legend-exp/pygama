@@ -152,7 +152,7 @@ def query_runs(
         else:
             msg = f"invalid join argument {join}"
             raise ValueError(msg)
-        stack.enter_context(chdir(this_tier[1]))
+        base_path = this_tier[1]
 
         # Get list of removed cycles if it exists
         if ignored_cycles is not None:
@@ -163,16 +163,13 @@ def query_runs(
             for iclist in ignored_cycles:
                 removed |= set(get_recursive(meta, iclist))
         else:
-            removed = {}
+            removed = set()
 
         col_names = cycle_def.split("-")
         records = []
 
-        if executor is None and processes:
-            executor = stack.enter_context(ProcessPoolExecutor(processes))
-
-        for dirpath, dirnames, files in os.walk(".", followlinks=True):
-            relpath = dirpath[2:]  # get rid of ./
+        for dirpath, dirnames, files in os.walk(base_path, followlinks=True):
+            relpath = os.path.relpath(dirpath, base_path)  # get rid of base_path and the following slash
 
             # Prune subdirectories that are not in all tiers
             if join == "inner":
