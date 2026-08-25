@@ -158,3 +158,51 @@ class EventSelector:
         plt.legend()
         plt.savefig(fig_path)
         plt.close()
+
+
+def xtalk_element(
+    e_trig: np.ndarray | float,
+    e_response: np.ndarray | float,
+    baseline_value: float,
+) -> np.ndarray | float:
+    """Cross-talk of a response channel relative to its trigger, in percent.
+
+    The response amplitude has its baseline removed and is expressed as a
+    fraction of the trigger energy::
+
+        (e_response - baseline_value) / e_trig * 100
+
+    Parameters
+    ----------
+    e_trig
+        Trigger-channel energy.  Array, or a single value.
+    e_response
+        Response-channel amplitude at the same events.  Must match the type
+        and length of *e_trig*.
+    baseline_value
+        Baseline of the response channel, subtracted from *e_response*.
+
+    Returns
+    -------
+    Percentage cross-talk, elementwise when the inputs are arrays.
+    """
+    if not isinstance(baseline_value, (int, float, np.integer, np.floating)):
+        msg = "baseline_value must be a numerical type (int or float)."
+        raise TypeError(msg)
+
+    if isinstance(e_trig, np.ndarray) and isinstance(e_response, np.ndarray):
+        if len(e_trig) != len(e_response):
+            msg = "e_trig and e_response must have the same length."
+            raise ValueError(msg)
+        return (e_response - baseline_value) / e_trig * 100
+
+    if isinstance(e_trig, (int, float, np.integer, np.floating)) and isinstance(
+        e_response, (int, float, np.integer, np.floating)
+    ):
+        return (e_response - baseline_value) / e_trig * 100
+
+    msg = (
+        "e_trig and e_response must either both be arrays of equal length "
+        "or both be numerical values."
+    )
+    raise TypeError(msg)
