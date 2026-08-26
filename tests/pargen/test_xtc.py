@@ -2,7 +2,7 @@ import json
 from pygama.pargen.xtc import prepare_baseline
 
 def test_prepare_baseline():
-    with open("file_test_p08.json", "r") as f:
+    with open("/global/homes/h/hungwei/xtc_talk_analysis/configs/test_p08.json", "r") as f:
         data = json.load(f)
 
     hit_files = data["hit"]
@@ -18,8 +18,10 @@ def test_prepare_baseline():
     result = prepare_baseline(
         hit_files=hit_files,
         dsp_files=dsp_files,
-        chn_id=chn_id[7],
+        chn_id=chn_id[17],
         config=config,
     )
 
-    print(result)
+    print(f"result: {result}")
+
+test_prepare_baseline()

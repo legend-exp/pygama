@@ -111,7 +111,10 @@ def prepare_baseline(
                 conditions=conditions,
             )
         except Exception as e:
-            msg = f"baseline selection on {energy_param} failed"
+            msg = (
+                f"baseline selection on {energy_param} failed: "
+                f"{type(e).__name__}: {e}"
+            )
             raise RuntimeError(msg) from e
 
         if len(baseline_selection.selected_idxs) == 0:
@@ -132,7 +135,10 @@ def prepare_baseline(
                 idx=baseline_selection.selected_idxs,
             )
         except Exception as e:
-            msg = f"reading {positive_param}/{negative_param} on the selected events failed"
+            msg = (
+                f"reading {positive_param}/{negative_param} on the selected "
+                f"events failed: {type(e).__name__}: {e}"
+            )
             raise RuntimeError(msg) from e
 
         if (
@@ -148,7 +154,11 @@ def prepare_baseline(
     except Exception as e:
         if debug_mode:
             raise
-        log.error("baseline preparation failed for channel %s: %s", chn_id, e)
+        log.error(
+            "baseline preparation failed for channel %s: %s",
+            chn_id,
+            e
+        )
         success = False
         positive_baseline = np.nan
         negative_baseline = np.nan
@@ -384,6 +394,7 @@ def xtalk_column(
     trigger_selection = None
     trigger_all = None
 
+    # trigger selection. Only need to be done once per column. 
     try:
         if _resolve_baseline(baseline, trigger_detector_id) is None:
             msg = f"trigger channel {trigger_detector_id} has no usable baseline"
@@ -398,7 +409,7 @@ def xtalk_column(
                 energy_range=trigger_energy_range,
             )
         except Exception as e:
-            msg = "trigger event selection failed"
+            msg = f"trigger event selection failed: {type(e).__name__}: {e}"
             raise RuntimeError(msg) from e
 
         if len(trigger_selection.selected_idxs) == 0:
@@ -411,7 +422,7 @@ def xtalk_column(
                 f"ch{trigger_detector_id}/dsp/{trigger_param}", dsp_files
             ).nda
         except Exception as e:
-            msg = f"reading trigger {trigger_param} failed"
+            msg = f"reading trigger {trigger_param} failed: {type(e).__name__}: {e}"
             raise RuntimeError(msg) from e
 
     except Exception as e:
@@ -424,6 +435,9 @@ def xtalk_column(
         )
         trigger_selection = None
 
+    # loop over response detectors starts here 
+    # If trigger selection failed or the trigger baseline is None, 
+    # skip to saving an empty column. 
     if trigger_selection is not None:
         for k, response_id in enumerate(chn_id_list):
             if str(response_id) == str(trigger_detector_id):
@@ -438,7 +452,6 @@ def xtalk_column(
                 continue
             positive_baseline, negative_baseline = baselines
 
-            # a failure on one response channel must not lose the whole column
             try:
                 response_selection = EventSelector(
                     table_path=f"ch{response_id}/hit/",
