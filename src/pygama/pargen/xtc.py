@@ -270,21 +270,22 @@ def xtalk_column(
     out_path: str | Path | None = None,
     debug_mode: bool = False,
 ) -> dict:
-    """Fill one column of the cross-talk matrix.
+    """Fill the histograms for one column of the cross-talk matrix.
 
-    Selects the events in which *trigger_detector_id* fired, then, for every
-    channel in *chn_id_list*, measures the amplitude that channel shows in
-    exactly those events and expresses it as a percentage of the trigger
-    energy (see :func:`.xtc_utils.xtalk_element`).  The distribution of that
-    percentage over the selected events is histogrammed, once against the
-    positive-going and once against the negative-going response parameter.
+    Selects the events in which *trigger_detector_id* fired with 
+    high enough energy (determined by *trigger_energy_range* in *config*). 
 
-    The trigger selection and the trigger energies are read once and reused
-    for the whole column; this is why the column, rather than the single
-    matrix element, is the unit of work.
+    Then, for each detector in *chn_id_list*, among these events, it 
+    further selects the events in which the detector did *not* 
+    fire with high energy (otherwise it's multiplicity event).
 
-    Elements are skipped -- recorded with ``valid = False`` and an empty
-    histogram -- when the response channel is the trigger itself, or when
+    Finally, calculates the per-event cross talk value for each of these events
+    and fills them into a histogram. 
+
+    This produces N=number of detectors histograms, one for each detector in *chn_id_list*.
+
+    Detector pairs skipped are recorded with ``valid = False`` and an empty
+    histogram. This happens when the response channel is the trigger itself, or when
     either channel has no usable baseline (missing, ``None`` or NaN).  If the
     *trigger* channel has no usable baseline the whole column is skipped.
 
@@ -296,25 +297,18 @@ def xtalk_column(
         DSP-tier file, or list of files, holding the amplitudes.  Must cover
         the same events, in the same order, as *hit_files*.
     trigger_detector_id
-        Channel identifier (rawid) of the trigger detector, without the
-        ``ch`` prefix.
-    chn_id_list
-        Response channel identifiers, in the order their histograms are
-        written.  Pass the full detector list for a whole column, or a slice
-        of it to split a column across several jobs.
+        Channel id of the trigger detector, without the ``ch`` prefix.
     baseline
         Per-channel baselines, as produced by :func:`prepare_baseline` and
-        collected by channel id::
+        collected by channel id. It should have the following structure: 
+        {chn_id: {"positive_baseline": float, "negative_baseline": float}, ...}
 
+        for example:
             {
                 1104000: {"positive_baseline": 5.0, "negative_baseline": -3.0},
                 1104001: {"positive_baseline": None, "negative_baseline": None},
                 ...
             }
-
-        Extra keys in each entry (``success``, ``processed_at``, ...) are
-        ignored, so the merged output of :func:`prepare_baseline` can be
-        passed straight through.  Keys may be ``int`` or ``str``.
     config
         Selection and histogram configuration.  Recognised keys, all
         optional:
