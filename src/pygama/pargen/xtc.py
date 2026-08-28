@@ -18,7 +18,7 @@ import lh5
 import numpy as np
 from scipy.optimize import curve_fit
 
-from pygama.pargen.xtc_utils import EventSelector, xtalk_element
+from pygama.pargen.xtc_utils import EventSelector, XTCMatrix, xtalk_element
 
 log = logging.getLogger(__name__)
 
@@ -921,7 +921,135 @@ def xtalk_histogram_fitter(
 
     return result
 
+
 def build_xtalk_matrix(
-    chn_id_list: list, fitted_files: list, out_path: str | Path, config: dict | None
-) -> None:
-    raise NotImplementedError()
+    fitted_columns: dict,
+    out_path: str | Path | None = None,
+    config: dict | None = None,
+) -> XTCMatrix:
+    """Assemble the fitted columns of a cross-talk matrix into the matrix.
+
+    *fitted_columns* collects what :func:`xtalk_histogram_fitter` returned for
+    each trigger, keyed by that trigger's channel id, the way *baseline*
+    collects what :func:`prepare_baseline` returned for each channel::
+
+        {1104000: xtalk_histogram_fitter(...), 1104001: ..., ...}
+
+    Each of those columns is one row of the matrix, so the rows are triggers
+    and the columns are responses.  Every column must cover the same
+    detectors in the same order -- they do when one *baseline* drove all of
+    them -- and that order becomes the matrix index.  A detector that no
+    column was filled for keeps a row of NaN rather than being dropped, so
+    the index stays the detector list rather than the subset that worked.
+
+    Parameters
+    ----------
+    fitted_columns
+        Result dicts of :func:`xtalk_histogram_fitter`, keyed by trigger
+        channel id.
+    out_path
+        ``.lh5`` file to write the matrix to; parent directories are created
+        and an existing file is replaced.  ``None`` builds the matrix and
+        returns it without writing.
+    config
+        Recognised keys, all optional:
+
+        ``max_status``
+            Highest :data:`FIT_STATUS` code to accept into the matrix; the
+            codes are ordered from the most to the least trustworthy, so this
+            is a quality cut.  Default ``FIT_STATUS["low_stats"]``, which
+            keeps the moments of a sparse histogram, as the production files
+            do, and drops everything that has no position to report anyway.
+        ``group``
+            Table name inside the file.  Default ``"xtc"``.
+        ``in_percent``
+            Whether the fitted values are in percent, in which case they are
+            divided by 100 on the way out so the file holds fractions like
+            the production xtc files.  Default True, which is what
+            :func:`~pygama.pargen.xtc_utils.xtalk_element` produces.
+
+    Returns
+    -------
+    XTCMatrix
+        Both matrices, their fit widths and their per-element status, held in
+        percent whatever the file ends up in.
+    """
+    config = config or {}
+    max_status = int(config.get("max_status", FIT_STATUS["low_stats"]))
+    group = config.get("group", "xtc")
+    in_percent = bool(config.get("in_percent", True))
+
+    if not fitted_columns:
+        msg = "fitted_columns is empty, there is no matrix to build"
+        raise ValueError(msg)
+
+    # every column ran over the same detector list, so any one of them gives
+    # the matrix index; disagreeing columns cannot be laid side by side
+    columns = {int(trigger_id): column for trigger_id, column in fitted_columns.items()}
+    rawids = None
+    for trigger_id, column in columns.items():
+        response_ids = np.asarray(column["response_ids"], dtype=np.int64)
+        if rawids is None:
+            rawids = response_ids
+        elif not np.array_equal(rawids, response_ids):
+            msg = (
+                f"column {trigger_id} covers different detectors, or covers "
+                f"them in a different order, than the columns before it"
+            )
+            raise ValueError(msg)
+
+        if int(column["trigger_id"]) != trigger_id:
+            msg = (
+                f"column filed under trigger {trigger_id} reports "
+                f"trigger_id {column['trigger_id']}"
+            )
+            raise ValueError(msg)
+
+    index_of = {int(rawid): j for j, rawid in enumerate(rawids)}
+    unknown = sorted(set(columns) - set(index_of))
+    if unknown:
+        msg = (
+            f"columns {unknown} trigger on detectors that are not among the "
+            f"responses, so they have no row in the matrix"
+        )
+        raise ValueError(msg)
+
+    n_detectors = len(rawids)
+    shape = (n_detectors, n_detectors)
+    mu = {p: np.full(shape, np.nan) for p in XTCMatrix.polarities}
+    sigma = {p: np.full(shape, np.nan) for p in XTCMatrix.polarities}
+    status = {
+        p: np.full(shape, FIT_STATUS["not_filled"], dtype=np.int8)
+        for p in XTCMatrix.polarities
+    }
+
+    for trigger_id, column in columns.items():
+        row = index_of[trigger_id]
+        for polarity in XTCMatrix.polarities:
+            column_status = np.asarray(column[f"{polarity}_status"], dtype=np.int8)
+            accepted = column_status <= max_status
+
+            status[polarity][row] = column_status
+            mu[polarity][row] = np.where(
+                accepted, np.asarray(column[f"{polarity}_mu"], dtype=float), np.nan
+            )
+            sigma[polarity][row] = np.where(
+                accepted, np.asarray(column[f"{polarity}_sigma"], dtype=float), np.nan
+            )
+
+    matrix = XTCMatrix(
+        rawids, mu=mu, sigma=sigma, status=status, status_codes=FIT_STATUS
+    )
+
+    missing = n_detectors - len(columns)
+    if missing:
+        log.warning(
+            "%s of %s detectors have no fitted column, their rows stay NaN",
+            missing,
+            n_detectors,
+        )
+
+    if out_path is not None:
+        matrix.write_lh5(out_path, group=group, in_percent=in_percent)
+
+    return matrix
