@@ -962,31 +962,26 @@ def build_xtalk_matrix(
             do, and drops everything that has no position to report anyway.
         ``group``
             Table name inside the file.  Default ``"xtc"``.
-        ``in_percent``
-            Whether the fitted values are in percent, in which case they are
-            divided by 100 on the way out so the file holds fractions like
-            the production xtc files.  Default True, which is what
-            :func:`~pygama.pargen.xtc_utils.xtalk_element` produces.
+        ``store_in_percent``
+            Whether to store percent in the file rather than the fractions
+            :func:`~pygama.pargen.xtc_utils.xtalk_element` produces.  Default
+            False.
 
     Returns
     -------
     XTCMatrix
-        Both matrices, their fit widths and their per-element status, held in
-        percent whatever the file ends up in.
+        Both matrices, their fit widths and their per-element status, always
+        as fractions whatever unit the file ends up in.
     """
     config = config or {}
     max_status = int(config.get("max_status", FIT_STATUS["low_stats"]))
     group = config.get("group", "xtc")
-    in_percent = bool(config.get("in_percent", True))
+    store_in_percent = bool(config.get("store_in_percent", False))
 
-    if not fitted_columns:
-        msg = "fitted_columns is empty, there is no matrix to build"
-        raise ValueError(msg)
-
-    # every column ran over the same detector list, so any one of them gives
-    # the matrix index; disagreeing columns cannot be laid side by side
     columns = {int(trigger_id): column for trigger_id, column in fitted_columns.items()}
     rawids = None
+
+    # Check whether the response id lists are identical across all columns
     for trigger_id, column in columns.items():
         response_ids = np.asarray(column["response_ids"], dtype=np.int64)
         if rawids is None:
@@ -1050,6 +1045,6 @@ def build_xtalk_matrix(
         )
 
     if out_path is not None:
-        matrix.write_lh5(out_path, group=group, in_percent=in_percent)
+        matrix.write_lh5(out_path, group=group, store_in_percent=store_in_percent)
 
     return matrix

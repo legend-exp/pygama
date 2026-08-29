@@ -22,8 +22,8 @@ log = logging.getLogger(__name__)
 #: are fixed by the production files the rest of LEGEND reads.
 XTC_LH5_FIELD = {"neg": "xtalk_matrix_negative", "pos": "xtalk_matrix_positive"}
 
-#: Colour-scale limits that make each matrix readable, in percent.
-XTC_PLOT_RANGE = {"neg": (-0.3, 0.1), "pos": (-0.07, 0.3)}
+#: Colour-scale limits that make each matrix readable, as fractions.
+XTC_PLOT_RANGE = {"neg": (-0.003, 0.001), "pos": (-0.0007, 0.003)}
 
 
 class EventSelector:
@@ -177,12 +177,12 @@ def xtalk_element(
     e_response: np.ndarray | float,
     baseline_value: float,
 ) -> np.ndarray | float:
-    """Cross-talk of a response channel relative to its trigger, in percent.
+    """Cross-talk of a response channel relative to its trigger, as a fraction.
 
     The response amplitude has its baseline removed and is expressed as a
     fraction of the trigger energy::
 
-        (e_response - baseline_value) / e_trig * 100
+        (e_response - baseline_value) / e_trig
 
     Parameters
     ----------
@@ -196,7 +196,9 @@ def xtalk_element(
 
     Returns
     -------
-    Percentage cross-talk, elementwise when the inputs are arrays.
+    Fractional cross-talk, elementwise when the inputs are arrays.  Multiply
+    by 100 for percent; nothing downstream does that for you, and
+    :meth:`XTCMatrix.write_lh5` only does it when asked.
     """
     if not isinstance(baseline_value, (int, float, np.integer, np.floating)):
         msg = "baseline_value must be a numerical type (int or float)."
@@ -206,12 +208,12 @@ def xtalk_element(
         if len(e_trig) != len(e_response):
             msg = "e_trig and e_response must have the same length."
             raise ValueError(msg)
-        return (e_response - baseline_value) / e_trig * 100
+        return (e_response - baseline_value) / e_trig
 
     if isinstance(e_trig, (int, float, np.integer, np.floating)) and isinstance(
         e_response, (int, float, np.integer, np.floating)
     ):
-        return (e_response - baseline_value) / e_trig * 100
+        return (e_response - baseline_value) / e_trig
 
     msg = (
         "e_trig and e_response must either both be arrays of equal length "
@@ -227,11 +229,11 @@ class XTCMatrix:
     when detector ``rawids[j1]`` triggered, so rows are triggers and columns
     are responses.  The diagonal, and any pair that was never fitted, is NaN.
 
-    Values are held **in percent**, the unit
-    :func:`~pygama.pargen.xtc_utils.xtalk_element` produces, while the lh5
-    file stores fractions the way the production xtc files do.
-    :meth:`write_lh5` and :meth:`read_lh5` do that conversion for you; pass
-    ``in_percent=False`` to either if you are working in fractions already.
+    Values are held as **fractions**, the unit
+    :func:`~pygama.pargen.xtc_utils.xtalk_element` produces and the one the
+    production xtc files store.  :meth:`write_lh5` can be asked to store
+    percent instead, and records that choice in the file so
+    :meth:`read_lh5` restores fractions without being told.
 
     Parameters
     ----------
@@ -307,7 +309,7 @@ class XTCMatrix:
         self,
         out_path: str | Path,
         group: str = "xtc",
-        in_percent: bool = True,
+        store_in_percent: bool = False,
     ) -> None:
         """Write both matrices to *out_path* as one lh5 table.
 
@@ -324,14 +326,16 @@ class XTCMatrix:
         group
             Table name inside the file.  Default ``"xtc"``, which is where
             the rest of LEGEND looks for it.
-        in_percent
-            Whether this object's values are in percent, in which case they
-            are divided by 100 on the way out so the file holds fractions.
+        store_in_percent
+            Whether to store percent rather than the fractions this object
+            holds, multiplying by 100 on the way out.  The choice is written
+            alongside the matrices as ``stored_in_percent``, so a reader
+            never has to be told which unit it is looking at.
         """
         out_path = Path(out_path)
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        scale = 0.01 if in_percent else 1.0
+        scale = 100.0 if store_in_percent else 1.0
         col_dict = {"rawid_index": lgdo.Array(self.rawids)}
         for polarity in self.polarities:
             field = XTC_LH5_FIELD[polarity]
@@ -339,7 +343,7 @@ class XTCMatrix:
             col_dict[f"{field}_sigma"] = lgdo.Array(self.sigma[polarity] * scale)
             col_dict[f"{field}_status"] = lgdo.Array(self.status[polarity])
 
-        attrs = {}
+        attrs = {"stored_in_percent": int(store_in_percent)}
         if self.status_codes:
             attrs["fit_status_codes"] = json.dumps(self.status_codes)
 
@@ -366,7 +370,7 @@ class XTCMatrix:
         cls,
         in_path: str | Path,
         group: str = "xtc",
-        in_percent: bool = True,
+        store_in_percent: bool | None = None,
     ) -> XTCMatrix:
         """Read a matrix back from an xtc lh5 file.
 
@@ -380,12 +384,17 @@ class XTCMatrix:
             File to read.
         group
             Table name inside the file.
-        in_percent
-            Whether the returned object should be in percent, in which case
-            the file's fractions are multiplied by 100 on the way in.
+        store_in_percent
+            Whether the file holds percent, which is divided by 100 so the
+            returned object is in fractions.  ``None``, the default, takes
+            the answer from the file's ``stored_in_percent`` and assumes
+            fractions when it has none, which is what a production file is.
         """
         table = lh5.read(group, Path(in_path))
-        scale = 100.0 if in_percent else 1.0
+
+        if store_in_percent is None:
+            store_in_percent = bool(int(table.attrs.get("stored_in_percent", 0)))
+        scale = 0.01 if store_in_percent else 1.0
 
         mu, sigma, status = {}, {}, {}
         for polarity in cls.polarities:
@@ -425,8 +434,8 @@ class XTCMatrix:
         fig_path
             File to write the figure to.
         vmin, vmax
-            Colour-scale limits, in the unit the matrix is held in.  ``None``
-            takes the polarity's entry in :data:`XTC_PLOT_RANGE`.
+            Colour-scale limits, as fractions.  ``None`` takes the
+            polarity's entry in :data:`XTC_PLOT_RANGE`.
         cmap
             Colormap, defaulting to reversed jet as in the original analysis.
         title
@@ -446,7 +455,7 @@ class XTCMatrix:
             vmax=default_vmax if vmax is None else vmax,
             cmap=plt.cm.jet_r if cmap is None else cmap,
         )
-        plt.colorbar(image, label="Cross-talk (%)")
+        plt.colorbar(image, label="Cross-talk (fraction)")
         plt.xlabel("Response channel index")
         plt.ylabel("Trigger channel index")
         plt.title(title if title is not None else f"{polarity} cross-talk matrix")
