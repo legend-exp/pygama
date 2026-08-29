@@ -3,7 +3,7 @@ This module provides routines for measuring cross-talk (XTC) between
 germanium channels and for building the resulting cross-talk matrix.
 
 The four main functions, in order of execution, are:
-prepare_baseline, xtalk_column, xtalk_histogram_fitter, and build_xtalk_matrix. 
+prepare_baseline, xtalk_column, xtalk_histogram_fitter, and build_xtalk_matrix.
 """
 
 from __future__ import annotations
@@ -135,8 +135,7 @@ def prepare_baseline(
             )
         except Exception as e:
             msg = (
-                f"baseline selection on {energy_param} failed: "
-                f"{type(e).__name__}: {e}"
+                f"baseline selection on {energy_param} failed: {type(e).__name__}: {e}"
             )
             raise RuntimeError(msg) from e
 
@@ -177,11 +176,7 @@ def prepare_baseline(
     except Exception as e:
         if debug_mode:
             raise
-        log.error(
-            "baseline preparation failed for channel %s: %s",
-            chn_id,
-            e
-        )
+        log.error("baseline preparation failed for channel %s: %s", chn_id, e)
         success = False
         positive_baseline = np.nan
         negative_baseline = np.nan
@@ -282,6 +277,7 @@ def _build_hist(
         bins=nbins,
         range=(mean - range_multiplier * stdev, mean + range_multiplier * stdev),
     )
+
 
 def _write_column(result: dict, out_path: str | Path) -> bool:
     """Write a cross-talk column to *out_path* as one lh5 table.
@@ -420,15 +416,15 @@ def xtalk_column(
 ) -> dict:
     """Fill the histograms for one column of the cross-talk matrix.
 
-    Selects the events in which *trigger_detector_id* fired with 
-    high enough energy (determined by *trigger_energy_range* in *config*). 
+    Selects the events in which *trigger_detector_id* fired with
+    high enough energy (determined by *trigger_energy_range* in *config*).
 
-    Then, for each detector in *chn_id_list*, among these events, it 
-    further selects the events in which the detector did *not* 
+    Then, for each detector in *chn_id_list*, among these events, it
+    further selects the events in which the detector did *not*
     fire with high energy (otherwise it's multiplicity event).
 
     Finally, calculates the per-event cross talk value for each of these events
-    and fills them into a histogram. 
+    and fills them into a histogram.
 
     This produces N=number of detectors histograms, one for each detector in *chn_id_list*.
 
@@ -448,7 +444,7 @@ def xtalk_column(
         Channel id of the trigger detector, without the ``ch`` prefix.
     baseline
         Per-channel baselines, as produced by :func:`prepare_baseline` and
-        collected by channel id. It should have the following structure: 
+        collected by channel id. It should have the following structure:
         {chn_id: {"positive_baseline": float, "negative_baseline": float}, ...}
 
         for example:
@@ -511,7 +507,7 @@ def xtalk_column(
         element, so they are written as attributes on that table, the
         latter as a JSON string.
     """
-    
+
     config = config or {}
     energy_param = config.get("energy_param", DEFAULT_ENERGY_PARAM)
     trigger_param = config.get("trigger_param", DEFAULT_TRIGGER_PARAM)
@@ -544,7 +540,7 @@ def xtalk_column(
     trigger_selection = None
     trigger_all = None
 
-    # trigger selection. Only need to be done once per column. 
+    # trigger selection. Only need to be done once per column.
     try:
         if _resolve_baseline(baseline, trigger_detector_id) is None:
             msg = f"trigger channel {trigger_detector_id} has no usable baseline"
@@ -585,9 +581,9 @@ def xtalk_column(
         )
         trigger_selection = None
 
-    # loop over response detectors starts here 
-    # If trigger selection failed or the trigger baseline is None, 
-    # skip to saving an empty column. 
+    # loop over response detectors starts here
+    # If trigger selection failed or the trigger baseline is None,
+    # skip to saving an empty column.
     if trigger_selection is not None:
         for k, response_id in enumerate(chn_id_list):
             if str(response_id) == str(trigger_detector_id):
@@ -711,6 +707,7 @@ def xtalk_column(
 
     return result
 
+
 def _gaussian(x: np.ndarray, amplitude: float, mu: float, sigma: float):
     """Unnormalised gaussian, the shape every cross-talk histogram is fitted with."""
     return amplitude * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
@@ -785,9 +782,9 @@ def xtalk_histogram_fitter(
 ) -> dict:
     """Fit a gaussian to every histogram of one cross-talk column.
 
-    *histogram_data* is the dict :func:`xtalk_column` returns. The 
-    result in previous function is written out and read back here so 
-    that we could refit the histograms without refilling.  
+    *histogram_data* is the dict :func:`xtalk_column` returns. The
+    result in previous function is written out and read back here so
+    that we could refit the histograms without refilling.
 
     Every element is fitted twice, once against the negative and once against
     the positive response, and each fit lands in one of the outcomes of
@@ -824,7 +821,7 @@ def xtalk_histogram_fitter(
         ``sharp_fit_min_points``
             Bins that mask must leave for the fit to use it.  Default 5.
     out_path
-        ``.lh5`` file to write to; if the file exists it is replaced. 
+        ``.lh5`` file to write to; if the file exists it is replaced.
         ``None`` computes the result and returns it without writing.
     debug_mode
         If True, re-raise instead of recording an element as ``fit_failed``.
