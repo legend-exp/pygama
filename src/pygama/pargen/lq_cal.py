@@ -1113,11 +1113,11 @@ def plot_survival_fraction_curves(
 def plot_sf_vs_energy(
     lq_class,
     data,
-    cut_param="LQ_Cut",
     xrange=(900, 3000),
     n_bins=701,
     figsize=(12, 8),
     fontsize=12,
+    cut_param="LQ_Cut",
 ) -> plt.figure:
     """Plots the survival fraction as a function of energy"""
 
@@ -1154,13 +1154,13 @@ def plot_sf_vs_energy(
 def plot_spectra(
     lq_class,
     data,
-    cut_param="LQ_Cut",
     xrange=(900, 3000),
     n_bins=2101,
     xrange_inset=(1580, 1640),
     n_bins_inset=200,
     figsize=(12, 8),
     fontsize=12,
+    cut_param="LQ_Cut",
 ) -> plt.figure:
     """Plots a 2D histogram of the LQ classifier vs calibrated energy"""
 
