@@ -14,7 +14,8 @@ from dbetto import TextDB
 from rich.console import Console
 from rich.status import Status
 
-from .utils import _read_dataflow_config, _setup_executor, _setup_spinner, get_recursive
+from .cycle_record import CycleRecord
+from .utils import _read_dataflow_config, _setup_executor, _setup_spinner, get_recursive, _tiers_to_dict
 
 
 def query_runs(
@@ -127,28 +128,17 @@ def query_runs(
                 raise ValueError(msg)
             cycle_def = query_config["cycle_def"]
 
-        # turn tiers into list of tier-name/path pairs
-        if tiers is None:
-            tiers = query_config.get("tiers", ["raw"])
-        if isinstance(tiers, str):
-            tiers = [tiers]
-        if isinstance(tiers, Mapping):
-            tier_list = [(f"tier_{t}", p) for t, p in tiers.items()]
-        else:
-            tier_list = [(f"tier_{t}", df_paths[f"tier_{t}"]) for t in tiers]
+        tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
         if ignored_cycles is None:
             ignored_cycles = query_config.get("ignored_cycles", None)
 
-        if join == "inner":
-            this_tier = tier_list[0]
-            other_tiers = tier_list[1:]
-        elif join == "outer":
-            this_tier = tier_list[0]
-            other_tiers = []
-        elif this_tier := next((t for t in tier_list if f"tier_{join}" == t[0]), False):
+        if join in ("inner", "outer"):
+            # fancy one-liner to split first item from remaining items
+            this_tier, other_tiers = (next(it:=iter(tiers.items())), dict(it))
+        elif this_tier := next((t for t in tiers if join == t), False):
             # if join is a tier name, find the matching entry in tiers
-            other_tiers = [t for t in tier_list if t != this_tier]
+            other_tiers = {t:p for t, p in tiers.items() if t != this_tier}
         else:
             msg = f"invalid join argument {join}"
             raise ValueError(msg)
@@ -177,9 +167,12 @@ def query_runs(
             if join == "inner":
                 for subdir in copy(dirnames):
                     if not all(
-                        Path(p, relpath, subdir).is_dir() for _, p in other_tiers
+                        Path(p, relpath, subdir).is_dir() for _, p in other_tiers.items()
                     ):
                         dirnames.remove(subdir)
+
+            if len(files) == 0:
+                continue
 
             if executor is None:
                 records += _get_run_records_loop(
@@ -187,7 +180,7 @@ def query_runs(
                     relpath,
                     col_names,
                     this_tier,
-                    other_tiers,
+                    other_tiers if join != "outer" else dict(),
                     join == "inner",
                     removed,
                     runs,
@@ -200,7 +193,7 @@ def query_runs(
                         relpath,
                         col_names,
                         this_tier,
-                        other_tiers,
+                        other_tiers if join != "outer" else dict(),
                         join == "inner",
                         removed,
                         runs,
@@ -211,13 +204,13 @@ def query_runs(
             records = [r for recs in records for r in recs.result()]
 
         # If outer join, recursively query other tiers and perform outer join
-        if join == "outer" and len(tiers) > 1:
+        if join == "outer" and len(other_tiers) > 0:
             other = query_runs(
                 runs=runs,
                 dataflow_config=dataflow_config,
                 group_by=None,
                 sort_by=sort_by,
-                tiers=tiers[1:],
+                tiers=other_tiers,
                 join="outer",
                 ignored_cycles=ignored_cycles,
                 processes=processes,
@@ -227,20 +220,18 @@ def query_runs(
             )
 
             if len(other) == 0:
-                records = [r | {f"tier_{t}": None for t in tiers[1:]} for r in records]
+                records = [r | {f"tier_{t}": None for t in other_tiers} for r in records]
             elif len(records) == 0:
-                records = [r | {f"tier_{this_tier}": None} for r in other]
+                records = [r | {f"tier_{this_tier}": None} for r in other.to_dict(orient="records")]
             else:
-                records = (
-                    ak.to_dataframe(records)
-                    .merge(
-                        other,
-                        on=["cycle", "relpath", *col_names],
-                        how="outer",
-                    )
-                    .where(records.notna(), None)
-                    .to_dict(orient="records")
+                records = ak.to_dataframe(records)
+                records = records.merge(
+                    other,
+                    on=["cycle", "relpath", *col_names],
+                    how="outer",
                 )
+                records.where(records.notna(), None, inplace=True)
+                records = records.to_dict(orient="records")
 
         # Format and return results
         records.sort(
@@ -316,75 +307,54 @@ def list_run_fields(
             msg = "cycle_def must be provided either as kwarg or in dataflow_config"
             raise ValueError(msg)
         cycle_def = query_config["cycle_def"]
+    tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
-    # turn tiers into list of tier-name/path pairs
-    if tiers is None:
-        tiers = query_config.get("tiers", ["raw"])
-    if isinstance(tiers, str):
-        tiers = [tiers]
-    if isinstance(tiers, Mapping):
-        tiers = [(f"tier_{t}", p) for t, p in tiers.items()]
-    else:
-        tiers = [(f"tier_{t}", df_paths[f"tier_{t}"]) for t in tiers]
-
-    return {"relpath", "cycle"} | set(cycle_def.split("-")) | {t[0] for t in tiers}
+    return {"relpath", "cycle"} | set(cycle_def.split("-")) | tiers.keys()
 
 
 def _get_run_records_loop(
     files: list[str],
     relpath: str,
     col_names: list[str],
-    this_tier: tuple[str, str],
-    other_tiers: list[tuple[str, str]],
+    this_tier: dict[str, str],
+    other_tiers: dict[str, str],
     inner_join: bool,
     removed: set[str],
     runs,
 ):
     # Worker for query_runs to build a list of records for a directory
     records = []
-    # parser to identify data files
-    parse_cycle = re.compile(f"(.*)-{this_tier[0]}\\.lh5")
 
-    # parse file names for data
     for f in sorted(files):
-        record = dict.fromkeys(col_names)
-        record["relpath"] = relpath
-
-        match = parse_cycle.search(f)
+        # check if file name matches expected cycle patterns
+        match = CycleRecord.parse_cycle.search(f)
         if not match:
             continue
         cycle_name = match.group(1)
         if cycle_name in removed:
             continue
 
-        # extract fields from cycle name
-        cycle = cycle_name
-        cycle_vals = cycle_name.split("-")
-        if len(cycle_vals) != len(col_names):
+        # Create the record
+        record = {
+            "relpath": relpath,
+            "cycle": cycle_name,
+            f"tier_{this_tier[0]}": f"{this_tier[1]}/{relpath}/{f}",
+        }
+        try:
+            CycleRecord.update_cycle_fields(record, col_names)
+        except ValueError:
             continue
-
-        for k, v in zip(col_names, cycle_vals, strict=True):
-            record[k] = v
-        record["cycle"] = cycle
-        record[this_tier[0]] = f"{this_tier[1]}/{relpath}/{f}"
 
         # evaluate the selection
         select_run = eval(runs, {}, record) if runs else True
         if not bool(select_run):
             continue
 
-        # check if file exists in all tiers and add other tiers' files
-        for t, p in other_tiers:
-            path = f"{p}/{relpath}/{cycle}-{t}.lh5"
-            if not Path(path).exists():
-                if inner_join:
-                    record = None
-                    break
-                path = None
-            record[t] = path
-        if not record:
+        # update record with other tiers
+        try:
+            CycleRecord.update_tiers(record, other_tiers, raise_on_missing=inner_join)
+        except FileNotFoundError:
             continue
 
         records.append(record)
-
     return records
