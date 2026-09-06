@@ -132,7 +132,7 @@ def test_bootstrap_valid_pars_terminates_when_nothing_valid():
     pars = [1, 0, 1, 0, 0.1, 0, 0]
     cov = np.diag([1e-16] * 7)
 
-    def always_raises(p):
+    def always_raises(_p):
         msg = "no draw is usable"
         raise ValueError(msg)
 

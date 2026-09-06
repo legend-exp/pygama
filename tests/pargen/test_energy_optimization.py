@@ -7,7 +7,7 @@ import numpy as np
 import scipy
 
 import pygama.math.distributions as pgd
-from pygama.pargen import energy_optimisation  # noqa: F401
+from pygama.pargen import energy_optimisation
 from pygama.pargen.energy_optimisation import (
     _fit_at_limit,
     _fit_bounds_by_index,
@@ -112,7 +112,7 @@ def test_get_peak_fwhm_with_dt_corr_returns_finite_errors(caplog):
     dt = np.zeros_like(energies)
 
     with caplog.at_level(logging.WARNING):
-        fwhm, fwhm_o_max, fwhm_err, fwhm_o_max_err, chisqr, n_sig, *_ = (
+        fwhm, _fwhm_o_max, fwhm_err, fwhm_o_max_err, _chisqr, _n_sig, *_ = (
             get_peak_fwhm_with_dt_corr(
                 energies,
                 0.0,
