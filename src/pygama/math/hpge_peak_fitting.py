@@ -85,10 +85,12 @@ def bootstrap_valid_pars(
     last_error = None
 
     while len(values) < size and n_drawn < max_draws:
-        batch = rng.multivariate_normal(pars, cov, size=size)
+        # draw only what could still be needed, so every generated draw is
+        # consumed and n_drawn is exactly the number of draws generated
+        batch = rng.multivariate_normal(
+            pars, cov, size=min(size - len(values), max_draws - n_drawn)
+        )
         for p in batch:
-            if n_drawn >= max_draws:
-                break
             n_drawn += 1
             if bounds is not None and not _within_bounds(p, bounds):
                 last_error = "outside fit bounds"
@@ -104,8 +106,6 @@ def bootstrap_valid_pars(
                 continue
             accepted.append(p)
             values.append(value)
-            if len(values) == size:
-                break
 
     if len(values) < size:
         log.warning(
