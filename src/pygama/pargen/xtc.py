@@ -53,7 +53,7 @@ FIT_STATUS = {
 #: Statuses whose ``mu`` and ``sigma`` come from a converged fit.
 FIT_STATUS_SUCCESS = (FIT_STATUS["ok"], FIT_STATUS["ok_few_points"])
 
-#: Column each polarity is stored under in an xtc lh5 file.  
+#: Column each polarity is stored under in an xtc lh5 file.
 XTC_LH5_FIELD = {"neg": "xtalk_matrix_negative", "pos": "xtalk_matrix_positive"}
 
 XTC_PLOT_RANGE = {"neg": (-0.003, 0.001), "pos": (-0.0007, 0.003)}
@@ -126,8 +126,7 @@ def prepare_baseline(
             )
         except Exception as e:
             msg = (
-                f"baseline selection on {energy_param} failed: "
-                f"{type(e).__name__}: {e}"
+                f"baseline selection on {energy_param} failed: {type(e).__name__}: {e}"
             )
             raise RuntimeError(msg) from e
 
@@ -168,11 +167,7 @@ def prepare_baseline(
     except Exception as e:
         if debug_mode:
             raise
-        log.error(
-            "baseline preparation failed for channel %s: %s",
-            chn_id,
-            e
-        )
+        log.error("baseline preparation failed for channel %s: %s", chn_id, e)
         success = False
 
     return {
@@ -245,15 +240,15 @@ def xtalk_column(
 ) -> dict:
     """Fill the histograms for one column of the cross-talk matrix.
 
-    Selects the events in which *trigger_detector_id* fired with 
-    high enough energy (determined by *trigger_energy_range* in *config*). 
+    Selects the events in which *trigger_detector_id* fired with
+    high enough energy (determined by *trigger_energy_range* in *config*).
 
-    Then, for each detector in the keys of *baseline*, among these events, it 
-    further selects the events in which the detector did *not* 
+    Then, for each detector in the keys of *baseline*, among these events, it
+    further selects the events in which the detector did *not*
     fire with high energy (otherwise it's multiplicity event).
 
     Finally, calculates the per-event cross talk value for each of these events
-    and fills them into a histogram. 
+    and fills them into a histogram.
 
     Detector pairs skipped are recorded with ``valid = False`` and an empty
     histogram. This happens when the response channel is the trigger itself, or when
@@ -271,7 +266,7 @@ def xtalk_column(
         Channel id of the trigger detector, without the ``ch`` prefix.
     baseline
         Per-channel baselines, as produced by :func:`prepare_baseline` and
-        collected by channel id. It should have the following structure: 
+        collected by channel id. It should have the following structure:
         {chn_id: {"positive_baseline": float, "negative_baseline": float}, ...}
 
         for example:
@@ -350,7 +345,7 @@ def xtalk_column(
     trigger_selection = None
     trigger_all = None
 
-    # trigger selection. Only need to be done once per column. 
+    # trigger selection. Only need to be done once per column.
     try:
         if _resolve_baseline(baseline, trigger_detector_id) is None:
             msg = f"trigger channel {trigger_detector_id} has no usable baseline"
@@ -391,9 +386,9 @@ def xtalk_column(
         )
         trigger_selection = None
 
-    # loop over response detectors starts here 
-    # If trigger selection failed or the trigger baseline is None, 
-    # skip the whole loop to saving an empty column. 
+    # loop over response detectors starts here
+    # If trigger selection failed or the trigger baseline is None,
+    # skip the whole loop to saving an empty column.
     if trigger_selection is not None:
         for k, response_id in enumerate(chn_id_list):
             if str(response_id) == str(trigger_detector_id):
@@ -525,7 +520,7 @@ def _fit_gaussian_with_fallbacks(
 
     x = pgh.get_bin_centers(bins)
 
-    # too few counts, fallback to histogram arithmetic mean 
+    # too few counts, fallback to histogram arithmetic mean
     if total_counts < low_stats_threshold:
         mu = float(np.sum(x * y) / total_counts)
         sigma = float(np.sqrt(np.sum(y * (x - mu) ** 2) / total_counts))
@@ -546,7 +541,7 @@ def _fit_gaussian_with_fallbacks(
     mu_0 = float(np.average(x_fit, weights=y_fit))
     sigma_0 = float(np.sqrt(np.average((x_fit - mu_0) ** 2, weights=y_fit)))
     if sigma_0 <= 0:
-        sigma_0 = float(x[1] - x[0]) if len(x) > 1 else 1.0 # Prevent ZeroDivisionError
+        sigma_0 = float(x[1] - x[0]) if len(x) > 1 else 1.0  # Prevent ZeroDivisionError
 
     try:
         popt, _ = curve_fit(nb_gauss_amp, x_fit, y_fit, p0=[mu_0, sigma_0, amplitude_0])
@@ -701,8 +696,8 @@ def build_xtalk_matrix(
 ) -> lgdo.Table:
     """Assemble the fitted columns of a cross-talk matrix into the matrix.
 
-    Element ``[j1, j2]`` of a matrix:  ``rawid_index[j1]`` represents triggered 
-    detector, while ``rawid_index[j2]`` represents the responding detector.  
+    Element ``[j1, j2]`` of a matrix:  ``rawid_index[j1]`` represents triggered
+    detector, while ``rawid_index[j2]`` represents the responding detector.
 
     Parameters
     ----------
@@ -719,7 +714,7 @@ def build_xtalk_matrix(
     Returns
     -------
     lgdo.Table
-        A table with the following fields. Values are sorted in the order of 
+        A table with the following fields. Values are sorted in the order of
         ``rawid_index``:
 
         ``rawid_index`` ``(N,)``
@@ -731,8 +726,8 @@ def build_xtalk_matrix(
         ``..._sigma`` ``(N, N)``
             The width of each of those fits, also as fractions.
         ``..._status`` ``(N, N)``
-            The :data:`FIT_STATUS` code of each element, meaning explained in 
-            :func:`xtalk_histogram_fitter`. 
+            The :data:`FIT_STATUS` code of each element, meaning explained in
+            :func:`xtalk_histogram_fitter`.
     """
     config = config or {}
     max_status = int(config.get("max_status", FIT_STATUS["low_stats"]))
