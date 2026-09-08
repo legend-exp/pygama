@@ -22,11 +22,12 @@ from scipy.optimize import curve_fit
 
 import pygama.math.histogram as pgh
 from pygama.math.functions.gauss import nb_gauss_amp
-from pygama.pargen.xtc_utils import EventSelector
 
 log = logging.getLogger(__name__)
 
 DEFAULT_ENERGY_PARAM = "cuspEmax_ctc_cal"
+DEFAULT_BASELINE_CONDITIONS = {"is_empty_candidate": 63}
+DEFAULT_TRIGGER_CONDITIONS = {"is_highly_positive_polarity_candidate": 511}
 DEFAULT_POSITIVE_PARAM = "trapTmax"
 DEFAULT_NEGATIVE_PARAM = "trapTmin"
 DEFAULT_TRIGGER_PARAM = "trapTmax"
@@ -37,6 +38,10 @@ DEFAULT_RANGE_MULTIPLIER = 3
 DEFAULT_LOW_STATS_THRESHOLD = 100
 DEFAULT_Y_MASK_THRESHOLD = 0.05
 DEFAULT_SHARP_FIT_MIN_POINTS = 5
+
+DEFAULT_BUFFER_LEN = 100000
+
+_DSP_SUFFIX = "_dsp"
 
 #: Outcome of fitting one histogram, ordered from the most to the least
 #: trustworthy.  Written into the lh5 file as ``fit_status_codes`` so a
@@ -49,14 +54,31 @@ FIT_STATUS = {
     "no_stats": 4,
     "not_filled": 5,
 }
-
-#: Statuses whose ``mu`` and ``sigma`` come from a converged fit.
 FIT_STATUS_SUCCESS = (FIT_STATUS["ok"], FIT_STATUS["ok_few_points"])
 
-#: Column each polarity is stored under in an xtc lh5 file.
 XTC_LH5_FIELD = {"neg": "xtalk_matrix_negative", "pos": "xtalk_matrix_positive"}
-
 XTC_PLOT_RANGE = {"neg": (-0.003, 0.001), "pos": (-0.0007, 0.003)}
+
+def _selection_mask(
+    table,
+    ene_field: str,
+    conditions: dict | None = None,
+    energy_range: tuple | None = None,
+) -> np.ndarray:
+    """
+    Rows of *table* that survive the event cuts, as a boolean mask.
+    """
+    energies = table[ene_field].nda
+    mask = ~np.isnan(energies)
+
+    for flag, value in (conditions or {}).items():
+        mask &= table[flag].nda == value
+
+    if energy_range is not None:
+        emin, emax = energy_range
+        mask &= (energies >= emin) & (energies <= emax)
+
+    return mask
 
 
 def prepare_baseline(
@@ -64,6 +86,7 @@ def prepare_baseline(
     dsp_files: str | list,
     chn_id: str | int,
     config: dict | None = None,
+    buffer_len: int = DEFAULT_BUFFER_LEN,
     debug_mode: bool = False,
 ) -> dict:
     """Measure the positive and negative baselines of a single channel.
@@ -80,7 +103,7 @@ def prepare_baseline(
         DSP-tier file, or list of files, holding the amplitudes.  Must cover
         the same events, in the same order, as *hit_files*.
     chn_id
-        Channel identifier (rawid) of the detector, without the ``ch``
+        Channel identifier (rawid) of the detsector, without the ``ch``
         prefix.  Tables are read from ``ch{chn_id}/hit/`` and
         ``ch{chn_id}/dsp/``.
     config
@@ -88,14 +111,15 @@ def prepare_baseline(
 
         ``baseline_conditions``
             Mapping of hit-tier flag field to the value it must equal for an
-            event to count as baseline, e.g. ``{"is_empty_candidate": 63}``.
-            Defaults to ``{}``, i.e. no flag cut.
+            event to count as baseline.  Default ``{"is_empty_candidate": 63}``.
         ``energy_param``
             Hit-tier field the selection is applied to.  Default
             ``"cuspEmax_ctc_cal"``.
         ``positive_param``, ``negative_param``
             DSP-tier fields averaged to give the positive and negative
             baselines.  Default ``"trapTmax"`` and ``"trapTmin"``.
+    buffer_len
+        Rows read per chunk.
     debug_mode
         If True, re-raise instead of falling back to a null result.
 
@@ -107,7 +131,7 @@ def prepare_baseline(
         and ``parameters``.
     """
     config = config or {}
-    conditions = config.get("baseline_conditions", {})
+    conditions = dict(config.get("baseline_conditions", DEFAULT_BASELINE_CONDITIONS))
     energy_param = config.get("energy_param", DEFAULT_ENERGY_PARAM)
     positive_param = config.get("positive_param", DEFAULT_POSITIVE_PARAM)
     negative_param = config.get("negative_param", DEFAULT_NEGATIVE_PARAM)
@@ -118,56 +142,60 @@ def prepare_baseline(
 
     try:
         try:
-            baseline_selection = EventSelector(
-                table_path=f"ch{chn_id}/hit/",
-                files=hit_files,
-                ene_dataset=energy_param,
-                conditions=conditions,
+            dsp_iterator = lh5.LH5Iterator(
+                dsp_files,
+                f"ch{chn_id}/dsp",
+                field_mask=[positive_param, negative_param],
+                buffer_len=buffer_len,
             )
+            hit_iterator = lh5.LH5Iterator(
+                hit_files,
+                f"ch{chn_id}/hit",
+                field_mask=[energy_param, *conditions],
+                buffer_len=buffer_len,
+                friend=dsp_iterator,
+                friend_suffix=_DSP_SUFFIX,
+            )
+
+            n_selected = 0
+            positive_chunks = []
+            negative_chunks = []
+            for table in hit_iterator:
+                mask = _selection_mask(table, energy_param, conditions)
+                n_selected += int(mask.sum())
+                positive = table[f"{positive_param}{_DSP_SUFFIX}"].nda[mask]
+                negative = table[f"{negative_param}{_DSP_SUFFIX}"].nda[mask]
+                positive_chunks.append(positive[np.isfinite(positive)])
+                negative_chunks.append(negative[np.isfinite(negative)])
         except Exception as e:
             msg = (
-                f"baseline selection on {energy_param} failed: {type(e).__name__}: {e}"
+                f"baseline selection on {energy_param} over "
+                f"{positive_param}/{negative_param} failed: "
+                f"{type(e).__name__}: {e}"
             )
             raise RuntimeError(msg) from e
 
-        if len(baseline_selection.selected_idxs) == 0:
+        if n_selected == 0:
             msg = "no events passed the baseline selection"
             raise RuntimeError(msg)
 
-        try:
-            positive_selection = EventSelector(
-                table_path=f"ch{chn_id}/dsp/",
-                files=dsp_files,
-                ene_dataset=positive_param,
-                idx=baseline_selection.selected_idxs,
-            )
-            negative_selection = EventSelector(
-                table_path=f"ch{chn_id}/dsp/",
-                files=dsp_files,
-                ene_dataset=negative_param,
-                idx=baseline_selection.selected_idxs,
-            )
-        except Exception as e:
-            msg = (
-                f"reading {positive_param}/{negative_param} on the selected "
-                f"events failed: {type(e).__name__}: {e}"
-            )
-            raise RuntimeError(msg) from e
-
-        if (
-            len(positive_selection.selected_energies) == 0
-            or len(negative_selection.selected_energies) == 0
-        ):
-            msg = "no baseline events survived the dsp-tier nan cut"
+        positive_selected = np.concatenate(positive_chunks)
+        negative_selected = np.concatenate(negative_chunks)
+        if len(positive_selected) == 0 or len(negative_selected) == 0:
+            msg = "no baseline events survived the dsp-tier non-finite cut"
             raise RuntimeError(msg)
 
-        positive_baseline = float(np.mean(positive_selection.selected_energies))
-        negative_baseline = float(np.mean(negative_selection.selected_energies))
+        positive_baseline = float(np.mean(positive_selected))
+        negative_baseline = float(np.mean(negative_selected))
 
     except Exception as e:
         if debug_mode:
             raise
-        log.error("baseline preparation failed for channel %s: %s", chn_id, e)
+        log.error(
+            "baseline preparation failed for channel %s: %s",
+            chn_id,
+            e
+        )
         success = False
 
     return {
@@ -202,7 +230,7 @@ def _resolve_baseline(baseline: dict, chn_id: str | int) -> tuple[float, float] 
 
     positive = float(positive)
     negative = float(negative)
-    if np.isnan(positive) or np.isnan(negative):
+    if not np.isfinite(positive) or not np.isfinite(negative):
         return None
 
     return positive, negative
@@ -215,12 +243,13 @@ def _build_hist(
 
     Returns ``None`` when the sample is empty or has no usable spread.
     """
+    vals = vals[np.isfinite(vals)]
     if vals.size == 0:
         return None
 
     mean = np.mean(vals)
     stdev = np.std(vals)
-    if np.isnan(mean) or np.isnan(stdev) or stdev <= 0:
+    if not np.isfinite(mean) or not np.isfinite(stdev) or stdev <= 0:
         return None
 
     return np.histogram(
@@ -236,23 +265,24 @@ def xtalk_column(
     trigger_detector_id: str | int,
     baseline: dict,
     config: dict | None = None,
+    buffer_len: int = DEFAULT_BUFFER_LEN,
     debug_mode: bool = False,
 ) -> dict:
     """Fill the histograms for one column of the cross-talk matrix.
 
-    Selects the events in which *trigger_detector_id* fired with
-    high enough energy (determined by *trigger_energy_range* in *config*).
+    Selects the events in which *trigger_detector_id* fired with 
+    high enough energy (determined by *trigger_energy_range* in *config*). 
 
-    Then, for each detector in the keys of *baseline*, among these events, it
-    further selects the events in which the detector did *not*
+    Then, for each detector in the keys of *baseline*, among these events, it 
+    further selects the events in which the detector did *not* 
     fire with high energy (otherwise it's multiplicity event).
 
     Finally, calculates the per-event cross talk value for each of these events
-    and fills them into a histogram.
+    and fills them into a histogram. 
 
     Detector pairs skipped are recorded with ``valid = False`` and an empty
     histogram. This happens when the response channel is the trigger itself, or when
-    either channel has no usable baseline (missing, ``None`` or NaN).  If the
+    either channel has no usable baseline (missing, ``None`` or non-finite).  If the
     *trigger* channel has no usable baseline the whole column is skipped.
 
     Parameters
@@ -266,7 +296,7 @@ def xtalk_column(
         Channel id of the trigger detector, without the ``ch`` prefix.
     baseline
         Per-channel baselines, as produced by :func:`prepare_baseline` and
-        collected by channel id. It should have the following structure:
+        collected by channel id. It should have the following structure: 
         {chn_id: {"positive_baseline": float, "negative_baseline": float}, ...}
 
         for example:
@@ -290,9 +320,8 @@ def xtalk_column(
             negative baselines.  Default ``"trapTmax"`` and ``"trapTmin"``.
         ``trigger_conditions``, ``response_conditions``
             Mappings of hit-tier flag field to the value it must equal, for
-            the trigger and response selections respectively, e.g.
-            ``{"is_highly_positive_polarity_candidate": 511}``.  Default
-            ``{}``, i.e. no flag cut.
+            the trigger and response selections respectively.  Default
+            ``{"is_highly_positive_polarity_candidate": 511}`` and ``{}``.
         ``trigger_energy_range``
             ``(emin, emax)`` on ``energy_param`` selecting real triggers.
             Default ``(1500, 99999)``.
@@ -304,6 +333,8 @@ def xtalk_column(
         ``range_multiplier``
             Histogram half-width in standard deviations about the mean.
             Default 3.
+    buffer_len
+        Rows read per chunk during the trigger selection.
     debug_mode
         If True, re-raise instead of falling back to an empty column or an
         empty element.
@@ -322,7 +353,9 @@ def xtalk_column(
     trigger_param = config.get("trigger_param", DEFAULT_TRIGGER_PARAM)
     positive_param = config.get("positive_param", DEFAULT_POSITIVE_PARAM)
     negative_param = config.get("negative_param", DEFAULT_NEGATIVE_PARAM)
-    trigger_conditions = config.get("trigger_conditions", {})
+    trigger_conditions = dict(
+        config.get("trigger_conditions", DEFAULT_TRIGGER_CONDITIONS)
+    )
     response_conditions = config.get("response_conditions", {})
     trigger_energy_range = tuple(
         config.get("trigger_energy_range", DEFAULT_TRIGGER_ENERGY_RANGE)
@@ -342,8 +375,8 @@ def xtalk_column(
     valid = np.zeros(n_response, dtype=bool)
     n_events = np.zeros(n_response, dtype=np.int64)
 
-    trigger_selection = None
-    trigger_all = None
+    trigger_idxs = None
+    trigger_amplitudes_all = None
 
     # trigger selection. Only need to be done once per column.
     try:
@@ -352,29 +385,55 @@ def xtalk_column(
             raise RuntimeError(msg)
 
         try:
-            trigger_selection = EventSelector(
-                table_path=f"ch{trigger_detector_id}/hit/",
-                files=hit_files,
-                ene_dataset=energy_param,
-                conditions=trigger_conditions,
-                energy_range=trigger_energy_range,
+            dsp_iterator = lh5.LH5Iterator(
+                dsp_files,
+                f"ch{trigger_detector_id}/dsp",
+                field_mask=[trigger_param],
+                buffer_len=buffer_len,
             )
+            hit_iterator = lh5.LH5Iterator(
+                hit_files,
+                f"ch{trigger_detector_id}/hit",
+                field_mask=[energy_param, *trigger_conditions],
+                buffer_len=buffer_len,
+                friend=dsp_iterator,
+                friend_suffix=_DSP_SUFFIX,
+            )
+
+            idx_chunks = []
+            amplitude_chunks = []
+            for table in hit_iterator:
+                mask = _selection_mask(
+                    table, energy_param, trigger_conditions, trigger_energy_range
+                )
+                idx_chunks.append(hit_iterator.current_global_entries[mask])
+                amplitude_chunks.append(table[f"{trigger_param}{_DSP_SUFFIX}"].nda[mask])
         except Exception as e:
             msg = f"trigger event selection failed: {type(e).__name__}: {e}"
             raise RuntimeError(msg) from e
 
-        if len(trigger_selection.selected_idxs) == 0:
+        if not idx_chunks:
             msg = "no events passed the trigger selection"
             raise RuntimeError(msg)
 
-        # read once for the whole column: this is the work the column shares
-        try:
-            trigger_all = lh5.read(
-                f"ch{trigger_detector_id}/dsp/{trigger_param}", dsp_files
-            ).nda
-        except Exception as e:
-            msg = f"reading trigger {trigger_param} failed: {type(e).__name__}: {e}"
-            raise RuntimeError(msg) from e
+        trigger_idxs = np.concatenate(idx_chunks).astype(np.int64)
+        trigger_amplitudes_all = np.concatenate(amplitude_chunks)
+
+        usable = np.isfinite(trigger_amplitudes_all) & (trigger_amplitudes_all != 0)
+        if not usable.all():
+            log.debug(
+                "trigger %s: dropping %d of %d events with a non-finite or zero %s",
+                trigger_detector_id,
+                int((~usable).sum()),
+                len(usable),
+                trigger_param,
+            )
+            trigger_idxs = trigger_idxs[usable]
+            trigger_amplitudes_all = trigger_amplitudes_all[usable]
+
+        if len(trigger_idxs) == 0:
+            msg = "no events passed the trigger selection"
+            raise RuntimeError(msg)
 
     except Exception as e:
         if debug_mode:
@@ -384,12 +443,12 @@ def xtalk_column(
             trigger_detector_id,
             e,
         )
-        trigger_selection = None
+        trigger_idxs = None
 
-    # loop over response detectors starts here
-    # If trigger selection failed or the trigger baseline is None,
-    # skip the whole loop to saving an empty column.
-    if trigger_selection is not None:
+    # loop over response detectors starts here 
+    # If trigger selection failed or the trigger baseline is None, 
+    # skip the whole loop to saving an empty column. 
+    if trigger_idxs is not None:
         for k, response_id in enumerate(chn_id_list):
             if str(response_id) == str(trigger_detector_id):
                 log.debug("self-interaction at channel %s ignored", response_id)
@@ -404,21 +463,23 @@ def xtalk_column(
             positive_baseline, negative_baseline = baselines
 
             try:
-                response_selection = EventSelector(
-                    table_path=f"ch{response_id}/hit/",
-                    files=hit_files,
-                    ene_dataset=energy_param,
-                    conditions=response_conditions,
-                    energy_range=response_energy_range,
-                    idx=trigger_selection.selected_idxs,
+                response_hit = lh5.read(
+                    f"ch{response_id}/hit/",
+                    hit_files,
+                    field_mask=[energy_param, *response_conditions],
+                    idx=trigger_idxs,
                 )
 
-                # selected_idxs index the original array, not the trigger
-                # subset, so they address trigger_all directly
-                coincident_idxs = response_selection.selected_idxs
-                trigger_energies = trigger_all[coincident_idxs]
+                keep = _selection_mask(
+                    response_hit,
+                    energy_param,
+                    response_conditions,
+                    response_energy_range,
+                )
+                coincident_idxs = trigger_idxs[keep]
+                trigger_amplitudes = trigger_amplitudes_all[keep]
 
-                response_table = lh5.read(
+                response_dsp = lh5.read(
                     f"ch{response_id}/dsp/",
                     dsp_files,
                     field_mask=[positive_param, negative_param],
@@ -426,11 +487,11 @@ def xtalk_column(
                 )
 
                 neg_vals = (
-                    response_table[negative_param].nda - negative_baseline
-                ) / trigger_energies
+                    response_dsp[negative_param].nda - negative_baseline
+                ) / trigger_amplitudes
                 pos_vals = (
-                    response_table[positive_param].nda - positive_baseline
-                ) / trigger_energies
+                    response_dsp[positive_param].nda - positive_baseline
+                ) / trigger_amplitudes
             except Exception as e:
                 if debug_mode:
                     raise
@@ -443,7 +504,7 @@ def xtalk_column(
                 continue
 
             valid[k] = True
-            n_events[k] = len(trigger_energies)
+            n_events[k] = len(trigger_amplitudes)
 
             neg_hist = _build_hist(neg_vals, nbins, range_multiplier)
             if neg_hist is not None:
@@ -520,7 +581,7 @@ def _fit_gaussian_with_fallbacks(
 
     x = pgh.get_bin_centers(bins)
 
-    # too few counts, fallback to histogram arithmetic mean
+    # too few counts, fallback to histogram arithmetic mean 
     if total_counts < low_stats_threshold:
         mu = float(np.sum(x * y) / total_counts)
         sigma = float(np.sqrt(np.sum(y * (x - mu) ** 2) / total_counts))
@@ -541,7 +602,7 @@ def _fit_gaussian_with_fallbacks(
     mu_0 = float(np.average(x_fit, weights=y_fit))
     sigma_0 = float(np.sqrt(np.average((x_fit - mu_0) ** 2, weights=y_fit)))
     if sigma_0 <= 0:
-        sigma_0 = float(x[1] - x[0]) if len(x) > 1 else 1.0  # Prevent ZeroDivisionError
+        sigma_0 = float(x[1] - x[0]) if len(x) > 1 else 1.0 # Prevent ZeroDivisionError
 
     try:
         popt, _ = curve_fit(nb_gauss_amp, x_fit, y_fit, p0=[mu_0, sigma_0, amplitude_0])
@@ -696,8 +757,8 @@ def build_xtalk_matrix(
 ) -> lgdo.Table:
     """Assemble the fitted columns of a cross-talk matrix into the matrix.
 
-    Element ``[j1, j2]`` of a matrix:  ``rawid_index[j1]`` represents triggered
-    detector, while ``rawid_index[j2]`` represents the responding detector.
+    Element ``[j1, j2]`` of a matrix:  ``rawid_index[j1]`` represents triggered 
+    detector, while ``rawid_index[j2]`` represents the responding detector.  
 
     Parameters
     ----------
@@ -714,7 +775,7 @@ def build_xtalk_matrix(
     Returns
     -------
     lgdo.Table
-        A table with the following fields. Values are sorted in the order of
+        A table with the following fields. Values are sorted in the order of 
         ``rawid_index``:
 
         ``rawid_index`` ``(N,)``
@@ -726,8 +787,8 @@ def build_xtalk_matrix(
         ``..._sigma`` ``(N, N)``
             The width of each of those fits, also as fractions.
         ``..._status`` ``(N, N)``
-            The :data:`FIT_STATUS` code of each element, meaning explained in
-            :func:`xtalk_histogram_fitter`.
+            The :data:`FIT_STATUS` code of each element, meaning explained in 
+            :func:`xtalk_histogram_fitter`. 
     """
     config = config or {}
     max_status = int(config.get("max_status", FIT_STATUS["low_stats"]))
