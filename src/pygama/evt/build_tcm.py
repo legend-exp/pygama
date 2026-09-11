@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 import re
-from pathlib import Path
+from copy import deepcopy
+from typing import Literal
 
 import awkward as ak
 import lgdo
 import lh5
+import numpy as np
 from lgdo.types import Struct, Table, VectorOfVectors
 
 from . import tcm as ptcm
@@ -49,10 +51,12 @@ def build_tcm(
     window_refs: str | list[str] = "last",
     out_file: str | None = None,
     out_name: str = "tcm",
+    channel_views: Literal["sparse", "dense", "all"] | None = None,
+    view_group: str = "ch{key}",
     wo_mode: str = "write_safe",
     buffer_len: int | None = None,
     out_fields: str | list[str] | None = None,
-) -> lgdo.Table | None:
+) -> lgdo.Table | tuple[lgdo.Table, dict[str, np.ndarray]] | None:
     r"""Build a Time Coincidence Map (TCM).
 
     Given a list of input tables, create an output table containing an entry
@@ -85,6 +89,20 @@ def build_tcm(
         written; the TCM will just be returned in memory.
     out_name
         name for the TCM table in the output file.
+    channel_views
+        mode for creating View of TCM for each channel, with only events
+        containing that channel. Options:
+        - ``"sparse"``: use in sparse trigger mode; a minority of events contain each channel
+        - ``"dense"``: use in global trigger mode; (almost) all events contain (almost) all channels
+        - ``"all"``: use in global trigger mode; assume all events are contained in all channels;
+            if this is not the case, a RunTimeError will be raised!
+        - ``"none"`` or ``None``: no channel views
+    view_group
+        format string for name of group containing view for each channel. View will
+        be named ``out_name``. Can include the format specifiers:
+        - ``key``: the index or hash integer of the channel
+        - ``table``: the name of the input table
+        Default: ``"ch{key}"`` (e.g. ``ch12345678/tcm``)
     wo_mode
         mode to send to :meth:`~lh5.io.store.LH5Store.write`.
 
@@ -94,10 +112,11 @@ def build_tcm(
 
     Returns
     -------
-    lgdo.Table or None
-        If ``out_file`` is ``None`` the resulting TCM is returned as a
-        :class:`lgdo.Table`. Otherwise ``None`` is returned after writing the
-        table to ``out_file``.
+    ``(lgdo.Table, dict[str, np.ndarray])`` or ``lgdo.Table`` or ``None``
+        If we are outputting to a file, return ``None``. Otherwise,
+        if ``out_file`` is ``None`` the resulting TCM is returned as a
+        :class:`lgdo.Table`; if ``channel_views`` is additionally enabled,
+        also return a ``dict`` from ``channel_name`` to entry list.
 
     See Also
     --------
@@ -137,6 +156,7 @@ def build_tcm(
     iterators = []
     table_keys = []
     all_tables = []
+    view_gps = {}
 
     # determine buffer length automatically
     if buffer_len is None:
@@ -195,6 +215,7 @@ def build_tcm(
                 )
             )
             table_keys.append(table_key)
+            view_gps[view_group.format(key=table_key, table=table)] = ([], 0)
 
     coin_windows = [
         ptcm.coin_groups(n, w, r)
@@ -204,31 +225,100 @@ def build_tcm(
     tcm_gen = ptcm.generate_tcm_cols(
         iterators, coin_windows=coin_windows, table_keys=table_keys, fields=out_fields
     )
-    tcm = []
-    # clear existing output files
-    if out_file is not None and wo_mode == "of" and Path(out_file).exists():
-        Path(out_file).unlink()
 
-    wrote_first = False
-    while True:
-        try:
-            out_tbl = tcm_gen.__next__()
+    tcm = None
+    tcm_row = 0
+    channel_views = channel_views.strip().lower() if channel_views is not None else None
+    with lh5.LH5Store(keep_open=True, default_mode=wo_mode) as st:
+        for out_tbl in tcm_gen:
             out_tbl.attrs.update(
                 {"tables": str(all_tables), "hash_func": str(hash_func)}
             )
+
+            # build entry list for each channel
+            if channel_views not in ("none", None):
+                for key, (view, (old_entries, offset)) in zip(
+                    table_keys, view_gps.items(), strict=True
+                ):
+                    table_key = out_tbl.table_key.view_as("ak")
+                    if channel_views == "sparse":
+                        entries = np.flatnonzero(
+                            np.array(ak.any(table_key == key, axis=-1))
+                        )
+                        entries += tcm_row
+                        new_off = offset + len(old_entries)
+                    elif channel_views == "dense":
+                        # This builds a 2d array of ranges where our mask is True by identifying
+                        # indices where mask changes between True and False
+                        entries = np.reshape(
+                            np.flatnonzero(
+                                np.diff(
+                                    np.concatenate(
+                                        [
+                                            [0],
+                                            np.array(ak.any(table_key == key, axis=-1)),
+                                            [0],
+                                        ]
+                                    )
+                                )
+                            ),
+                            (-1, 2),
+                        )
+                        entries += tcm_row
+                        new_off = offset + len(old_entries)
+                    elif channel_views == "all":
+                        # Build a single 2d array with all entries; overwrite for each iteration
+                        if not ak.all(ak.any(table_key == key, axis=-1)):
+                            msg = f"channel {key} not found in all events; channel_views='all' failed"
+                            raise RuntimeError(msg)
+                        entries = np.array([[0, len(table_key) + tcm_row]])
+                        new_off = 0
+                    else:
+                        msg = f"unknown channel_views mode: {channel_views}"
+                        raise ValueError(msg)
+                    view_gps[view] = (entries, new_off)
+
+            # Write to file
             if out_file is not None:
-                lh5.write(
+                st.write(
                     out_tbl,
                     out_name,
                     out_file,
-                    wo_mode=wo_mode if not wrote_first else "a",
+                    write_start=tcm_row,
                 )
-                wrote_first = True
+
+                if channel_views not in ("none", None):
+                    for view, (entries, offset) in view_gps.items():
+                        st.write_view(
+                            out_name,
+                            entries,
+                            out_name,
+                            out_file,
+                            group=view,
+                            link_type="hard",
+                            write_start=offset,
+                            wo_mode=None if channel_views != "all" else "o",
+                        )
+
+            # build up the table in memory
+            elif tcm is None:
+                tcm = deepcopy(out_tbl)
+                channel_entries = {k: v[0] for k, v in view_gps.items()}
             else:
                 tcm.append(out_tbl)
-        except StopIteration:
-            break
+                if channel_views not in ("none", None):
+                    for ch_name, (new_entries, _) in view_gps.items():
+                        if channel_views == "all":
+                            channel_entries[ch_name] = new_entries
+                        else:
+                            channel_entries[ch_name] = np.append(
+                                channel_entries[ch_name], new_entries, axis=0
+                            )
 
-    if out_file is None:
-        return _concat_tables(tcm)
-    return None
+            tcm_row += len(out_tbl)
+
+    if tcm is None:
+        return None
+    if channel_views in ("none", None):
+        return tcm
+    return tcm, channel_entries
