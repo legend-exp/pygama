@@ -136,11 +136,11 @@ def query_runs(
         if join in ("inner", "outer"):
             # fancy one-liner to split first item from remaining items
             this_tier, other_tiers = (next(it:=iter(tiers.items())), dict(it))
-        elif this_tier := next((t for t in tiers if join == t), False):
+        elif this_tier := next((t for t in tiers.items() if join == t[0]), False):
             # if join is a tier name, find the matching entry in tiers
-            other_tiers = {t:p for t, p in tiers.items() if t != this_tier}
+            other_tiers = {t:p for t, p in tiers.items() if t != this_tier[0]}
         else:
-            msg = f"invalid join argument {join}"
+            msg = f"invalid join argument {join}. Valid options: inner, outer, {", ".join(tiers)}"
             raise ValueError(msg)
         base_path = this_tier[1]
 
