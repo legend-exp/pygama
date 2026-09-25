@@ -900,7 +900,7 @@ class LQCal:
 def plot_lq_mean_time(
     lq_class,
     data,  # noqa: ARG001
-    lq_param="LQ_Timecorr",  # noqa: ARG001
+    lq_param="LQ_Timecorr",
     figsize=(12, 8),
     fontsize=12,
 ) -> plt.figure:
@@ -921,7 +921,7 @@ def plot_lq_mean_time(
         )
 
         grouped_means = [
-            cal_dict["LQ_Timecorr"]["parameters"]["a"]
+            cal_dict[lq_param]["parameters"]["a"]
             for tstamp, cal_dict in lq_class.cal_dicts.items()
         ]
         ax.step(
@@ -1111,7 +1111,13 @@ def plot_survival_fraction_curves(
 
 
 def plot_sf_vs_energy(
-    lq_class, data, xrange=(900, 3000), n_bins=701, figsize=(12, 8), fontsize=12
+    lq_class,
+    data,
+    xrange=(900, 3000),
+    n_bins=701,
+    figsize=(12, 8),
+    fontsize=12,
+    cut_param="LQ_Cut",
 ) -> plt.figure:
     """Plots the survival fraction as a function of energy"""
 
@@ -1122,7 +1128,7 @@ def plot_sf_vs_energy(
     try:
         bins = np.linspace(xrange[0], xrange[1], n_bins)
         counts_pass, bins_pass, _ = pgh.get_hist(
-            data.query(f"{lq_class.selection_string}&LQ_Cut")[
+            data.query(f"{lq_class.selection_string}&{cut_param}")[
                 lq_class.cal_energy_param
             ],
             bins=bins,
@@ -1154,6 +1160,7 @@ def plot_spectra(
     n_bins_inset=200,
     figsize=(12, 8),
     fontsize=12,
+    cut_param="LQ_Cut",
 ) -> plt.figure:
     """Plots a 2D histogram of the LQ classifier vs calibrated energy"""
 
@@ -1178,7 +1185,7 @@ def plot_spectra(
         #     label="after double sided A/E cut",
         # )
         ax.hist(
-            data.query(f"{lq_class.selection_string}&LQ_Cut")[
+            data.query(f"{lq_class.selection_string}&{cut_param}")[
                 lq_class.cal_energy_param
             ],
             bins=bins,
@@ -1186,7 +1193,7 @@ def plot_spectra(
             label="after LQ cut",
         )
         ax.hist(
-            data.query(f"{lq_class.selection_string} & (~LQ_Cut)")[
+            data.query(f"{lq_class.selection_string} & (~{cut_param})")[
                 lq_class.cal_energy_param
             ],
             bins=bins,
@@ -1212,14 +1219,14 @@ def plot_spectra(
         #     histtype="step",
         # )
         axins.hist(
-            select_df.query(f"{lq_class.selection_string}&LQ_Cut")[
+            select_df.query(f"{lq_class.selection_string}&{cut_param}")[
                 lq_class.cal_energy_param
             ],
             bins=bins,
             histtype="step",
         )
         axins.hist(
-            select_df.query(f"{lq_class.selection_string} & (~LQ_Cut)")[
+            select_df.query(f"{lq_class.selection_string} & (~{cut_param})")[
                 lq_class.cal_energy_param
             ],
             bins=bins,
