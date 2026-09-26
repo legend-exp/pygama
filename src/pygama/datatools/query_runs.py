@@ -48,7 +48,8 @@ def query_runs(
     ----------
     runs
         boolean python expression for selecting runs, using column names defined
-        in ``cycle_def`` as variables.
+        in ``cycle_def``, plus ``relpath`` and ``cycle`` as variables. Note that
+        tier paths are not included as variables.
 
         Examples:
 
@@ -114,6 +115,8 @@ def query_runs(
     library
         format of returned table. Can be ``ak`` (default), ``pd`` or ``np``
 
+        Note: ``np`` will break if ``None`` values appear in table (e.g. outer join)
+
     progress:
         if ``True`` draw progress spinner; can also provide a :class:`rich.Status`
         or:class:`rich.Console`
@@ -141,7 +144,7 @@ def query_runs(
             # if join is a tier name, find the matching entry in tiers
             other_tiers = {t:p for t, p in tiers.items() if t != this_tier[0]}
         else:
-            msg = f"invalid join argument {join}. Valid options: inner, outer, {", ".join(tiers)}"
+            msg = f"invalid join argument {join}. Valid options: inner, outer, {', '.join(tiers)}"
             raise ValueError(msg)
         base_path = this_tier[1]
 
@@ -274,7 +277,7 @@ def list_run_fields(
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
     cycle_def: str | None = None,
     tiers: str | Collection[str] | Mapping[str, str] | None = None,
-) -> list[str]:
+) -> set[str]:
     """
     List the fields that are available to :meth:`query_runs`.
 
