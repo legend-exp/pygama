@@ -99,7 +99,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         cycle_relpath = cycle_path.parent.relative_to(tiers[tier])
         record = {
             "cycle": cycle_name,
-            "relpath": cycle_relpath
+            "relpath": str(cycle_relpath)
         }
         cls.update_tiers(record, tiers, raise_on_missing=raise_on_missing)
 
@@ -157,7 +157,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
                 msg = f"tier {t} for cycle {record['cycle']}"
                 raise FileNotFoundError(msg)
             else:
-                record[t] = None
+                record[f"tier_{t}"] = None
 
     def get_tier_filepath(
         record,

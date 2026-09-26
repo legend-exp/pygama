@@ -10,6 +10,7 @@ from pathlib import Path
 
 import awkward as ak
 import numpy as np
+import pandas as pd
 from dbetto import TextDB
 from rich.console import Console
 from rich.status import Status
@@ -222,7 +223,7 @@ def query_runs(
             if len(other) == 0:
                 records = [r | {f"tier_{t}": None for t in other_tiers} for r in records]
             elif len(records) == 0:
-                records = [r | {f"tier_{this_tier}": None} for r in other.to_dict(orient="records")]
+                records = [r | {f"tier_{this_tier[0]}": None} for r in other.to_dict(orient="records")]
             else:
                 records = ak.to_dataframe(records)
                 records = records.merge(
@@ -262,7 +263,7 @@ def query_runs(
         if library == "ak":
             return result
         if library == "pd":
-            return ak.to_dataframe(result)
+            return pd.DataFrame(ak.to_list(result))
         if library == "np":
             return ak.to_numpy(result)
         msg = "library must be 'ak', 'pd' or 'np'"
@@ -309,7 +310,7 @@ def list_run_fields(
         cycle_def = query_config["cycle_def"]
     tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
-    return {"relpath", "cycle"} | set(cycle_def.split("-")) | tiers.keys()
+    return {"relpath", "cycle"} | set(cycle_def.split("-")) | {f"tier_{t}" for t in tiers}
 
 
 def _get_run_records_loop(
@@ -338,7 +339,6 @@ def _get_run_records_loop(
         record = {
             "relpath": relpath,
             "cycle": cycle_name,
-            f"tier_{this_tier[0]}": f"{this_tier[1]}/{relpath}/{f}",
         }
         try:
             CycleRecord.update_cycle_fields(record, col_names)
@@ -351,6 +351,7 @@ def _get_run_records_loop(
             continue
 
         # update record with other tiers
+        record[f"tier_{this_tier[0]}"] = f"{this_tier[1]}/{relpath}/{f}"
         try:
             CycleRecord.update_tiers(record, other_tiers, raise_on_missing=inner_join)
         except FileNotFoundError:
