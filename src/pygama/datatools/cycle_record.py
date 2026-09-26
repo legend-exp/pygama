@@ -2,6 +2,7 @@ from abc import ABCMeta
 from collections.abc import Collection, Mapping
 
 import awkward as ak
+import numpy as np
 import pandas as pd
 import re
 from pathlib import Path
@@ -12,11 +13,17 @@ class CycleRecordMeta(ABCMeta):
     """Recognize mappings containing the fields required for cycle records."""
 
     def __instancecheck__(cls, instance):
-        if not isinstance(instance, (Mapping, pd.Series, ak.Record)):
-            return False
         try:
+            if isinstance(instance, (np.ndarray, np.void)):
+                return (
+                    instance.shape == () and
+                    instance["relpath"].dtype.type is np.str_ and
+                    instance["cycle"].dtype.type is np.str_
+                )
+            elif not isinstance(instance, (Mapping, pd.Series, ak.Record)):
+                return False
             return isinstance(instance["relpath"], (str, Path)) and isinstance(instance["cycle"], str)
-        except (KeyError, AttributeError, ak.errors.FieldNotFoundError):
+        except (KeyError, AttributeError, IndexError, ak.errors.FieldNotFoundError):
             return False
 
 class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
@@ -36,6 +43,8 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
 
         if isinstance(record, Mapping):
             super().__init__(record)
+        elif isinstance(record, (np.ndarray, np.void)):
+            super().__init__({ k:record[k].item() for k in record.dtype.names })
         elif isinstance(record, pd.Series):
             super().__init__(record.to_dict())
         elif isinstance(record, ak.Record):
