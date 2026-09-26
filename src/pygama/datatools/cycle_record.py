@@ -1,13 +1,17 @@
+from __future__ import annotations
+
+import re
 from abc import ABCMeta
 from collections.abc import Collection, Mapping
+from pathlib import Path
 
 import awkward as ak
 import numpy as np
 import pandas as pd
-import re
-from pathlib import Path
-from pygama.datatools.utils import _read_dataflow_config, _tiers_to_dict
 from dbetto import AttrsDict
+
+from pygama.datatools.utils import _read_dataflow_config, _tiers_to_dict
+
 
 class CycleRecordMeta(ABCMeta):
     """Recognize mappings containing the fields required for cycle records."""
@@ -16,21 +20,25 @@ class CycleRecordMeta(ABCMeta):
         try:
             if isinstance(instance, (np.ndarray, np.void)):
                 return (
-                    instance.shape == () and
-                    instance["relpath"].dtype.type is np.str_ and
-                    instance["cycle"].dtype.type is np.str_
+                    instance.shape == ()
+                    and instance["relpath"].dtype.type is np.str_
+                    and instance["cycle"].dtype.type is np.str_
                 )
-            elif not isinstance(instance, (Mapping, pd.Series, ak.Record)):
+            if not isinstance(instance, (Mapping, pd.Series, ak.Record)):
                 return False
-            return isinstance(instance["relpath"], (str, Path)) and isinstance(instance["cycle"], str)
+            return isinstance(instance["relpath"], (str, Path)) and isinstance(
+                instance["cycle"], str
+            )
         except (KeyError, AttributeError, IndexError, ak.errors.FieldNotFoundError):
             return False
+
 
 class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
     """`RunRecord` is a read-only wrapper for rows in a run table built by `query_runs`.
     This class will validate the data in the row and provide a configurable
     (via dataflow_config) interface to the data in the row.
     """
+
     parse_cycle = re.compile(r"(\w+(?:-\w+)*)-tier_(\w+)\.lh5")
 
     def __init__(self, record):
@@ -39,12 +47,13 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         based implementation
         """
         if not isinstance(record, CycleRecord):
-            raise ValueError(f"record must contain 'cycle' and 'relpath' fields")
+            msg = "record must contain 'cycle' and 'relpath' fields"
+            raise ValueError(msg)
 
         if isinstance(record, Mapping):
             super().__init__(record)
         elif isinstance(record, (np.ndarray, np.void)):
-            super().__init__({ k:record[k].item() for k in record.dtype.names })
+            super().__init__({k: record[k].item() for k in record.dtype.names})
         elif isinstance(record, pd.Series):
             super().__init__(record.to_dict())
         elif isinstance(record, ak.Record):
@@ -81,12 +90,14 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         # split the cycle name from the data tier
         try:
             cycle_name, tier = cls.parse_cycle.fullmatch(cycle_file).groups()
-        except AttributeError:
+        except AttributeError as e:
             msg = f"invalid file name: {cycle_file}"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
         if not isinstance(tiers, Mapping) or cycle_def is None:
-            dataflow_config, df_paths, query_config = _read_dataflow_config(dataflow_config)
+            dataflow_config, df_paths, query_config = _read_dataflow_config(
+                dataflow_config
+            )
 
         tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
@@ -97,10 +108,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
             raise ValueError(msg)
 
         cycle_relpath = cycle_path.parent.relative_to(tiers[tier])
-        record = {
-            "cycle": cycle_name,
-            "relpath": str(cycle_relpath)
-        }
+        record = {"cycle": cycle_name, "relpath": str(cycle_relpath)}
         cls.update_tiers(record, tiers, raise_on_missing=raise_on_missing)
 
         if cycle_def is None:
@@ -131,9 +139,9 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         try:
             for f, v in zip(cycle_def, record["cycle"].split("-"), strict=True):
                 record[f] = v
-        except ValueError:
+        except ValueError as e:
             msg = f"cycle name {record['cycle']} has different number of fields from cycle_def {list(cycle_def)}"
-            raise ValueError(msg)
+            raise ValueError(msg) from e
 
     def update_tiers(
         record,
@@ -141,7 +149,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         raise_on_missing: bool = False,
     ):
         """Update a record to add files found for given tiers
-        
+
         Parameters
         ----------
         record
@@ -164,7 +172,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         tier: str,
         *,
         dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
-        tiers: Mapping[str, str] = None,
+        tiers: Mapping[str, str] | None = None,
     ):
         """Build the filename for a tier in a given ``CycleRecord``
 
@@ -181,7 +189,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
             mapping from tier name to base path; ignore ``dataflow_config``
         """
         if not isinstance(record, CycleRecord):
-            msg = f"record must contain 'cycle' and 'relpath' fields"
+            msg = "record must contain 'cycle' and 'relpath' fields"
             raise ValueError(msg)
 
         if not isinstance(tiers, Mapping):

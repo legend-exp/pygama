@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Collection, Mapping
 from concurrent.futures import Executor
 from contextlib import ExitStack
@@ -16,7 +15,13 @@ from rich.console import Console
 from rich.status import Status
 
 from .cycle_record import CycleRecord
-from .utils import _read_dataflow_config, _setup_executor, _setup_spinner, get_recursive, _tiers_to_dict
+from .utils import (
+    _read_dataflow_config,
+    _setup_executor,
+    _setup_spinner,
+    _tiers_to_dict,
+    get_recursive,
+)
 
 
 def query_runs(
@@ -139,10 +144,10 @@ def query_runs(
 
         if join in ("inner", "outer"):
             # fancy one-liner to split first item from remaining items
-            this_tier, other_tiers = (next(it:=iter(tiers.items())), dict(it))
+            this_tier, other_tiers = (next(it := iter(tiers.items())), dict(it))
         elif this_tier := next((t for t in tiers.items() if join == t[0]), False):
             # if join is a tier name, find the matching entry in tiers
-            other_tiers = {t:p for t, p in tiers.items() if t != this_tier[0]}
+            other_tiers = {t: p for t, p in tiers.items() if t != this_tier[0]}
         else:
             msg = f"invalid join argument {join}. Valid options: inner, outer, {', '.join(tiers)}"
             raise ValueError(msg)
@@ -171,7 +176,8 @@ def query_runs(
             if join == "inner":
                 for subdir in copy(dirnames):
                     if not all(
-                        Path(p, relpath, subdir).is_dir() for _, p in other_tiers.items()
+                        Path(p, relpath, subdir).is_dir()
+                        for _, p in other_tiers.items()
                     ):
                         dirnames.remove(subdir)
 
@@ -184,7 +190,7 @@ def query_runs(
                     relpath,
                     col_names,
                     this_tier,
-                    other_tiers if join != "outer" else dict(),
+                    other_tiers if join != "outer" else {},
                     join == "inner",
                     removed,
                     runs,
@@ -197,7 +203,7 @@ def query_runs(
                         relpath,
                         col_names,
                         this_tier,
-                        other_tiers if join != "outer" else dict(),
+                        other_tiers if join != "outer" else {},
                         join == "inner",
                         removed,
                         runs,
@@ -224,9 +230,14 @@ def query_runs(
             )
 
             if len(other) == 0:
-                records = [r | {f"tier_{t}": None for t in other_tiers} for r in records]
+                records = [
+                    r | {f"tier_{t}": None for t in other_tiers} for r in records
+                ]
             elif len(records) == 0:
-                records = [r | {f"tier_{this_tier[0]}": None} for r in other.to_dict(orient="records")]
+                records = [
+                    r | {f"tier_{this_tier[0]}": None}
+                    for r in other.to_dict(orient="records")
+                ]
             else:
                 records = ak.to_dataframe(records)
                 records = records.merge(
@@ -234,7 +245,7 @@ def query_runs(
                     on=["cycle", "relpath", *col_names],
                     how="outer",
                 )
-                records.where(records.notna(), None, inplace=True)
+                records = records.where(records.notna(), None)
                 records = records.to_dict(orient="records")
 
         # Format and return results
@@ -313,7 +324,9 @@ def list_run_fields(
         cycle_def = query_config["cycle_def"]
     tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
-    return {"relpath", "cycle"} | set(cycle_def.split("-")) | {f"tier_{t}" for t in tiers}
+    return (
+        {"relpath", "cycle"} | set(cycle_def.split("-")) | {f"tier_{t}" for t in tiers}
+    )
 
 
 def _get_run_records_loop(

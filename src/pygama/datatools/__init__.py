@@ -96,8 +96,8 @@ from .query_meta import query_meta
 from .query_runs import list_run_fields, query_runs
 
 __all__ = [
-    "build_iterator",
     "CycleRecord",
+    "build_iterator",
     "list_run_fields",
     "query_data",
     "query_evt",

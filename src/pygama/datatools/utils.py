@@ -138,6 +138,7 @@ def _read_dataflow_config(dataflow_config="$REFPROD/dataflow-config.yaml"):
         raise ValueError(msg)
     return df_config, df_config["paths"], df_config.get("query", {})
 
+
 def _tiers_to_dict(tiers, df_paths, query_config):
     # turn tiers into list of tier-name/path pairs
     if tiers is None:
@@ -146,12 +147,12 @@ def _tiers_to_dict(tiers, df_paths, query_config):
         tiers = [tiers]
     if isinstance(tiers, Mapping):
         return tiers
-    else:
-        try:
-            return {t: df_paths[f"tier_{t}"] for t in tiers}
-        except KeyError as e:
-            msg = f"{e.args[0]} not found in dataflow paths"
-            raise ValueError(msg)
+    try:
+        return {t: df_paths[f"tier_{t}"] for t in tiers}
+    except KeyError as e:
+        msg = f"{e.args[0]} not found in dataflow paths"
+        raise ValueError(msg) from None
+
 
 @cache
 def _read_config_file(file):
