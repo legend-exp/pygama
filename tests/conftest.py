@@ -10,9 +10,7 @@ config_dir = Path(__file__).parent / "configs"
 
 @pytest.fixture(scope="session")
 def lgnd_test_data():
-    ldata = LegendTestData()
-    ldata.checkout("229cde0")
-    return ldata
+    return LegendTestData()
 
 
 @pytest.fixture(scope="session")
@@ -39,4 +37,12 @@ def raw_test_file(lgnd_test_data, tmp_dir):  # noqa: ARG001
     )
     assert Path(out_name).exists()
 
+    return out_name
+
+
+@pytest.fixture
+def test_refprod(lgnd_test_data, monkeypatch):
+    out_name = lgnd_test_data.get_path("lh5/prod-ref-l200")
+    assert Path(out_name).exists()
+    monkeypatch.setenv("REFPROD", out_name)
     return out_name
