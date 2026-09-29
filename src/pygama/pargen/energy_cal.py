@@ -1932,6 +1932,42 @@ class HPGeCalibration:
         plt.close()
         return fig
 
+    def get_peak_hists(self, energies):
+        """
+        Histogram the data under each fitted peak, as drawn by :meth:`plot_fits`.
+
+        Parameters
+        ----------
+        energies
+            1-D array of uncalibrated energy values.
+
+        Returns
+        -------
+        dict
+            ``{peak_kev: {"edges": ndarray, "counts": ndarray}}`` with 0.1 keV
+            wide bins over each peak's fit range. Peaks whose binning cannot be
+            built (e.g. NaN range) are left out.
+        """
+        pk_parameters = self.results[list(self.results)[-1]].get(
+            "peak_parameters", None
+        )
+        if pk_parameters is None:
+            return {}
+        derco = Polynomial(self.pars).deriv().coef
+        hists = {}
+        for peak, pk_dict in pk_parameters.items():
+            try:
+                lo, hi = pk_dict["range"]
+                edges = np.arange(lo, hi, 0.1 / pgf.nb_poly(5, derco))
+                counts, _ = np.histogram(energies, bins=edges)
+            except Exception as e:
+                if self.debug_mode:
+                    raise
+                log.debug("peak %s histogram failed: %s", peak, e, exc_info=True)
+                continue
+            hists[peak] = {"edges": edges, "counts": counts}
+        return hists
+
     def plot_fits(
         self,
         energies,
@@ -1975,21 +2011,20 @@ class HPGeCalibration:
 
         fig = plt.figure(figsize=figsize)
         derco = Polynomial(self.pars).deriv().coef
-        der = [pgf.nb_poly(5, derco) for _ in list(pk_parameters)]
+        range_adu = 5 / pgf.nb_poly(5, derco)
+        hists = self.get_peak_hists(energies)
         for i, peak in enumerate(pk_parameters):
-            range_adu = 5 / der[i]
             plt.subplot(nrows, ncols, i + 1)
             pk_dict = pk_parameters[peak]
             pk_pars = pk_dict["parameters"]
-            pk_ranges = pk_dict["range"]
             pk_func = pk_dict["function"]
             mu = pk_func.get_mu(pk_pars) if pk_pars is not None else np.nan
 
             try:
-                binning = np.arange(pk_ranges[0], pk_ranges[1], 0.1 / der[i])
-                bin_cs = (binning[1:] + binning[:-1]) / 2
-
-                counts, bs, _bars = plt.hist(energies, bins=binning, histtype="step")
+                bs = hists[peak]["edges"]
+                counts = hists[peak]["counts"]
+                bin_cs = (bs[1:] + bs[:-1]) / 2
+                plt.hist(bin_cs, bins=bs, weights=counts, histtype="step")
                 if pk_pars is not None:
                     fit_vals = pk_func.get_pdf(bin_cs, *pk_pars, 0) * np.diff(bs)[0]
                     plt.plot(bin_cs, fit_vals)
