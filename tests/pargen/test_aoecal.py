@@ -143,3 +143,89 @@ def test_aoe_cal_override_partial_energy_warns(lgnd_test_data, caplog):
     # Normal energy correction still ran, so the cut should be valid.
     assert hasattr(aoe_partial, "low_cut_val")
     assert np.isfinite(aoe_partial.low_cut_val)
+
+
+def test_aoe_plot_data(lgnd_test_data):
+    import matplotlib as mpl
+
+    mpl.use("Agg")
+    from matplotlib.figure import Figure
+
+    data_df = _load_test_df(lgnd_test_data)
+    aoe = _make_aoe()
+    aoe.calibrate(data_df, "AoE_Uncorr", suffix="sfx")
+    assert aoe.suffix == "sfx"
+
+    spec = Coe.get_spectra_data(aoe, data_df)
+    sel = data_df.query(aoe.selection_string)
+    expected, _ = np.histogram(
+        sel.query("AoE_Low_Cut_sfx")["cuspEmax_cal"], bins=spec["edges"]
+    )
+    np.testing.assert_array_equal(spec["low_cut"], expected)  # suffixed column used
+    assert (spec["before"] >= spec["double_cut"]).all()
+    assert len(spec["inset"]["edges"]) == 200
+
+    sf = Coe.get_sf_vs_energy_data(aoe, data_df)
+    assert ((sf["sf"] >= 0) & (sf["sf"] <= 100)).all()
+
+    hist = Coe.get_classifier_data(aoe, data_df)
+    assert hist["counts"].shape == (699, 499)
+
+    dt = Coe.get_dt_dep_data(aoe, data_df, eranges=[(1000, 1300), (1300, 1500)])
+    assert set(dt) == {"1000-1300", "1300-1500"}
+    assert dt["1000-1300"]["counts"].shape == (200, 100)
+
+    bands = Coe.get_compt_bands_data(aoe, data_df, eranges=[(1000, 1020)])
+    assert len(bands["1000-1020"]["counts"]) == 49
+
+    corr = Coe.get_energy_corr_data(aoe, data_df)
+    np.testing.assert_array_equal(corr["mean"], aoe.energy_corr_fits["mean"])
+
+    cut = Coe.get_cut_fit_data(aoe, data_df)
+    assert cut["function"] == "SigmoidFit"
+    assert cut["low_cut"] == aoe.low_cut_val
+
+    curves = Coe.get_survival_fraction_curves_data(aoe, data_df)
+    assert set(curves["peaks"]) == {str(p) for p in aoe.low_side_peak_dfs}
+
+    for plot in (
+        Coe.plot_spectra,
+        Coe.plot_sf_vs_energy,
+        Coe.plot_classifier,
+        Coe.plot_mean_fit,
+        Coe.plot_sigma_fit,
+        Coe.plot_cut_fit,
+        Coe.plot_survival_fraction_curves,
+    ):
+        assert plot.data_func is not None
+        assert isinstance(plot(aoe, data_df), Figure)
+    assert isinstance(Coe.plot_dt_dep(aoe, data_df, eranges=[(1000, 1300)]), Figure)
+    assert isinstance(
+        Coe.plot_compt_bands_overlayed(aoe, data_df, eranges=[(1000, 1020)]), Figure
+    )
+
+
+@pytest.mark.filterwarnings("ignore:No artists with labels:UserWarning")
+def test_aoe_plots_without_calibration():
+    # plotting must never raise when calibration steps were skipped or failed
+    import matplotlib as mpl
+    import pandas as pd
+
+    mpl.use("Agg")
+    aoe = _make_aoe()
+    df = pd.DataFrame(
+        {"cuspEmax_cal": np.linspace(1000, 2000, 50), "dt_eff": np.ones(50)}
+    )
+    for plot in (
+        Coe.plot_spectra,
+        Coe.plot_sf_vs_energy,
+        Coe.plot_classifier,
+        Coe.plot_mean_fit,
+        Coe.plot_sigma_fit,
+        Coe.plot_cut_fit,
+        Coe.plot_survival_fraction_curves,
+    ):
+        assert plot(aoe, df) is not None
+        assert isinstance(plot.data_func(aoe, df), dict)
+    assert Coe.plot_dt_dep(aoe, df, eranges=[(1000, 1300)]) is not None
+    assert Coe.plot_compt_bands_overlayed(aoe, df, eranges=[(1000, 1020)]) is not None
