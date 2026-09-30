@@ -369,6 +369,7 @@ def dplms_ge_dict(
                 ax.plot(wf)
         ax.legend(loc="upper right")
         plot_dict["bls"] = fig
+        plot_dict["bls_data"] = {"waveforms": np.asarray(bls, dtype=np.float32)}
         plt.close()
 
         wf_idxs = np.random.choice(len(wfs), dplms_dict["n_plot"])  # noqa: NPY002
@@ -388,6 +389,12 @@ def dplms_ge_dict(
         axin.set_xlim(wsize / 2 - dplms_dict["zoom"], wsize / 2 + dplms_dict["zoom"])
         axin.set_yticklabels("")
         plot_dict["wfs"] = fig
+        plot_dict["wfs_data"] = {
+            "waveforms": np.asarray(wfs, dtype=np.float32),
+            "zoom": np.asarray(
+                [wsize / 2 - dplms_dict["zoom"], wsize / 2 + dplms_dict["zoom"]]
+            ),
+        }
         plt.close()
 
         peak_pos = dsp_cal["peak_pos"].nda
@@ -399,6 +406,7 @@ def dplms_ge_dict(
         wfs_cut_pars = ["centroid", "peak_pos", "risetime"]
 
         fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 9), facecolor="white")
+        sel_data = {}
 
         for ii, par in enumerate(wfs_cut_pars):
             pspace = np.linspace(
@@ -418,6 +426,7 @@ def dplms_ge_dict(
             else:
                 llo, lup = np.min(cal_par[par]), np.max(cal_par[par])
                 hh, bb = np.histogram(cal_par[par], bins=np.linspace(llo, lup, 200))
+            sel_data[par] = {"edges": bb, "counts": hh, "cut": np.asarray([llo, lup])}
             ax.flat[ii + 1].plot(bb[1:], hh, ds="steps", label=f"cut on {par}")
             ax.flat[ii + 1].axvline(
                 llo, color="k", linestyle=":", label=f"sel. {llo:.1f} {lup:.1f}"
@@ -438,6 +447,8 @@ def dplms_ge_dict(
         ax.flat[0].set_yscale("log")
         ax.flat[0].legend(loc="upper right")
         plot_dict["wf_sel"] = fig
+        sel_data["rough_energy"] = {"edges": be, "initial": he, "selected": hs}
+        plot_dict["wf_sel_data"] = sel_data
         plt.close()
 
         fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")

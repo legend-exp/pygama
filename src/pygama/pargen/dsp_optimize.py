@@ -922,6 +922,64 @@ class BayesianOptimizer:
         return out_dict
 
     @ignore_warnings(category=ConvergenceWarning)
+    def get_plot_data(self, init_samples=None) -> dict:
+        """Data behind :meth:`plot` and :meth:`plot_acq`.
+
+        Evaluates the Gaussian Process mean and standard deviation and the
+        acquisition function on the same 0.1-step grid the plots use.
+
+        Parameters
+        ----------
+        init_samples
+            Optional initial sample points to mark.
+
+        Returns
+        -------
+        dict
+            ``labels`` (``{"0": axis label, ...}``), ``samples_x``/``samples_y``, ``failed``
+            mask, ``init_x``/``init_y``, ``optimal_x``, ``y_min`` and the grid:
+            1D ``grid``, ``mean``, ``std``, ``acq``; 2D ``grid_0``/``grid_1``
+            (axis values) with ``mean`` and ``acq`` of shape ``(n_0, n_1)``.
+        """
+        nan_idxs = np.isnan(self.y_init)
+        self.gauss_pr.fit(self.x_init[~nan_idxs], np.array(self.y_init)[~nan_idxs])
+        if len(self.dims) not in (1, 2):
+            msg = f"plot data is only implemented for 1 or 2 dimensions, got {len(self.dims)}"
+            raise NotImplementedError(msg)
+        out = {
+            "labels": {
+                str(i): f"{d.name}-{d.parameter}({d.unit})"
+                for i, d in enumerate(self.dims)
+            },
+            "samples_x": np.asarray(self.x_init, dtype=float),
+            "samples_y": np.asarray(self.y_init, dtype=float),
+            "failed": np.isnan(np.asarray(self.yerr_init, dtype=float)),
+            "optimal_x": np.asarray(self.optimal_x, dtype=float),
+            "y_min": float(self.y_min),
+        }
+        if init_samples is not None:
+            init_idx = [np.where(s == self.x_init)[0][0] for s in init_samples]
+            out["init_x"] = np.asarray(init_samples, dtype=float)
+            out["init_y"] = np.asarray(self.y_init, dtype=float)[init_idx]
+        grids = [np.arange(d.min_val, d.max_val, 0.1) for d in self.dims]
+        points = np.stack(np.meshgrid(*grids, indexing="ij"), axis=-1).reshape(
+            -1, len(self.dims)
+        )
+        mean, std = self.gauss_pr.predict(points, return_std=True)
+        acq = np.array([self.acq_function(p) for p in points])
+        shape = tuple(len(g) for g in grids)
+        if len(self.dims) == 1:
+            out.update(grid=grids[0], mean=mean, std=std, acq=acq)
+        else:
+            out.update(
+                grid_0=grids[0],
+                grid_1=grids[1],
+                mean=mean.reshape(shape),
+                acq=acq.reshape(shape),
+            )
+        return out
+
+    @ignore_warnings(category=ConvergenceWarning)
     def plot(self, init_samples=None) -> Figure:
         """Plot the Gaussian Process regression and acquisition function.
 

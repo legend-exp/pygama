@@ -232,6 +232,7 @@ def noise_optimization(
         if display > 0:
             plot_range = opt_dict["plot_range"]
             fig, ax = plt.subplots(figsize=(12, 6.75), facecolor="white")
+            distributions = {}
             for i, x in enumerate(sample_list):
                 x_str = f"{x:.1f}"
                 energies = par_dict_res[x_str]["energies"]
@@ -239,6 +240,7 @@ def noise_optimization(
                 hist, bins, _var = get_hist(
                     energies, range=plot_range, dx=opt_dict["dx"]
                 )
+                distributions[x_str] = {"edges": bins, "counts": hist}
                 bc = (bins[:-1] + bins[1:]) / 2.0
                 string_res = (
                     f"par = {x} us, FOM = {fom_list[i]:.3f} ± {fom_err_list[i]:.3f} ADC"
@@ -249,6 +251,7 @@ def noise_optimization(
             ax.set_ylabel("counts")
             ax.legend(loc="upper right")
             par_dict_res["distribution"] = fig
+            par_dict_res["distribution_data"] = distributions
             if display > 1:
                 plt.show()
             else:
@@ -286,6 +289,16 @@ def noise_optimization(
             else:
                 plt.close()
             par_dict_res["optimization"] = fig
+            par_dict_res["optimization_data"] = {
+                "par": np.asarray(sample_list, dtype=float),
+                "fom": np.asarray(fom_list, dtype=float),
+                "fom_err": np.asarray(fom_err_list, dtype=float),
+                "spline_x": np.asarray(samples_val, dtype=float),
+                "spline_y": np.asarray(splev(samples_val, tck), dtype=float),
+                "best_par": float(best_par),
+                "best_par_err": float(best_par_err),
+                "best_val": float(best_val),
+            }
             plot_dict["nopt"][dict_str] = par_dict_res
 
     log.info("Time to complete the optimization %.2f s", time.time() - t0)
