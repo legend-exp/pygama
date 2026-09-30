@@ -44,6 +44,13 @@ def test_bayesian_opt():
     acq_fig = optimizer.plot_acq()
     assert isinstance(acq_fig, Figure)
 
+    data = optimizer.get_plot_data()
+    assert data["labels"]["0"].startswith("x")
+    assert (
+        len(data["grid"]) == len(data["mean"]) == len(data["std"]) == len(data["acq"])
+    )
+    assert data["y_min"] == 0.0
+
     # test different acq function
     optimizer = dsp_optimize.BayesianOptimizer(acq_func="ucb", batch_size=1)
     optimizer = dsp_optimize.BayesianOptimizer(acq_func="lcb", batch_size=1)
@@ -164,3 +171,18 @@ def test_optimise(raw_test_file):
     best = best[0]
     assert "y_val" in best
     assert "y_val_err" in best
+
+
+def test_bayesian_opt_plot_data_2d():
+    optimizer = dsp_optimize.BayesianOptimizer(acq_func="ei", batch_size=1)
+    optimizer.add_dimension("x", parameter=0.0, min_val=0, max_val=1)
+    optimizer.add_dimension("y", parameter=0.0, min_val=0, max_val=2)
+    x = np.array([[0.2, 0.5], [0.8, 1.5], [0.5, 1.0]])
+    optimizer.add_initial_values(
+        x, np.array([1.0, 2.0, 0.5]), np.array([0.1, 0.1, 0.1])
+    )
+    optimizer.optimal_x, optimizer.y_min = x[2], 0.5
+    data = optimizer.get_plot_data(init_samples=x[:1])
+    assert data["mean"].shape == (len(data["grid_0"]), len(data["grid_1"]))
+    assert data["acq"].shape == data["mean"].shape
+    np.testing.assert_array_equal(data["init_y"], [1.0])

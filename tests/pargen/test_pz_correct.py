@@ -171,3 +171,42 @@ def test_get_dpz_decay_constants():
         float(tau.output_dict["pz"]["tau2"].split("*")[0]) / 16, tau2, rtol=1e-2
     )
     assert np.allclose(float(tau.output_dict["pz"]["frac"]), frac, rtol=1e-2)
+
+
+def test_pz_plot_data(monkeypatch):
+    import matplotlib as mpl
+
+    mpl.use("Agg")
+    rng = np.random.default_rng(4)
+    wfs = rng.normal(1.0, 0.01, (50, 600)).astype(np.float32)
+    out = Table(
+        col_dict={
+            "wf_pz": WaveformTable(
+                values=wfs, dt=16, dt_units="ns", t0=0, t0_units="ns"
+            ),
+            "pz_mean": Array(np.ones(50)),
+            "pz_slope": Array(rng.normal(0.0, 1e-4, 50)),
+        }
+    )
+    monkeypatch.setattr(pz_correct.opt, "run_one_dsp", lambda *a, **k: out)  # noqa: ARG005
+    pz = pz_correct.PZCorrect({}, "waveform")
+    plots = pz.plot_waveforms_after_correction(
+        out,
+        "wf_pz",
+        norm_param="pz_mean",
+        xlim=(100, 600),
+        n_waveforms=10,
+        downsample=2,
+    )
+    wf_data = plots["waveforms_data"]
+    assert wf_data["waveforms"].shape == (10, 250)
+    np.testing.assert_array_equal(wf_data["samples"], np.arange(100, 600, 2))
+
+    pz.results_dict = {
+        "single_decay_constant": {"slope_pars": {"mode": 0.0, "stdev": 1e-4}}
+    }
+    slopes = pz.plot_slopes(out, "pz_slope", with_correction=True)
+    data = slopes["corrected_slope_data"]
+    assert len(data["counts"]) == len(data["edges"]) - 1
+    assert data["mode"] == 0.0
+    assert len(data["inset"]["counts"]) == 50
