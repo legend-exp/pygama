@@ -51,3 +51,35 @@ def test_cuts(lgnd_test_data):
     ids_tbl = dc.get_cut_indexes(tbl, cut_pars)
 
     assert (ids == ids_tbl).all()
+
+
+def test_cut_plot_data(lgnd_test_data):
+    import matplotlib as mpl
+    import numpy as np
+
+    mpl.use("Agg")
+    data = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
+    )
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
+    cut_pars = {
+        "bl_std_cut": {"cut_parameter": "bl_std", "cut_level": 4, "mode": "inclusive"}
+    }
+
+    cut_dict, plots = dc.generate_cuts(data_df, cut_pars, display=1)
+    hist = plots["bl_std_cut_data"]
+    assert len(hist["counts"]) == len(hist["edges"]) - 1 == 99
+    np.testing.assert_allclose(
+        hist["cuts"],
+        [
+            cut_dict["bl_std_cut"]["parameters"]["a"],
+            cut_dict["bl_std_cut"]["parameters"]["b"],
+        ],
+        rtol=1e-3,
+    )
+
+    cut_dict, plots = dc.generate_cut_classifiers(data_df, cut_pars, display=1)
+    hist = plots["bl_std_cut_data"]
+    assert hist["xlabel"] == "bl_std_cut_classifier"
+    assert len(hist["counts"]) == len(hist["edges"]) - 1
+    assert np.isfinite(hist["cuts"]).any()
