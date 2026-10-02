@@ -133,17 +133,21 @@ def test_query_runs_grouping(test_refprod):  # noqa: ARG001
     res = query_runs(group_by="datatype")
     assert isinstance(res, ak.Array)
     assert len(res) == 2
-    assert list(res.datatype) == ["cal", "phy"]
-    assert list(ak.num(res.cycle, axis=-1)) == [2, 2]
+    assert ak.all(res.datatype[0] == "cal")
+    assert ak.all(res.datatype[1] == "phy")
+    assert list(ak.num(res, axis=-1)) == [2, 2]
 
     # multi-group
     res = query_runs(group_by=("period", "run", "datatype"))
     assert isinstance(res, ak.Array)
     assert len(res) == 2
-    assert list(res.datatype) == ["cal", "phy"]
-    assert list(res.period) == ["p03", "p03"]
-    assert list(res.run) == ["r001", "r001"]
-    assert list(ak.num(res.cycle, axis=-1)) == [2, 2]
+    assert ak.all(res.datatype[0] == "cal")
+    assert ak.all(res.datatype[1] == "phy")
+    assert ak.all(res.period[0] == "p03")
+    assert ak.all(res.period[1] == "p03")
+    assert ak.all(res.run[0] == "r001")
+    assert ak.all(res.run[1] == "r001")
+    assert list(ak.num(res, axis=-1)) == [2, 2]
 
 
 def test_query_runs_ignored_cycles(test_refprod):  # noqa: ARG001

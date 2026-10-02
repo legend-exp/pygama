@@ -9,7 +9,6 @@ from pathlib import Path
 
 import awkward as ak
 import numpy as np
-import pandas as pd
 from dbetto import TextDB
 from rich.console import Console
 from rich.status import Status
@@ -75,8 +74,7 @@ def query_runs(
         if ``None`` (default) return a flat array with all cycles. If one or more fields
         are provided, group entries by these fields (using :meth:`ak.run_lengths`, so group
         consecutive equal values; this is done after sorting, so be careful if sorting
-        changes order!) Fields that vary within groups will be un-flattened into 2-D ragged
-        arrays. Note that ``runs`` query cannot act collectively on grouped cycles.
+        changes order!) Note that ``runs`` query cannot act collectively on grouped cycles.
 
     sort_by
         field by which to sort table, or list of fields in order by priority
@@ -239,13 +237,16 @@ def query_runs(
                     for r in other.to_dict(orient="records")
                 ]
             else:
-                records = ak.to_dataframe(records)
-                records = records.merge(
-                    other,
-                    on=["cycle", "relpath", *col_names],
-                    how="outer",
+                records = (
+                    ak.to_dataframe(records)
+                    .merge(
+                        other,
+                        on=["cycle", "relpath", *col_names],
+                        how="outer",
+                    )
+                    .fillna(np.nan)
+                    .replace([np.nan], None)
                 )
-                records = records.where(records.notna(), None)
                 records = records.to_dict(orient="records")
 
         # Format and return results
@@ -265,19 +266,12 @@ def query_runs(
                 lengths = [np.cumsum(ak.run_lengths(result[f])) for f in group_by]
             lengths = np.unique(np.concatenate([0, *lengths]))
             result = ak.unflatten(result, lengths[1:] - lengths[:-1])
-            result = ak.Array(
-                {
-                    f: ak.firsts(result[f])
-                    if ak.all(ak.all(result[f] == ak.firsts(result[f]), axis=1), axis=0)
-                    else result[f]
-                    for f in result.fields
-                }
-            )
 
         if library == "ak":
             return result
         if library == "pd":
-            return pd.DataFrame(ak.to_list(result))
+            # to_dataframe seems to turn None into 'nan'...
+            return ak.to_dataframe(result).replace("nan", None)
         if library == "np":
             return ak.to_numpy(result)
         msg = "library must be 'ak', 'pd' or 'np'"
