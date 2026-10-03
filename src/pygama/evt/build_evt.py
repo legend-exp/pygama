@@ -4,7 +4,6 @@ This module implements routines to build the `evt` tier.
 
 from __future__ import annotations
 
-import contextlib
 import importlib
 import itertools
 import logging
@@ -30,6 +29,7 @@ def build_evt(
     datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
     config: str | Mapping[str, ...],
     wo_mode: str = "write_safe",
+    view_group: str | Sequence[str] | None = "ch*",
     buffer_len=10**4,
 ) -> None | Table:
     r"""Transform data from hit-structured tiers to event-structured data.
@@ -139,6 +139,11 @@ def build_evt(
               }
             }
 
+    view_group
+        wildcard expression for identifying channel views in TCM.
+        For each, an evt channel view will be created of the event
+        tier with an identical entry selection.
+
     wo_mode
         writing mode, see :func:`lh5.io.core.write`.
     """
@@ -222,9 +227,39 @@ def build_evt(
     else:
         channel_mapping = None
 
-    evt_tbl = build_evt_cols(
-        datainfo, config, channels, wo_mode, buffer_len, channel_mapping
-    )
+    with lh5.LH5Store(keep_open=True) as store:
+        evt_tbl = build_evt_cols(
+            datainfo, config, channels, store, wo_mode, buffer_len, channel_mapping
+        )
+
+        # write channel views using same entry selections as views in TCM
+        if datainfo.evt.file is not None and view_group is not None:
+            if isinstance(view_group, str):
+                view_group = [view_group]
+
+            for vg in itertools.chain.from_iterable(
+                [
+                    lh5.ls(datainfo.tcm.file, f"{vg}/{datainfo.tcm.group}")
+                    for vg in view_group
+                ]
+            ):
+                view = store.gimme_file(datainfo.tcm.file)[vg]
+                datatype = view.attrs.get("datatype")
+                if not isinstance(datatype, str) and datatype[:4] != "view":
+                    msg = f"{vg} is not a view; skipping"
+                    log.warning(msg)
+                    continue
+
+                # Just read the entries, and write an evt view with same ones
+                entries = view["entries"][:]
+                lh5.write_view(
+                    datainfo.evt.group,
+                    entries,
+                    vg,
+                    datainfo.evt.file,
+                    "hard",
+                )
+
     if datainfo.evt.file is None:
         return evt_tbl
     return None
@@ -234,6 +269,7 @@ def build_evt_cols(
     datainfo: utils.DataInfo | Mapping[str, Sequence[str, ...]],
     config: dict,
     channels: list,
+    store: lh5.LH5Store,
     wo_mode: str = "write_safe",
     buffer_len=10**4,
     channel_mapping: dict | None = None,
@@ -261,6 +297,8 @@ def build_evt_cols(
         dict as defined in the :func:`build_evt` function.
     channels
         list of channels to be used in the event table.
+    store
+        LH5Store for handling file IO
     wo_mode
         writing mode, see :func:`lh5.io.core.write`.
     buffer_len
@@ -290,16 +328,14 @@ def build_evt_cols(
     # read otherwise reopens the file, and there is one such read per
     # (chunk, operation, channel) -- hundreds of thousands of opens for a
     # calibration file. lh5.ls/lh5.read accept an open handle directly.
-    stack = contextlib.ExitStack()
-    with stack:
-        datainfo = _open_input_tiers(datainfo, stack)
-        cache = utils.EvtCache()
-        return _build_evt_cols(
-            datainfo, config, channels, wo_mode, buffer_len, channel_mapping, cache
-        )
+    datainfo = _open_input_tiers(datainfo, store)
+    cache = utils.EvtCache()
+    return _build_evt_cols(
+        datainfo, config, channels, store, wo_mode, buffer_len, channel_mapping, cache
+    )
 
 
-def _open_input_tiers(datainfo, stack):
+def _open_input_tiers(datainfo, store):
     """Replace each per-channel input tier's path with an open HDF5 handle.
 
     `evt` is the output, and `tcm` is streamed by :class:`lh5.LH5Iterator`,
@@ -311,7 +347,7 @@ def _open_input_tiers(datainfo, stack):
             continue
         if isinstance(tier.file, h5py.Group):  # caller already opened it
             continue
-        handle = stack.enter_context(h5py.File(str(tier.file), "r"))
+        handle = store.gimme_file(tier.file)
         opened[name] = tier._replace(file=handle)
     return datainfo._replace(**opened) if opened else datainfo
 
@@ -320,6 +356,7 @@ def _build_evt_cols(
     datainfo,
     config,
     channels,
+    store,
     wo_mode,
     buffer_len,
     channel_mapping,
@@ -490,7 +527,7 @@ def _build_evt_cols(
             if datainfo.evt.file is None:
                 evt_tables.append(nested_tbl)
             else:
-                lh5.write(
+                store.write(
                     obj=nested_tbl,
                     name=datainfo.evt.group,
                     lh5_file=datainfo.evt.file,
