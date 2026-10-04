@@ -239,14 +239,14 @@ def build_evt(
 
             for vg in itertools.chain.from_iterable(
                 [
-                    lh5.ls(datainfo.tcm.file, f"{vg}/{datainfo.tcm.group}")
+                    lh5.ls(datainfo.tcm.file, f"{vg}")
                     for vg in view_group
                 ]
             ):
-                view = store.gimme_file(datainfo.tcm.file)[vg]
-                datatype = view.attrs.get("datatype")
-                if not isinstance(datatype, str) and datatype[:4] != "view":
-                    msg = f"{vg} is not a view; skipping"
+                view = store.gimme_file(datainfo.tcm.file)[vg].get(datainfo.tcm.group)
+                datatype = view.attrs.get("datatype") if view is not None else None
+                if not isinstance(datatype, str) or datatype[:4] != "view":
+                    msg = f"{vg} does not contain a view called {datainfo.tcm.group}; skipping"
                     log.warning(msg)
                     continue
 
@@ -255,7 +255,7 @@ def build_evt(
                 lh5.write_view(
                     datainfo.evt.group,
                     entries,
-                    vg,
+                    f"{vg}/{datainfo.evt.group}",
                     datainfo.evt.file,
                     "hard",
                 )
