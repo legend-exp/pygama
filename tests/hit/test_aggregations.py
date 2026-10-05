@@ -59,11 +59,11 @@ def test_field_equality_filtering():
 
     rec = unpack_bitmask(arr)
 
-    assert ak.to_list(rec.low == True) == [False, True, False, True]  # noqa: E712
-    assert ak.to_list(rec.low == False) == [True, False, True, False]  # noqa: E712
-    assert ak.to_list(rec.high == True) == [False, False, True, True]  # noqa: E712
+    assert ak.to_list(rec.low == True) == [False, True, False, True]
+    assert ak.to_list(rec.low == False) == [True, False, True, False]
+    assert ak.to_list(rec.high == True) == [False, False, True, True]
 
-    both_set = rec[(rec.low == True) & (rec.high == True)]  # noqa: E712
+    both_set = rec[(rec.low == True) & (rec.high == True)]
     assert len(both_set) == 1
 
 

@@ -58,7 +58,7 @@ def nb_gauss_tail_exact(
     """
 
     abstau = np.absolute(tau)
-    tmp = tmp if tmp < limit else limit
+    tmp = min(limit, tmp)
     if sigma == 0 or abstau == 0:
         return x * 0
     z = (x - mu) / sigma

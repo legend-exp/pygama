@@ -31,7 +31,7 @@ def build_evt(
     config: str | Mapping[str, ...],
     wo_mode: str = "write_safe",
     buffer_len=10**4,
-) -> None | Table:
+) -> Table | None:
     r"""Transform data from hit-structured tiers to event-structured data.
 
     Parameters
@@ -237,7 +237,7 @@ def build_evt_cols(
     wo_mode: str = "write_safe",
     buffer_len=10**4,
     channel_mapping: dict | None = None,
-) -> None | Table:
+) -> Table | None:
     """
     Iterates through the TCM file and builds the event table according to the
     configuration file. The event table is written to the output file if an
@@ -324,7 +324,7 @@ def _build_evt_cols(
     buffer_len,
     channel_mapping,
     cache,
-) -> None | Table:
+) -> Table | None:
     evt_tables = []
 
     # Pre-compute source attrs for single-field aggregation operations.
@@ -516,7 +516,7 @@ def evaluate_expression(
     table: Table = None,
     parameters: Mapping[str, Any] | None = None,
     query: str | None = None,
-    default_value: bool | int | float = np.nan,
+    default_value: bool | float = np.nan,
     sorter: str | None = None,
     channel_mapping: dict | None = None,
 ) -> Array | ArrayOfEqualSizedArrays | VectorOfVectors:
