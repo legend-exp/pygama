@@ -89,6 +89,28 @@ def test_generate_tcm_cols(lgnd_test_data):
             )
         )
 
+    # Test with auto views enabled; should be same as sparse
+    (tcm_cols2, chan_tcms) = evt.build_tcm(
+        [(f_raw, "ch*/raw")],
+        "timestamp",
+        buffer_len=100,
+        channel_views="auto",
+    )
+
+    assert tcm_cols2.table_key == exp_keys
+    assert tcm_cols2.row_in_table == exp_rows
+
+    assert set(chan_list) == set(chan_tcms.keys())
+    assert all(np.issubdtype(v.dtype, np.integer) for v in chan_tcms.values())
+    for chan_name, entries in chan_tcms.items():
+        chan_id = int(chan_name[2:])
+        assert np.all(
+            entries
+            == np.flatnonzero(
+                np.any(tcm_cols2.table_key.view_as("ak") == chan_id, axis=-1)
+            )
+        )
+
     # test with small buffer len
     tcm_cols = evt.build_tcm(
         [(f_raw, [f"{chan}/raw" for chan in lh5.ls(f_raw)])],
@@ -131,6 +153,29 @@ def test_generate_tcm_cols(lgnd_test_data):
         hash_func=None,
         buffer_len=1,
         channel_views="sparse",
+    )
+
+    assert tcm_cols2.table_key == exp_idxs
+    assert tcm_cols2.row_in_table == exp_rows
+
+    assert {f"ch{i}" for i in range(3)} == set(chan_tcms.keys())
+    assert all(np.issubdtype(v.dtype, np.integer) for v in chan_tcms.values())
+    for chan_name, entries in chan_tcms.items():
+        chan_id = int(chan_name[2:])
+        assert np.all(
+            entries
+            == np.flatnonzero(
+                np.any(tcm_cols2.table_key.view_as("ak") == chan_id, axis=-1)
+            )
+        )
+
+    # Test with auto; should be same as above
+    (tcm_cols2, chan_tcms) = evt.build_tcm(
+        [(f_raw, [f"{chan}/raw" for chan in lh5.ls(f_raw)])],
+        "timestamp",
+        hash_func=None,
+        buffer_len=1,
+        channel_views="auto",
     )
 
     assert tcm_cols2.table_key == exp_idxs
@@ -207,6 +252,19 @@ def test_generate_tcm_cols(lgnd_test_data):
     for entries in chan_tcms.values():
         assert (entries == np.array([0])).all()
 
+    # test with auto; should be same as above
+    tcm_cols, chan_tcms = evt.build_tcm(
+        [(f_raw, [f"{chan}/raw" for chan in lh5.ls(f_raw)])],
+        "timestamp",
+        buffer_len=100,
+        coin_windows=1,
+        channel_views="auto",
+    )
+    assert tcm_cols.table_key == exp_keys
+    assert set(chan_list) == set(chan_tcms.keys())
+    for entries in chan_tcms.values():
+        assert (entries == np.array([0])).all()
+
 
 def test_build_tcm_multiple_cols(lgnd_test_data):
     f_raw = lgnd_test_data.get_path(
@@ -228,6 +286,7 @@ def test_build_tcm_multiple_cols(lgnd_test_data):
     tcm = evt.build_tcm(
         [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
         coin_cols=["timestamp", "table_key"],
+        channel_views=None,
     )
     assert isinstance(tcm, Table)
     assert isinstance(tcm.table_key, VectorOfVectors)
@@ -326,6 +385,28 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         mask = ak.any(tcm_cols.table_key.view_as("ak") == ch_id, axis=-1)
         assert ch_tcm == tcm_cols[mask]
 
+    # test with auto; should be same as sparse
+    evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_file=out_file,
+        out_name="hardware_tcm",
+        wo_mode="of",
+        channel_views="auto",
+    )
+    assert Path(out_file).exists()
+    tcm_cols = lh5.read("hardware_tcm", out_file)
+    assert isinstance(tcm_cols, lgdo.Struct)
+    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    for ch in channels:
+        ch_tcm = lh5.read(f"{ch}/hardware_tcm", out_file)
+        ch_id = int(ch[2:])
+        mask = ak.any(tcm_cols.table_key.view_as("ak") == ch_id, axis=-1)
+        assert ch_tcm == tcm_cols[mask]
+
     # Test both view modes with small buffers in a fresh output file.
     small_out_file = f"{tmp_dir}/pygama-test-tcm-small-buffer.lh5"
     evt.build_tcm(
@@ -368,6 +449,29 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         mask = ak.any(tcm_cols.table_key.view_as("ak") == ch_id, axis=-1)
         assert ch_tcm == tcm_cols[mask]
 
+    # test with auto; should be same as sparse
+    evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_file=small_out_file,
+        out_name="hardware_tcm",
+        wo_mode="of",
+        buffer_len=1,
+        channel_views="auto",
+    )
+    assert Path(small_out_file).exists()
+    tcm_cols = lh5.read("hardware_tcm", small_out_file)
+    assert isinstance(tcm_cols, lgdo.Struct)
+    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    for ch in channels:
+        ch_tcm = lh5.read(f"{ch}/hardware_tcm", small_out_file)
+        ch_id = int(ch[2:])
+        mask = ak.any(tcm_cols.table_key.view_as("ak") == ch_id, axis=-1)
+        assert ch_tcm == tcm_cols[mask]
+
     # test append to input file
     clone = f"{tmp_dir}/test-append-tcm-input.lh5"
     tables = ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"]
@@ -383,6 +487,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         out_name="/tcm",
         wo_mode="a",
         buffer_len=1,
+        channel_views=None,
     )
     assert Path(clone).exists()
     tcm_cols = lh5.read("tcm", clone)
@@ -400,6 +505,7 @@ def test_build_tcm_multiple_files(lgnd_test_data, tmp_dir):  # noqa: ARG001
             (f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"]),
         ],
         coin_cols="timestamp",
+        channel_views=None,
     ).view_as("ak")
 
     tcm = evt.build_tcm(
@@ -408,6 +514,7 @@ def test_build_tcm_multiple_files(lgnd_test_data, tmp_dir):  # noqa: ARG001
             (f_raw, ["ch1084804/raw", "ch1121600/raw"]),
         ],
         coin_cols="timestamp",
+        channel_views=None,
     ).view_as("ak")
 
     assert tcm_orig.fields == tcm.fields
@@ -429,12 +536,14 @@ def test_build_tcm_buffer_reuse_copy_regression(lgnd_test_data):
         [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
         coin_cols="timestamp",
         buffer_len=1,
+        channel_views=None,
     ).view_as("ak")
 
     tcm_large = evt.build_tcm(
         [(f_raw, ["ch1084803/raw", "ch1084804/raw", "ch1121600/raw"])],
         coin_cols="timestamp",
         buffer_len=1_000_000,
+        channel_views=None,
     ).view_as("ak")
 
     assert tcm_small.fields == tcm_large.fields
@@ -538,6 +647,38 @@ def test_build_tcm_phy(lgnd_test_data):
         for v in chan_tcms.values()
     )
 
+    # auto should go to dense; repeat above tests with auto
+    (tcm_cols, chan_tcms) = evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_name="tcm",
+        wo_mode="of",
+        channel_views="auto",
+    )
+
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    assert set(channels) == set(chan_tcms.keys())
+    assert all(np.issubdtype(v.dtype, np.integer) for v in chan_tcms.values())
+    assert all(np.all(v == np.array([0, 10])) for v in chan_tcms.values())
+
+    # buffer len of 1 will end up sparse!
+    (tcm_cols, chan_tcms) = evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_name="tcm",
+        wo_mode="of",
+        buffer_len=1,
+        channel_views="auto",
+    )
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    assert set(channels) == set(chan_tcms.keys())
+    assert all(np.issubdtype(v.dtype, np.integer) for v in chan_tcms.values())
+    assert all(np.all(v == np.arange(10)) for v in chan_tcms.values())
+
 
 # Test with phy data (non-sparse mode); most important for views in dense/all modes
 def test_build_tcm_write_phy(lgnd_test_data, tmp_dir):
@@ -640,6 +781,45 @@ def test_build_tcm_write_phy(lgnd_test_data, tmp_dir):
         wo_mode="of",
         buffer_len=1,
         channel_views="dense",
+    )
+    assert Path(out_file).exists()
+    tcm_cols = lh5.read("tcm", out_file)
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    for ch in channels:
+        ch_tcm = lh5.read(f"{ch}/tcm", out_file)
+        assert ch_tcm.table_key == exp_keys
+        assert ch_tcm.row_in_table == exp_rows
+
+    # auto should use same as dense; repeat above tests
+    evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_file=out_file,
+        out_name="tcm",
+        wo_mode="of",
+        channel_views="auto",
+    )
+    assert Path(out_file).exists()
+    tcm_cols = lh5.read("tcm", out_file)
+    assert tcm_cols.table_key == exp_keys
+    assert tcm_cols.row_in_table == exp_rows
+
+    for ch in channels:
+        ch_tcm = lh5.read(f"{ch}/tcm", out_file)
+        assert ch_tcm.table_key == exp_keys
+        assert ch_tcm.row_in_table == exp_rows
+
+    # Now test with views in "dense" mode with short buffer
+    evt.build_tcm(
+        [(f_raw, [f"{ch}/raw" for ch in channels])],
+        "timestamp",
+        out_file=out_file,
+        out_name="tcm",
+        wo_mode="of",
+        buffer_len=1,
+        channel_views="auto",
     )
     assert Path(out_file).exists()
     tcm_cols = lh5.read("tcm", out_file)

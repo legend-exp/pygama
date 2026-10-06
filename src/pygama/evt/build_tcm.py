@@ -51,7 +51,7 @@ def build_tcm(
     window_refs: str | list[str] = "last",
     out_file: str | None = None,
     out_name: str = "tcm",
-    channel_views: Literal["sparse", "dense", "all"] | None = None,
+    channel_views: Literal["sparse", "dense", "all", "auto"] | None = "auto",
     view_group: str = "ch{key}",
     wo_mode: str = "write_safe",
     buffer_len: int | None = None,
@@ -96,6 +96,8 @@ def build_tcm(
         - ``"dense"``: use in global trigger mode; (almost) all events contain (almost) all channels
         - ``"all"``: use in global trigger mode; assume all events are contained in all channels;
             if this is not the case, a RunTimeError will be raised!
+        - ``"auto"``: choose sparse or dense based on the first batch of entries read; if >80% of
+            entries are consecutive, use dense. Note, all channels will use the same thing!
         - ``"none"`` or ``None``: no channel views
     view_group
         format string for name of group containing view for each channel. View will
@@ -241,10 +243,23 @@ def build_tcm(
                     table_keys, view_gps.items(), strict=True
                 ):
                     table_key = out_tbl.table_key.view_as("ak")
+                    entry_mask = np.array(ak.any(table_key == key, axis=-1))
+
+                    if channel_views == "auto":
+                        # count consecutive entries that do not change state
+                        n_consecutive = np.sum(~np.diff(entry_mask) & entry_mask[1:])
+
+                        if n_consecutive / np.sum(entry_mask) < 0.8:
+                            msg = "Using sparse channel view mode"
+                            log.info(msg)
+                            channel_views = "sparse"
+                        else:
+                            msg = "Using dense channel view mode"
+                            log.info(msg)
+                            channel_views = "dense"
+
                     if channel_views == "sparse":
-                        entries = np.flatnonzero(
-                            np.array(ak.any(table_key == key, axis=-1))
-                        )
+                        entries = np.flatnonzero(entry_mask)
                         entries += tcm_row
                         new_off = offset + len(old_entries)
                     elif channel_views == "dense":
@@ -256,7 +271,7 @@ def build_tcm(
                                     np.concatenate(
                                         [
                                             [0],
-                                            np.array(ak.any(table_key == key, axis=-1)),
+                                            entry_mask,
                                             [0],
                                         ]
                                     )
@@ -268,7 +283,7 @@ def build_tcm(
                         new_off = offset + len(old_entries)
                     elif channel_views == "all":
                         # Build a single 2d array with all entries; overwrite for each iteration
-                        if not ak.all(ak.any(table_key == key, axis=-1)):
+                        if not ak.all(entry_mask):
                             msg = f"channel {key} not found in all events; channel_views='all' failed"
                             raise RuntimeError(msg)
                         entries = np.array([[0, len(table_key) + tcm_row]])
