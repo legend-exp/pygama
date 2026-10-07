@@ -7,6 +7,7 @@ import string
 from collections.abc import Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import ExitStack
+from functools import cache
 from pathlib import Path
 
 from dbetto import Props, TextDB
@@ -129,12 +130,30 @@ def _setup_executor(
 def _read_dataflow_config(dataflow_config="$REFPROD/dataflow-config.yaml"):
     # helper to get configs
     if isinstance(dataflow_config, (Path, str)):
-        df_config = Props.read_from(
-            os.path.expandvars(dataflow_config), subst_pathvar=True
-        )
+        df_config = _read_config_file(os.path.expandvars(dataflow_config))
     elif isinstance(dataflow_config, Mapping):
         df_config = dataflow_config
     else:
         msg = "dataflow_config must be a str, Path, or Mapping"
         raise ValueError(msg)
     return df_config, df_config["paths"], df_config.get("query", {})
+
+
+def _tiers_to_dict(tiers, df_paths, query_config):
+    # turn tiers into list of tier-name/path pairs
+    if tiers is None:
+        tiers = query_config.get("tiers", ["raw"])
+    if isinstance(tiers, str):
+        tiers = [tiers]
+    if isinstance(tiers, Mapping):
+        return tiers
+    try:
+        return {t: df_paths[f"tier_{t}"] for t in tiers}
+    except KeyError as e:
+        msg = f"{e.args[0]} not found in dataflow paths"
+        raise ValueError(msg) from None
+
+
+@cache
+def _read_config_file(file):
+    return Props.read_from(file, subst_pathvar=True)

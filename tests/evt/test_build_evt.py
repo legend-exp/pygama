@@ -365,9 +365,49 @@ def test_build_evt_write(files_config_write):
         files_config_write,
         config=f"{config_dir}/basic-evt-config.yaml",
         wo_mode="of",
+        view_group=None,
     )
     outfile = files_config_write["evt"][0]
     assert Path(outfile).exists()
+
+
+# test that tcm channel views correctly produce evt views
+def test_channel_views(files_config_write):
+    # test with view_group off
+    build_evt(
+        files_config_write,
+        config=f"{config_dir}/basic-evt-config.yaml",
+        wo_mode="of",
+        view_group=None,
+    )
+    outfile = files_config_write["evt"][0]
+    assert Path(outfile).exists()
+    assert set(lh5.ls(outfile)) == {"evt"}
+
+    # test with default view group (ch*)
+    build_evt(
+        files_config_write,
+        config=f"{config_dir}/basic-evt-config.yaml",
+        wo_mode="of",
+    )
+    outfile = files_config_write["evt"][0]
+    assert Path(outfile).exists()
+    assert "evt" in set(lh5.ls(outfile))
+    chan_gps = set(lh5.ls(outfile)) - {"evt"}
+    assert chan_gps == set(lh5.ls(files_config_write["tcm"][0])) - {"hardware_tcm_1"}
+    assert all(lh5.ls(outfile, f"{g}/*") == [f"{g}/evt"] for g in chan_gps)
+
+    # test with specified view group
+    build_evt(
+        files_config_write,
+        config=f"{config_dir}/basic-evt-config.yaml",
+        wo_mode="of",
+        view_group="ch1121600",
+    )
+    outfile = files_config_write["evt"][0]
+    assert Path(outfile).exists()
+    assert set(lh5.ls(outfile)) == {"ch1121600", "evt"}
+    assert lh5.ls(outfile, "ch1121600/*") == ["ch1121600/evt"]
 
 
 def test_description_attr(files_config_nowrite):
