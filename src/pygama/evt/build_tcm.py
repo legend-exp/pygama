@@ -173,7 +173,7 @@ def build_tcm(
             if out_fields is not None
             else 2 + len(set(coin_cols))
         )
-        buffer_len = int(10**7 / (ntables * n_fields))
+        buffer_len = int(5.0e7 / (ntables * n_fields))
 
     msg = f"buffer length is {buffer_len}"
     log.debug(msg)

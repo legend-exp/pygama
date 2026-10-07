@@ -238,10 +238,7 @@ def build_evt(
                 view_group = [view_group]
 
             for vg in itertools.chain.from_iterable(
-                [
-                    lh5.ls(datainfo.tcm.file, f"{vg}")
-                    for vg in view_group
-                ]
+                [lh5.ls(datainfo.tcm.file, f"{vg}") for vg in view_group]
             ):
                 view = store.gimme_file(datainfo.tcm.file)[vg].get(datainfo.tcm.group)
                 datatype = view.attrs.get("datatype") if view is not None else None
