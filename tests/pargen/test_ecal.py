@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import lh5
 import numpy as np
 import pytest
@@ -176,3 +178,44 @@ def test_hpge_cal_prominent_peak(lgnd_test_data):
     assert cal.peaks_kev[0] == 2614.5
     assert len(cal.peaks_kev) == 1
     assert pytest.approx(cal.pars[1], 0.1) == 0.15
+
+
+@pytest.mark.filterwarnings("ignore:invalid value encountered in sqrt")
+def test_interpolate_energy_res_reports_unusable_draws(caplog):
+    """The resolution model is bounded but the draw is not.
+
+    ``sqrt(a + b*E)`` returns nan whenever a draw sends the radicand negative,
+    and ``nanstd`` drops those silently; the count must be reported so a
+    shrinking sample is visible rather than hidden.
+    """
+    # a sits close to its 0 bound with a wide error, so a sizeable fraction of
+    # the draws go negative at a low interpolation energy
+    results = {"parameters": [0.05, 1e-4], "cov": [[0.1**2, 0], [0, 1e-10]]}
+
+    with caplog.at_level(logging.DEBUG, logger="pygama.pargen.energy_cal"):
+        out = energy_cal.HPGeCalibration.interpolate_energy_res(
+            energy_cal.FWHMLinear,
+            np.array([100.0, 3000.0]),
+            dict(results),
+            interp_energy_kev={"low": 200.0},
+        )
+
+    assert "draws unusable" in caplog.text
+    # the surviving sample still yields a finite uncertainty
+    assert np.isfinite(out["low_fwhm_in_kev"])
+    assert np.isfinite(out["low_fwhm_err_in_kev"])
+
+
+@pytest.mark.filterwarnings("ignore:invalid value encountered in sqrt")
+def test_interpolate_energy_res_quiet_when_all_draws_usable(caplog):
+    results = {"parameters": [4.0, 1e-3], "cov": [[0.01, 0], [0, 1e-10]]}
+
+    with caplog.at_level(logging.DEBUG, logger="pygama.pargen.energy_cal"):
+        energy_cal.HPGeCalibration.interpolate_energy_res(
+            energy_cal.FWHMLinear,
+            np.array([100.0, 3000.0]),
+            dict(results),
+            interp_energy_kev={"qbb": 2039.0},
+        )
+
+    assert "draws unusable" not in caplog.text
