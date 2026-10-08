@@ -184,6 +184,48 @@ def test_spms_p13(tcm_path: str, lgnd_test_data, tmp_dir):
     assert len(evt.trigger.timestamp) == len(evt.spms.energy) == 50
 
 
+@pytest.mark.parametrize(
+    "tcm_path",
+    [
+        "lh5/l200-truncated/generated/tier/tcm/ath/p13/r001/l200-p13-r001-ath-20241210T230220Z-tier_tcm.lh5",
+        "lh5/l200-truncated/generated/tier/tcm/ant/p13/r001/l200-p13-r001-ant-20241210T225016Z-tier_tcm.lh5",
+    ],
+)
+def test_gather_follows_tcm_order(tcm_path: str, lgnd_test_data, tmp_dir):
+    """`gather` columns must line up with the TCM order of the spms module
+    functions, whatever the order of the channel list."""
+
+    outfile = f"{tmp_dir}/{Path(tcm_path).name}".replace("tcm", "evt-reversed")
+    files_config = {
+        "tcm": (lgnd_test_data.get_path(tcm_path), "hardware_tcm_1"),
+        "dsp": (lgnd_test_data.get_path(tcm_path.replace("tcm", "dsp")), "dsp", "ch{}"),
+        "hit": (
+            hit_file := lgnd_test_data.get_path(tcm_path.replace("tcm", "hit")),
+            "hit",
+            "ch{}",
+        ),
+        "evt": (outfile, "evt"),
+    }
+
+    with Path(f"{config_dir}/spms-p13-config.yaml").open() as file:
+        evt_config = yaml.safe_load(file)
+    evt_config["channels"]["spms_on"] = evt_config["channels"]["spms_on"][::-1]
+
+    build_evt(files_config, evt_config)
+    evt = lh5.read("/evt", outfile)
+
+    rawid = evt.spms.rawid.view_as("ak")
+    hit_idx = evt.spms.hit_idx.view_as("ak")
+    is_physical = evt.spms.quality.is_physical.view_as("ak")
+    assert ak.all(ak.num(is_physical) == ak.num(rawid))
+
+    for raw_key in np.unique(ak.flatten(rawid).to_numpy()):
+        has_any_noise = read_as(f"ch{raw_key}/hit/has_any_noise", hit_file, "np")
+        rows = ak.flatten(hit_idx[rawid == raw_key]).to_numpy()
+        evt_is_physical = ak.flatten(is_physical[rawid == raw_key]).to_numpy()
+        assert np.array_equal(evt_is_physical, ~has_any_noise[rows])
+
+
 # FIXME: this can't be properly tested until proper testdata is available
 # def test_spms_module(lgnd_test_data, files_config_nowrite):
 #     build_evt(

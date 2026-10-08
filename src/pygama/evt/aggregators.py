@@ -509,6 +509,9 @@ def evaluate_to_vector(
     """Aggregates by returning a :class:`.VectorOfVector` of evaluated
     expressions of channels that fulfill a query expression.
 
+    Without a sorter, the channels of each event are in TCM order, as in the
+    functions of :mod:`.modules.spms`, not in the order of `channels`.
+
     Parameters
     ----------
     datainfo
@@ -538,6 +541,9 @@ def evaluate_to_vector(
        ``ascend_by:<hit|dsp.field>`` results in an vector ordered ascending,
        ``decend_by:<hit|dsp.field>`` sorts descending.
     """
+    if not isinstance(datainfo, utils.DataInfo):
+        datainfo = utils.make_files_config(datainfo)
+
     out, dtype = evaluate_to_aoesa(
         datainfo=datainfo,
         tcm=tcm,
@@ -551,6 +557,16 @@ def evaluate_to_vector(
         default_value=default_value,
         missing_value=np.nan,
     )
+
+    # put the columns of each event in TCM order; channels not in the event go last
+    tcm_pos = np.full((n_rows, len(channels)), np.iinfo(np.int64).max)
+    for i, ch in enumerate(channels):
+        table_id = utils.get_tcm_id_by_pattern(datainfo.hit.table_fmt, ch)
+        if table_id is not None:
+            hit_mask, _, evt_ids_ch = utils.channel_indices(tcm, table_id)
+            tcm_pos[evt_ids_ch, i] = np.flatnonzero(hit_mask)
+    tcm_order = np.argsort(tcm_pos, axis=1, kind="stable")
+    out = np.take_along_axis(out, tcm_order, axis=1)
 
     # if a sorter is given sort accordingly
     if sorter is not None:
@@ -566,6 +582,7 @@ def evaluate_to_vector(
             n_rows=n_rows,
             missing_value=np.nan,
         )
+        s_val = np.take_along_axis(s_val, tcm_order, axis=1)
 
         if md == "ascend_by":
             out = out[np.arange(len(out))[:, None], np.argsort(s_val)]
