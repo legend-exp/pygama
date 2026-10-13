@@ -550,7 +550,8 @@ def evaluate_expression(
        - ``keep_at_idx:tcm_idx_field``: aggregates according to passed tcm
          index field.
        - ``gather``: channels are not combined, but result saved as
-         :class:`.VectorOfVectors`.
+         :class:`.VectorOfVectors`, with the channels of each event in TCM
+         order (unless `sorter` is given).
        - ``function``: the function call specified in `expr` is evaluated, and
          the resulting column is inserted into the output table.
 
