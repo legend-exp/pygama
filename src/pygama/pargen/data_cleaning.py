@@ -627,7 +627,7 @@ def generate_cuts(
                     plt.axvline(lower)
                     low_val = min(low_val, lower)
 
-                plt.hist(
+                counts, edges, _ = plt.hist(
                     all_par_array,
                     bins=np.linspace(
                         low_val,
@@ -640,6 +640,14 @@ def generate_cuts(
                 plt.ylabel("counts")
                 plt.xlabel(out_par)
                 plot_dict[out_par] = fig
+                plot_dict[f"{out_par}_data"] = {
+                    "edges": edges,
+                    "counts": counts,
+                    "cuts": np.array(
+                        [np.nan if c is None else c for c in (lower, upper)]
+                    ),
+                    "xlabel": out_par,
+                }
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
@@ -992,11 +1000,19 @@ def generate_cut_classifiers(
                 fig = plt.figure()
                 low = -10 if cut_left is None or cut_left > -10 else cut_left
                 hi = 10 if cut_right is None or cut_right < 10 else cut_right
-                _hist, _, _ = plt.hist(
+                counts, edges, _ = plt.hist(
                     norm_par_array,
                     bins=np.arange(low, hi, 0.1),
                     histtype="step",
                 )
+                plot_data = {
+                    "edges": edges,
+                    "counts": counts,
+                    "cuts": np.array(
+                        [np.nan if c is None else c for c in (cut_left, cut_right)]
+                    ),
+                    "xlabel": f"{out_par}_classifier",
+                }
                 if percentile is not None and method == "fit":
                     xs = np.arange(low, hi, 0.1)
                     if func == skewed_fit:
@@ -1004,6 +1020,10 @@ def generate_cut_classifiers(
                     else:
                         pdf_values = func.pdf_ext(xs, *pars)[1] * 0.1
                     plt.plot(xs, pdf_values)
+                    plot_data["fit"] = {  # re-evaluate with pdf_ext, or skewed_fit
+                        "function": getattr(func, "name", func.__name__),
+                        "pars": np.asarray(pars, dtype=float),
+                    }
                 if cut_left is not None:
                     plt.axvline(cut_left)
                 if cut_right is not None:
@@ -1012,6 +1032,7 @@ def generate_cut_classifiers(
                 plt.ylabel("counts")
                 plt.xlabel(f"{out_par}_classifier")
                 plot_dict[out_par] = fig
+                plot_dict[f"{out_par}_data"] = plot_data
                 plt.close()
     if display > 0:
         return output_dict, plot_dict
