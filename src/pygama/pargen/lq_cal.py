@@ -30,7 +30,6 @@ from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import linregress
 
-# for
 from sklearn.covariance import MinCovDet
 from sklearn.linear_model import LinearRegression
 
@@ -332,7 +331,7 @@ def fit_gaussian_tail_to_histogram(
         return mu_fit, sigma_fit, mu_err, sigma_err
 
     except Exception as e:
-        log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed: {e}")
+        log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed", exc_info=True)
 
         if return_full:
             return np.nan, np.nan, np.nan, np.nan, None, None, model, bin_centers, hist
@@ -485,7 +484,7 @@ def fit_mean_model(bin_centers, means, mean_errs):
         return popt, np.sqrt(np.diag(pcov)), model
 
     except Exception as e:
-        log.error(f"Mean linear fit failed: {e}")
+        log.error("Mean linear fit failed", exc_info=True)
         return [np.nan, np.nan], [np.nan, np.nan], model
 
 
@@ -535,7 +534,7 @@ def fit_sigma_model(bin_centers, sigmas, sigma_errs):
         )
         return np.abs(popt), np.sqrt(np.diag(pcov)), model
     except Exception as e:
-        log.error(f"Sigma model fit failed: {e}")
+        log.error(f"Sigma model fit failed", exc_info=True)
         return [np.nan, np.nan], [np.nan, np.nan], model
 
 
@@ -907,7 +906,7 @@ class LQCal:
         except Exception as e:
             if self.debug_mode:
                 raise
-            log.error("LQ over correction failed: %s", e)
+            log.error("LQ over correction failed", exc_info=True)
 
     def energy_width_correction(
         self,
@@ -922,18 +921,13 @@ class LQCal:
         log.info("Starting LQ energy width correction")
 
         try:
-            #
-            # lq_over_e = df[lq_param].to_numpy()/df[cal_energy_param].to_numpy()
-
             bin_centers, means, mean_errs, sigmas, sigma_errs, hist_panels = (
                 extract_gaussian_trends(
                     df[lq_param].to_numpy(),
                     df[cal_energy_param].to_numpy(),
                     np.linspace(250, 2650, 25),
                 )
-            )  # energy_windows,
-            # lq_filter)
-
+            ) 
             # fit a linear model to mu vs E. outputs are used only in plots?
             popt_mean, perr_mean, mean_model = fit_mean_model(
                 bin_centers, means, mean_errs
@@ -956,7 +950,7 @@ class LQCal:
         except Exception as e:
             if self.debug_mode:
                 raise
-            log.error("LQ energy width correction failed: %s", e)
+            log.error("LQ energy width correction failed", exc_info=True)
             popt_mean = [np.nan, np.nan]
             perr_mean = [np.nan, np.nan]
             mean_model = MeanModel
@@ -1182,7 +1176,7 @@ class LQCal:
         except Exception as e:
             if self.debug_mode:
                 raise
-            log.error("LQ time correction failed: %s", e)
+            log.error("LQ time correction failed", exc_info=True)
             self.update_cal_dicts(
                 {
                     output_name: {
@@ -1286,7 +1280,7 @@ class LQCal:
             except Exception as e:
                 if self.debug_mode:
                     raise
-                log.error("LQ drift time correction (linear mode) failed: %s", e)
+                log.error("LQ drift time correction (linear mode) failed", exc_info=True)
                 self.dt_fit_pars = (np.nan, np.nan)
 
         elif mode == "LR-MCD":
@@ -1333,7 +1327,7 @@ class LQCal:
             except Exception as e:
                 if self.debug_mode:
                     raise
-                log.error("LQ drift time correction (MCD mode) failed: %s", e)
+                log.error("LQ drift time correction (MCD mode) failed", exc_info=True)
                 self.dt_fit_pars = (np.nan, np.nan)
 
         # update dataframe
@@ -1416,7 +1410,7 @@ class LQCal:
         except Exception as e:
             if self.debug_mode:
                 raise
-            log.error("LQ cut determination failed: %s", e)
+            log.error("LQ cut determination failed", exc_info=True)
             self.cut_val = np.nan
             c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
             m = Minuit(c, np.full(2, np.nan))
@@ -1602,9 +1596,8 @@ class LQCal:
                     ]
                 )
                 log.error(
-                    "LQ survival fraction determination failed for %s peak: %s",
-                    peak,
-                    e,
+                    f"LQ survival fraction determination failed for {peak} peak",
+                    exc_info=True,
                 )
         self.low_side_sf = self.low_side_sf.set_index("peak")
 
