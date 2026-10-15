@@ -145,6 +145,20 @@ def test_hpge_cal_full_calibration(lgnd_test_data):
     assert pytest.approx(cal.pars[1], 0.1) == 0.15
     assert cal.pars[0] == 0.0
 
+    hists = cal.get_peak_hists(energy)
+    pk_parameters = cal.results[list(cal.results)[-1]]["peak_parameters"]
+    assert set(hists) == set(pk_parameters)
+    for peak, hist in hists.items():
+        lo, hi = pk_parameters[peak]["range"]
+        assert len(hist["counts"]) == len(hist["edges"]) - 1
+        assert hist["edges"][0] == lo
+        assert hist["edges"][-1] <= hi
+        in_range = (energy >= hist["edges"][0]) & (energy <= hist["edges"][-1])
+        assert hist["counts"].sum() == in_range.sum()
+
+    fig = cal.plot_fits(energy)
+    assert len(fig.axes) == len(pk_parameters)
+
 
 def test_hpge_cal_prominent_peak(lgnd_test_data):
     data = lgnd_test_data.get_path(

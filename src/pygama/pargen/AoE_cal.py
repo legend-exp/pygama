@@ -2345,6 +2345,7 @@ class CalAoE:
             fit_widths = [(40, 25), (25, 40), (0, 0), (25, 40), (50, 50)]
 
         _n = (lambda base: f"{base}_{suffix}") if suffix else (lambda base: base)
+        self.suffix = suffix
 
         timecorr_name = _n("AoE_Timecorr")
         dtcorr_name = _n("AoE_DTcorr")
@@ -2722,11 +2723,64 @@ def drifttime_corr_plot(
     return fig
 
 
+def _col(aoe_class, base: str, name: str | None = None) -> str:
+    """Column *name*, or *base* with the calibration's suffix (e.g. ``AoE_Low_Cut_dplms``)."""
+    if name is not None:
+        return name
+    suffix = getattr(aoe_class, "suffix", None)
+    return f"{base}_{suffix}" if suffix else base
+
+
+def _hist2d(x, y, x_edges, y_edges) -> dict:
+    counts, _, _ = np.histogram2d(x, y, bins=[x_edges, y_edges])
+    return {"counts": counts.astype(np.int32), "x_edges": x_edges, "y_edges": y_edges}
+
+
+def get_compt_bands_data(
+    aoe_class,
+    data,
+    eranges: list[tuple],
+    aoe_param: str | None = None,
+    aoe_range: list[float] | None = None,
+    density=True,
+    n_bins=50,
+) -> dict:
+    """
+    A/E histograms of Compton bands, as drawn by :func:`plot_compt_bands_overlayed`.
+
+    Returns
+    -------
+    dict
+        ``{"<lo>-<hi>": {"edges", "counts"}}``; ``counts`` are densities if
+        *density*. Bands whose selection fails are left out.
+    """
+    aoe_param = _col(aoe_class, "AoE_Timecorr", aoe_param)
+    bands = {}
+    for erange in eranges:
+        try:
+            select_df = data.query(
+                f"{aoe_class.selection_string}&{aoe_class.cal_energy_param}>{erange[0]}&{aoe_class.cal_energy_param}<{erange[1]}&{aoe_param}=={aoe_param}"
+            )
+            if aoe_range is not None:
+                select_df = select_df.query(
+                    f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}"
+                )
+                edges = np.linspace(aoe_range[0], aoe_range[1], n_bins)
+            else:
+                edges = np.linspace(0.85, 1.05, n_bins)
+            counts, _ = np.histogram(select_df[aoe_param], bins=edges, density=density)
+        except Exception as e:
+            log.debug("compton band %s failed: %s", erange, e)
+            continue
+        bands[f"{erange[0]}-{erange[1]}"] = {"edges": edges, "counts": counts}
+    return bands
+
+
 def plot_compt_bands_overlayed(
     aoe_class,
     data,
     eranges: list[tuple],
-    aoe_param="AoE_Timecorr",
+    aoe_param: str | None = None,
     aoe_range: list[float] | None = None,
     title="Compton Bands",
     density=True,
@@ -2740,35 +2794,71 @@ def plot_compt_bands_overlayed(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    bands = get_compt_bands_data(
+        aoe_class, data, eranges, aoe_param, aoe_range, density, n_bins
+    )
     fig = plt.figure()
-
-    for erange in eranges:
-        try:
-            select_df = data.query(
-                f"{aoe_class.selection_string}&{aoe_class.cal_energy_param}>{erange[0]}&{aoe_class.cal_energy_param}<{erange[1]}&{aoe_param}=={aoe_param}"
-            )
-            if aoe_range is not None:
-                select_df = select_df.query(
-                    f"{aoe_param}>{aoe_range[0]}&{aoe_param}<{aoe_range[1]}"
-                )
-                bins = np.linspace(aoe_range[0], aoe_range[1], n_bins)
-            else:
-                bins = np.linspace(0.85, 1.05, n_bins)
-            plt.hist(
-                select_df[aoe_param],
-                bins=bins,
-                histtype="step",
-                label=f"{erange[0]}-{erange[1]}",
-                density=density,
-            )
-        except Exception:
-            pass
+    for label, band in bands.items():
+        centres = (band["edges"][1:] + band["edges"][:-1]) / 2
+        plt.hist(
+            centres,
+            bins=band["edges"],
+            weights=band["counts"],
+            histtype="step",
+            label=label,
+        )
     plt.ylabel("counts")
-    plt.xlabel(aoe_param)
+    plt.xlabel(_col(aoe_class, "AoE_Timecorr", aoe_param))
     plt.title(title)
     plt.legend(loc="upper left")
     plt.close()
     return fig
+
+
+plot_compt_bands_overlayed.data_func = get_compt_bands_data
+
+
+def get_dt_dep_data(
+    aoe_class,
+    data,
+    eranges: list[tuple],
+    titles: list | None = None,
+    aoe_param: str | None = None,
+    bins=(200, 100),
+    dt_max=2000,
+) -> dict:
+    """
+    2D A/E vs drift-time histograms, as drawn by :func:`plot_dt_dep`.
+
+    Returns
+    -------
+    dict
+        ``{title: {"counts" (n_aoe, n_dt), "x_edges" (A/E), "y_edges" (drift time)}}``.
+    """
+    aoe_param = _col(aoe_class, "AoE_Timecorr", aoe_param)
+    maps = {}
+    for i, erange in enumerate(eranges):
+        try:
+            select_df = data.query(
+                f"{aoe_class.selection_string}&{aoe_class.cal_energy_param}<{erange[1]}&{aoe_class.cal_energy_param}>{erange[0]}&{aoe_param}=={aoe_param}"
+            )
+            hist, bs, _var = pgh.get_hist(select_df[aoe_param], bins=500)
+            bin_cs = (bs[1:] + bs[:-1]) / 2
+            mu = bin_cs[np.argmax(hist)]
+            aoe_range = [mu * 0.9, mu * 1.1]
+            final_df = select_df.query(
+                f"{aoe_param}<{aoe_range[1]}&{aoe_param}>{aoe_range[0]}&{aoe_class.dt_param}<{dt_max}"
+            )
+            x, y = final_df[aoe_param], final_df[aoe_class.dt_param]
+            # same edges as plt.hist2d(bins=int): span of the selected data
+            x_edges = np.linspace(x.min(), x.max(), bins[0] + 1)
+            y_edges = np.linspace(y.min(), y.max(), bins[1] + 1)
+        except Exception as e:
+            log.debug("dt dependence %s failed: %s", erange, e)
+            continue
+        title = f"{erange[0]}-{erange[1]}" if titles is None else titles[i]
+        maps[title] = _hist2d(x, y, x_edges, y_edges)
+    return maps
 
 
 def plot_dt_dep(
@@ -2776,7 +2866,7 @@ def plot_dt_dep(
     data,
     eranges: list[tuple],
     titles: list | None = None,
-    aoe_param="AoE_Timecorr",
+    aoe_param: str | None = None,
     bins=(200, 100),
     dt_max=2000,
     figsize=(12, 8),
@@ -2788,39 +2878,44 @@ def plot_dt_dep(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    maps = get_dt_dep_data(aoe_class, data, eranges, titles, aoe_param, bins, dt_max)
     fig = plt.figure()
-    for i, erange in enumerate(eranges):
-        try:
-            plt.subplot(3, 2, i + 1)
-            select_df = data.query(
-                f"{aoe_class.selection_string}&{aoe_class.cal_energy_param}<{erange[1]}&{aoe_class.cal_energy_param}>{erange[0]}&{aoe_param}=={aoe_param}"
-            )
-
-            hist, bs, _var = pgh.get_hist(select_df[aoe_param], bins=500)
-            bin_cs = (bs[1:] + bs[:-1]) / 2
-            mu = bin_cs[np.argmax(hist)]
-            aoe_range = [mu * 0.9, mu * 1.1]
-
-            final_df = select_df.query(
-                f"{aoe_param}<{aoe_range[1]}&{aoe_param}>{aoe_range[0]}&{aoe_class.dt_param}<{dt_max}"
-            )
-            plt.hist2d(
-                final_df[aoe_param],
-                final_df[aoe_class.dt_param],
-                bins=bins,
-                norm=LogNorm(),
-            )
-            plt.ylabel("drift time (ns)")
-            plt.xlabel("A/E")
-            if titles is None:
-                plt.title(f"{erange[0]}-{erange[1]}")
-            else:
-                plt.title(titles[i])
-        except Exception:
-            pass
+    for i, (title, hist) in enumerate(maps.items()):
+        plt.subplot(3, 2, i + 1)
+        plt.pcolormesh(
+            hist["x_edges"], hist["y_edges"], hist["counts"].T, norm=LogNorm()
+        )
+        plt.ylabel("drift time (ns)")
+        plt.xlabel("A/E")
+        plt.title(title)
     plt.tight_layout()
     plt.close()
     return fig
+
+
+plot_dt_dep.data_func = get_dt_dep_data
+
+
+def get_energy_corr_data(aoe_class, _data) -> dict:
+    """
+    Compton-band A/E means and widths behind the energy-correction fits.
+
+    The fitted curves themselves are in the results (``correction_fit_results``).
+
+    Returns
+    -------
+    dict
+        ``{"energy", "mean", "mean_err", "sigma", "sigma_err", "band_width"}``,
+        or an empty dict if the correction was not run.
+    """
+    fits = getattr(aoe_class, "energy_corr_fits", None)
+    if fits is None or len(fits) == 0:
+        return {}
+    out = {"energy": fits.index.to_numpy(dtype=float)}
+    for col in ("mean", "mean_err", "sigma", "sigma_err"):
+        out[col] = fits[col].to_numpy(dtype=float)
+    out["band_width"] = float(getattr(aoe_class, "compt_bands_width", np.nan))
+    return out
 
 
 def plot_mean_fit(aoe_class, _data, figsize=(12, 8), fontsize=12) -> plt.figure:
@@ -2968,6 +3063,41 @@ def plot_sigma_fit(aoe_class, _data, figsize=(12, 8), fontsize=12) -> plt.figure
     return fig
 
 
+plot_mean_fit.data_func = get_energy_corr_data
+plot_sigma_fit.data_func = get_energy_corr_data
+
+
+def _sf_points(df) -> dict:
+    return {
+        "cut_vals": df.index.to_numpy(dtype=float),
+        "sf": df["sf"].to_numpy(dtype=float),
+        "sf_err": df["sf_err"].to_numpy(dtype=float),
+    }
+
+
+def get_cut_fit_data(aoe_class, _data, dep_acc=0.9) -> dict:
+    """
+    DEP survival fraction against cut value and the sigmoid fitted to it.
+
+    Returns
+    -------
+    dict
+        :func:`_sf_points` of the sweep plus ``"function"``/``"pars"`` of the
+        sigmoid, ``"low_cut"`` and ``"dep_acc"``; empty if no cut was fitted.
+    """
+    cut_fits = getattr(aoe_class, "cut_fits", None)
+    cut_fit = getattr(aoe_class, "cut_fit", None)
+    if cut_fits is None or len(cut_fits) == 0 or cut_fit is None:
+        return {}
+    return {
+        **_sf_points(cut_fits),
+        "function": cut_fit["function"],
+        "pars": dict(cut_fit["pars"]),
+        "low_cut": float(getattr(aoe_class, "low_cut_val", np.nan)),
+        "dep_acc": dep_acc,
+    }
+
+
 def plot_cut_fit(
     aoe_class, _data, dep_acc=0.9, figsize=(12, 8), fontsize=12
 ) -> plt.figure:
@@ -3014,6 +3144,9 @@ def plot_cut_fit(
     return fig
 
 
+plot_cut_fit.data_func = get_cut_fit_data
+
+
 def get_peak_label(peak: float) -> str:
     if peak == 2039:
         return "CC @"
@@ -3026,6 +3159,26 @@ def get_peak_label(peak: float) -> str:
     if peak == 2614.5:
         return "Tl FEP @"
     return ""
+
+
+def get_survival_fraction_curves_data(aoe_class, _data) -> dict:
+    """
+    Survival fraction against cut value for each peak.
+
+    Returns
+    -------
+    dict
+        ``{"low_cut", "peaks": {peak: {"cut_vals", "sf", "sf_err"}}}``, or an
+        empty dict if the sweeps were not run.
+    """
+    peak_dfs = getattr(aoe_class, "low_side_peak_dfs", None)
+    if not peak_dfs:
+        return {}
+    peaks = {}
+    for peak, df in peak_dfs.items():
+        with contextlib.suppress(Exception):
+            peaks[str(peak)] = _sf_points(df)
+    return {"low_cut": float(getattr(aoe_class, "low_cut_val", np.nan)), "peaks": peaks}
 
 
 def plot_survival_fraction_curves(
@@ -3064,6 +3217,62 @@ def plot_survival_fraction_curves(
     return fig
 
 
+plot_survival_fraction_curves.data_func = get_survival_fraction_curves_data
+
+
+def get_spectra_data(
+    aoe_class,
+    data,
+    xrange=(900, 3000),
+    n_bins=2101,
+    xrange_inset=(1580, 1640),
+    n_bins_inset=200,
+    low_cut_param: str | None = None,
+    double_cut_param: str | None = None,
+) -> dict:
+    """
+    Energy spectra before and after the A/E cuts, as drawn by :func:`plot_spectra`.
+
+    Returns
+    -------
+    dict
+        ``{"edges", "before", "low_cut", "double_cut", "rejected", "inset": {...}}``
+        where ``inset`` holds the same histograms on the finer inset binning.
+    """
+    low = _col(aoe_class, "AoE_Low_Cut", low_cut_param)
+    double = _col(aoe_class, "AoE_Double_Sided_Cut", double_cut_param)
+    sel = aoe_class.selection_string
+    queries = {
+        "before": sel,
+        "low_cut": f"{sel}&{low}",
+        "double_cut": f"{sel}&{double}",
+        "rejected": f"{sel} & (~{double})",
+    }
+    energy = aoe_class.cal_energy_param
+
+    def spectra(df, edges):
+        out = {"edges": edges}
+        for key, query in queries.items():
+            out[key], _ = np.histogram(df.query(query)[energy], bins=edges)
+        return out
+
+    try:
+        out = spectra(data, np.linspace(xrange[0], xrange[1], n_bins))
+        inset_df = data.query(f"{energy}<{xrange_inset[1]}&{energy}>{xrange_inset[0]}")
+        out["inset"] = spectra(
+            inset_df, np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
+        )
+    except Exception as e:
+        log.warning("A/E spectra failed: %s", e)
+        return {}
+    return out
+
+
+def _draw_step(ax, edges, counts, **kwargs):
+    centres = (edges[1:] + edges[:-1]) / 2
+    ax.hist(centres, bins=edges, weights=counts, histtype="step", **kwargs)
+
+
 def plot_spectra(
     aoe_class,
     data,
@@ -3071,79 +3280,36 @@ def plot_spectra(
     n_bins=2101,
     xrange_inset=(1580, 1640),
     n_bins_inset=200,
+    low_cut_param: str | None = None,
+    double_cut_param: str | None = None,
     figsize=(12, 8),
     fontsize=12,
 ) -> plt.figure:
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    spec = get_spectra_data(
+        aoe_class,
+        data,
+        xrange,
+        n_bins,
+        xrange_inset,
+        n_bins_inset,
+        low_cut_param,
+        double_cut_param,
+    )
+    labels = {
+        "before": "before PSD",
+        "low_cut": "low side PSD cut",
+        "double_cut": "double sided PSD cut",
+        "rejected": "rejected by PSD cut",
+    }
     fig, ax = plt.subplots()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        ax.hist(
-            data.query(aoe_class.selection_string)[aoe_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-            label="before PSD",
-        )
-        ax.hist(
-            data.query(f"{aoe_class.selection_string}&AoE_Low_Cut")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="low side PSD cut",
-        )
-        ax.hist(
-            data.query(f"{aoe_class.selection_string}&AoE_Double_Sided_Cut")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="double sided PSD cut",
-        )
-        ax.hist(
-            data.query(f"{aoe_class.selection_string} & (~AoE_Double_Sided_Cut)")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="rejected by PSD cut",
-        )
-
+    if spec:
         axins = ax.inset_axes([0.25, 0.07, 0.4, 0.3])
-        bins = np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
-        select_df = data.query(
-            f"{aoe_class.cal_energy_param}<{xrange_inset[1]}&{aoe_class.cal_energy_param}>{xrange_inset[0]}"
-        )
-        axins.hist(
-            select_df.query(aoe_class.selection_string)[aoe_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-        )
-        axins.hist(
-            select_df.query(f"{aoe_class.selection_string}&AoE_Low_Cut")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-        axins.hist(
-            select_df.query(f"{aoe_class.selection_string}&AoE_Double_Sided_Cut")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-        axins.hist(
-            select_df.query(f"{aoe_class.selection_string} & (~AoE_Double_Sided_Cut)")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-    except Exception:
-        pass
+        for key, label in labels.items():
+            _draw_step(ax, spec["edges"], spec[key], label=label)
+            _draw_step(axins, spec["inset"]["edges"], spec["inset"][key])
     ax.set_xlim(xrange)
     ax.set_yscale("log")
     plt.xlabel("energy (keV)")
@@ -3153,30 +3319,50 @@ def plot_spectra(
     return fig
 
 
+plot_spectra.data_func = get_spectra_data
+
+
+def get_sf_vs_energy_data(
+    aoe_class, data, xrange=(900, 3000), n_bins=701, cut_param: str | None = None
+) -> dict:
+    """
+    Fraction of events passing the double-sided A/E cut against energy.
+
+    Returns
+    -------
+    dict
+        ``{"edges", "sf"}`` with ``sf`` in percent.
+    """
+    cut = _col(aoe_class, "AoE_Double_Sided_Cut", cut_param)
+    edges = np.linspace(xrange[0], xrange[1], n_bins)
+    try:
+        sel = data.query(aoe_class.selection_string)[[aoe_class.cal_energy_param, cut]]
+        counts_pass, _ = np.histogram(
+            sel[sel[cut]][aoe_class.cal_energy_param], bins=edges
+        )
+        counts, _ = np.histogram(sel[aoe_class.cal_energy_param], bins=edges)
+    except Exception as e:
+        log.warning("A/E survival fraction vs energy failed: %s", e)
+        return {}
+    return {"edges": edges, "sf": 100 * counts_pass / (counts + 10**-99)}
+
+
 def plot_sf_vs_energy(
-    aoe_class, data, xrange=(900, 3000), n_bins=701, figsize=(12, 8), fontsize=12
+    aoe_class,
+    data,
+    xrange=(900, 3000),
+    n_bins=701,
+    cut_param: str | None = None,
+    figsize=(12, 8),
+    fontsize=12,
 ) -> plt.figure:
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    sf = get_sf_vs_energy_data(aoe_class, data, xrange, n_bins, cut_param)
     fig = plt.figure()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        counts_pass, bins_pass, _ = pgh.get_hist(
-            data.query(f"{aoe_class.selection_string}&AoE_Double_Sided_Cut")[
-                aoe_class.cal_energy_param
-            ],
-            bins=bins,
-        )
-        counts, bins, _ = pgh.get_hist(
-            data.query(aoe_class.selection_string)[aoe_class.cal_energy_param],
-            bins=bins,
-        )
-        survival_fracs = counts_pass / (counts + 10**-99)
-
-        plt.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
-    except Exception:
-        pass
+    if sf:
+        plt.step(pgh.get_bin_centers(sf["edges"]), sf["sf"])
     plt.ylim([0, 100])
     vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
@@ -3186,10 +3372,44 @@ def plot_sf_vs_energy(
     return fig
 
 
+plot_sf_vs_energy.data_func = get_sf_vs_energy_data
+
+
+def get_classifier_data(
+    aoe_class,
+    data,
+    aoe_param: str | None = None,
+    xrange=(900, 3000),
+    yrange=(-50, 10),
+    xn_bins=700,
+    yn_bins=500,
+) -> dict:
+    """
+    2D energy vs A/E classifier histogram, as drawn by :func:`plot_classifier`.
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_energy, n_classifier), "x_edges" (energy), "y_edges"}``.
+    """
+    aoe_param = _col(aoe_class, "AoE_Classifier", aoe_param)
+    try:
+        sel = data.query(aoe_class.selection_string)
+        return _hist2d(
+            sel[aoe_class.cal_energy_param],
+            sel[aoe_param],
+            np.linspace(xrange[0], xrange[1], xn_bins),
+            np.linspace(yrange[0], yrange[1], yn_bins),
+        )
+    except Exception as e:
+        log.warning("A/E classifier histogram failed: %s", e)
+        return {}
+
+
 def plot_classifier(
     aoe_class,
     data,
-    aoe_param="AoE_Classifier",
+    aoe_param: str | None = None,
     xrange=(900, 3000),
     yrange=(-50, 10),
     xn_bins=700,
@@ -3200,20 +3420,20 @@ def plot_classifier(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    hist = get_classifier_data(
+        aoe_class, data, aoe_param, xrange, yrange, xn_bins, yn_bins
+    )
     fig = plt.figure()
-    with contextlib.suppress(Exception):
-        plt.hist2d(
-            data.query(aoe_class.selection_string)[aoe_class.cal_energy_param],
-            data.query(aoe_class.selection_string)[aoe_param],
-            bins=[
-                np.linspace(xrange[0], xrange[1], xn_bins),
-                np.linspace(yrange[0], yrange[1], yn_bins),
-            ],
-            norm=LogNorm(),
+    if hist:
+        plt.pcolormesh(
+            hist["x_edges"], hist["y_edges"], hist["counts"].T, norm=LogNorm()
         )
     plt.xlabel("energy (keV)")
-    plt.ylabel(aoe_param)
+    plt.ylabel(_col(aoe_class, "AoE_Classifier", aoe_param))
     plt.xlim(xrange)
     plt.ylim(yrange)
     plt.close()
     return fig
+
+
+plot_classifier.data_func = get_classifier_data

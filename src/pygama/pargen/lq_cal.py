@@ -962,6 +962,39 @@ def plot_lq_mean_time(
     return fig
 
 
+def get_drift_time_correction_data(lq_class, data, lq_param="LQ_Timecorr") -> dict:
+    """
+    2D LQ vs drift-time histogram in the DEP, as drawn by :func:`plot_drift_time_correction`.
+
+    The correction line itself is in the results (``rt_correction``).
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_dt, n_lq), "x_edges" (drift time), "y_edges" (LQ),
+        "dt_range", "lq_range"}``.
+    """
+    dep_range = (1590, 1595)
+    try:
+        dep = data[
+            (data[lq_class.cal_energy_param] > dep_range[0])
+            & (data[lq_class.cal_energy_param] < dep_range[1])
+        ]
+        out = AoE._hist2d(
+            dep["dt_eff"],
+            dep[lq_param],
+            np.linspace(0, 1500, 101),
+            np.linspace(0, 2.5, 101),
+        )
+    except Exception as e:
+        log.warning("LQ drift time histogram failed: %s", e)
+        return {}
+    for name in ("dt_range", "lq_range"):  # unset if the correction was skipped
+        if getattr(lq_class, name, None) is not None:
+            out[name] = np.asarray(getattr(lq_class, name), dtype=float)
+    return out
+
+
 def plot_drift_time_correction(
     lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12
 ) -> plt.figure:
@@ -973,45 +1006,47 @@ def plot_drift_time_correction(
     plt.rcParams["font.size"] = fontsize
     fig, _ax = plt.subplots(1, 1)
 
-    try:
-        dep_range = (1590, 1595)
-
-        initial_df = data[
-            (data[lq_class.cal_energy_param] > dep_range[0])
-            & (data[lq_class.cal_energy_param] < dep_range[1])
-        ]
-        max_dt = 1500
-        max_lq = 2.5
-
-        plt.hist2d(
-            initial_df["dt_eff"],
-            initial_df[lq_param],
-            bins=100,
-            range=((0, max_dt), (0, max_lq)),
-            norm=mcolors.LogNorm(),
+    hist = get_drift_time_correction_data(lq_class, data, lq_param)
+    if hist:
+        plt.pcolormesh(
+            hist["x_edges"], hist["y_edges"], hist["counts"].T, norm=mcolors.LogNorm()
         )
-
-        x = np.linspace(0, max_dt, 100)
-        model = lq_class.dt_fit_pars[0] * x + lq_class.dt_fit_pars[1]
-
-        plt.plot(x, model, color="r")
-
-        plt.axvline(lq_class.dt_range[0], color="k")
-        plt.axvline(lq_class.dt_range[1], color="k")
-        plt.axhline(lq_class.lq_range[0], color="k")
-        plt.axhline(lq_class.lq_range[1], color="k")
-
+        fit_pars = getattr(lq_class, "dt_fit_pars", None)
+        if fit_pars is not None:
+            x = np.linspace(0, hist["x_edges"][-1], 100)
+            plt.plot(x, fit_pars[0] * x + fit_pars[1], color="r")
+        for dt in hist.get("dt_range", []):
+            plt.axvline(dt, color="k")
+        for lq in hist.get("lq_range", []):
+            plt.axhline(lq, color="k")
         plt.xlabel("Drift Time (ns)")
         plt.ylabel("LQ")
-
         plt.title("LQ versus Drift Time for DEP")
-
-    except Exception:
-        pass
 
     plt.tight_layout()
     plt.close()
     return fig
+
+
+plot_drift_time_correction.data_func = get_drift_time_correction_data
+
+
+def get_lq_cut_fit_data(lq_class, data) -> dict:  # noqa: ARG001
+    """
+    Sideband-subtracted DEP LQ histogram used for the cut fit.
+
+    The Gaussian itself is in the results (``cut_fit_pars``).
+
+    Returns
+    -------
+    dict
+        ``{"counts", "edges"}``, or an empty dict if the cut was not fitted.
+    """
+    fit_hist = getattr(lq_class, "fit_hist", None)
+    if fit_hist is None:
+        return {}
+    hist, bins = fit_hist
+    return {"counts": np.asarray(hist, dtype=float), "edges": np.asarray(bins)}
 
 
 def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:  # noqa: ARG001
@@ -1068,6 +1103,29 @@ def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:
     return fig
 
 
+plot_lq_cut_fit.data_func = get_lq_cut_fit_data
+
+
+def get_survival_fraction_curves_data(lq_class, data) -> dict:  # noqa: ARG001
+    """
+    Survival fraction against LQ cut value for each peak.
+
+    Returns
+    -------
+    dict
+        ``{"cut_val", "peaks": {peak: {"cut_vals", "sf", "sf_err"}}}``, or an
+        empty dict if the sweeps were not run.
+    """
+    peak_dfs = getattr(lq_class, "low_side_peak_dfs", None)
+    if not peak_dfs:
+        return {}
+    peaks = {}
+    for peak, df in peak_dfs.items():
+        with contextlib.suppress(Exception):
+            peaks[str(peak)] = AoE._sf_points(df)
+    return {"cut_val": float(getattr(lq_class, "cut_val", np.nan)), "peaks": peaks}
+
+
 def plot_survival_fraction_curves(
     lq_class,
     data,  # noqa: ARG001
@@ -1110,6 +1168,33 @@ def plot_survival_fraction_curves(
     return fig
 
 
+plot_survival_fraction_curves.data_func = get_survival_fraction_curves_data
+
+
+def get_sf_vs_energy_data(
+    lq_class, data, xrange=(900, 3000), n_bins=701, cut_param="LQ_Cut"
+) -> dict:
+    """
+    Fraction of events passing the LQ cut against energy.
+
+    Returns
+    -------
+    dict
+        ``{"edges", "sf"}`` with ``sf`` in percent.
+    """
+    edges = np.linspace(xrange[0], xrange[1], n_bins)
+    try:
+        sel = data.query(lq_class.selection_string)
+        counts_pass, _ = np.histogram(
+            sel.query(cut_param)[lq_class.cal_energy_param], bins=edges
+        )
+        counts, _ = np.histogram(sel[lq_class.cal_energy_param], bins=edges)
+    except Exception as e:
+        log.warning("LQ survival fraction vs energy failed: %s", e)
+        return {}
+    return {"edges": edges, "sf": 100 * counts_pass / (counts + 10**-99)}
+
+
 def plot_sf_vs_energy(
     lq_class,
     data,
@@ -1124,24 +1209,10 @@ def plot_sf_vs_energy(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    sf = get_sf_vs_energy_data(lq_class, data, xrange, n_bins, cut_param)
     fig = plt.figure()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        counts_pass, bins_pass, _ = pgh.get_hist(
-            data.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-        )
-        counts, bins, _ = pgh.get_hist(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-        )
-        survival_fracs = counts_pass / (counts + 10**-99)
-
-        plt.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
-    except Exception:
-        pass
+    if sf:
+        plt.step(pgh.get_bin_centers(sf["edges"]), sf["sf"])
     plt.ylim([0, 100])
     vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
@@ -1149,6 +1220,53 @@ def plot_sf_vs_energy(
     plt.ylabel("survival percentage")
     plt.close()
     return fig
+
+
+plot_sf_vs_energy.data_func = get_sf_vs_energy_data
+
+
+def get_spectra_data(
+    lq_class,
+    data,
+    xrange=(900, 3000),
+    n_bins=2101,
+    xrange_inset=(1580, 1640),
+    n_bins_inset=200,
+    cut_param="LQ_Cut",
+) -> dict:
+    """
+    Energy spectra before and after the LQ cut, as drawn by :func:`plot_spectra`.
+
+    Returns
+    -------
+    dict
+        ``{"edges", "before", "after_cut", "rejected", "inset": {...}}`` where
+        ``inset`` holds the same histograms on the finer inset binning.
+    """
+    sel = lq_class.selection_string
+    queries = {
+        "before": sel,
+        "after_cut": f"{sel}&{cut_param}",
+        "rejected": f"{sel} & (~{cut_param})",
+    }
+    energy = lq_class.cal_energy_param
+
+    def spectra(df, edges):
+        out = {"edges": edges}
+        for key, query in queries.items():
+            out[key], _ = np.histogram(df.query(query)[energy], bins=edges)
+        return out
+
+    try:
+        out = spectra(data, np.linspace(xrange[0], xrange[1], n_bins))
+        inset_df = data.query(f"{energy}<{xrange_inset[1]}&{energy}>{xrange_inset[0]}")
+        out["inset"] = spectra(
+            inset_df, np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
+        )
+    except Exception as e:
+        log.warning("LQ spectra failed: %s", e)
+        return {}
+    return out
 
 
 def plot_spectra(
@@ -1162,78 +1280,25 @@ def plot_spectra(
     fontsize=12,
     cut_param="LQ_Cut",
 ) -> plt.figure:
-    """Plots a 2D histogram of the LQ classifier vs calibrated energy"""
+    """Plots the energy spectra before and after the LQ cut"""
 
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    spec = get_spectra_data(
+        lq_class, data, xrange, n_bins, xrange_inset, n_bins_inset, cut_param
+    )
+    labels = {
+        "before": "before PSD",
+        "after_cut": "after LQ cut",
+        "rejected": "rejected by LQ cut",
+    }
     fig, ax = plt.subplots()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        ax.hist(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-            label="before PSD",
-        )
-        # ax.hist(
-        #     data.query(f"{lq_class.selection_string}&AoE_Double_Sided_Cut")[
-        #         lq_class.cal_energy_param
-        #     ],
-        #     bins=bins,
-        #     histtype="step",
-        #     label="after double sided A/E cut",
-        # )
-        ax.hist(
-            data.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="after LQ cut",
-        )
-        ax.hist(
-            data.query(f"{lq_class.selection_string} & (~{cut_param})")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="rejected by LQ cut",
-        )
-
+    if spec:
         axins = ax.inset_axes([0.25, 0.07, 0.4, 0.3])
-        bins = np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
-        select_df = data.query(
-            f"{lq_class.cal_energy_param}<{xrange_inset[1]}&{lq_class.cal_energy_param}>{xrange_inset[0]}"
-        )
-        axins.hist(
-            select_df.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-        )
-        # axins.hist(
-        #     select_df.query(f"{lq_class.selection_string}&AoE_Double_Sided_Cut")[
-        #         lq_class.cal_energy_param
-        #     ],
-        #     bins=bins,
-        #     histtype="step",
-        # )
-        axins.hist(
-            select_df.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-        axins.hist(
-            select_df.query(f"{lq_class.selection_string} & (~{cut_param})")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-    except Exception:
-        pass
+        for key, label in labels.items():
+            AoE._draw_step(ax, spec["edges"], spec[key], label=label)
+            AoE._draw_step(axins, spec["inset"]["edges"], spec["inset"][key])
     ax.set_xlim(xrange)
     ax.set_yscale("log")
     plt.xlabel("energy (keV)")
@@ -1241,6 +1306,39 @@ def plot_spectra(
     plt.legend(loc="upper left")
     plt.close()
     return fig
+
+
+plot_spectra.data_func = get_spectra_data
+
+
+def get_classifier_data(
+    lq_class,
+    data,
+    lq_param="LQ_Classifier",
+    xrange=(800, 3000),
+    yrange=(-10, 30),
+    xn_bins=700,
+    yn_bins=500,
+) -> dict:
+    """
+    2D energy vs LQ classifier histogram, as drawn by :func:`plot_classifier`.
+
+    Returns
+    -------
+    dict
+        ``{"counts" (n_energy, n_classifier), "x_edges" (energy), "y_edges"}``.
+    """
+    try:
+        sel = data.query(lq_class.selection_string)
+        return AoE._hist2d(
+            sel[lq_class.cal_energy_param],
+            sel[lq_param],
+            np.linspace(xrange[0], xrange[1], xn_bins),
+            np.linspace(yrange[0], yrange[1], yn_bins),
+        )
+    except Exception as e:
+        log.warning("LQ classifier histogram failed: %s", e)
+        return {}
 
 
 def plot_classifier(
@@ -1257,16 +1355,13 @@ def plot_classifier(
     plt.rcParams["figure.figsize"] = figsize
     plt.rcParams["font.size"] = fontsize
 
+    hist = get_classifier_data(
+        lq_class, data, lq_param, xrange, yrange, xn_bins, yn_bins
+    )
     fig = plt.figure()
-    with contextlib.suppress(Exception):
-        plt.hist2d(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            data.query(lq_class.selection_string)[lq_param],
-            bins=[
-                np.linspace(xrange[0], xrange[1], xn_bins),
-                np.linspace(yrange[0], yrange[1], yn_bins),
-            ],
-            norm=LogNorm(),
+    if hist:
+        plt.pcolormesh(
+            hist["x_edges"], hist["y_edges"], hist["counts"].T, norm=LogNorm()
         )
     plt.xlabel("energy (keV)")
     plt.ylabel(lq_param)
@@ -1274,3 +1369,6 @@ def plot_classifier(
     plt.ylim(yrange)
     plt.close()
     return fig
+
+
+plot_classifier.data_func = get_classifier_data
