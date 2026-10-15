@@ -29,7 +29,6 @@ import pandas as pd
 from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import linregress
-
 from sklearn.covariance import MinCovDet
 from sklearn.linear_model import LinearRegression
 
@@ -87,14 +86,16 @@ def fit_gaussian_tail_to_histogram(
 
     # get 10%/50%/90% quantile estimates
     cdf = np.cumsum(hist.values())
-    cdf = cdf/N
+    cdf = cdf / N
     quant_bins = np.searchsorted(cdf, [0.1, 0.5, 0.9])
     q10, q50, q90 = hist.axes.centers[0][quant_bins]
 
     # Automatically detect tail side
     if tail_side == "auto":
         tail_side = "right" if (q90 - q50) > (q50 - q10) else "left"
-        log.debug(f"Using {tail_side} tail: q90-q50 = {q90 - q50}, q50-q10 = {q50 - q10}")
+        log.debug(
+            f"Using {tail_side} tail: q90-q50 = {q90 - q50}, q50-q10 = {q50 - q10}"
+        )
 
     if tail_side not in ["right", "left"]:
         raise ValueError("tail_side must be 'auto', 'right', or 'left'.")
@@ -125,7 +126,7 @@ def fit_gaussian_tail_to_histogram(
     # Initial guesses
     # -------------------------------
     mu0 = np.searchsorted(cdf, 0.5)
-    sigma0 = (q90-q10)/2.5
+    sigma0 = (q90 - q10) / 2.5
 
     if not np.isfinite(sigma0) or sigma0 <= 0:
         sigma0 = 1.0
@@ -149,7 +150,7 @@ def fit_gaussian_tail_to_histogram(
         fitter.limits[1] = (hist.axes.edges[0][0], hist.axes.edges[0][-1])
         fitter.limits[2] = (0, hist.axes.edges[0][-1] - hist.axes.edges[0][0])
         fitter.limits[3] = (0, N)
-        fitter.limits[4] = (0, 5*(hist.axes.edges[0][-1] - hist.axes.edges[0][0]))
+        fitter.limits[4] = (0, 5 * (hist.axes.edges[0][-1] - hist.axes.edges[0][0]))
         result = fitter.migrad()
 
         popt = np.array(result.values)
@@ -159,7 +160,7 @@ def fit_gaussian_tail_to_histogram(
 
         ##########
         if not result.accurate or not result.valid:
-            log.warning(f"Fit failed {repr(result)}")
+            log.warning(f"Fit failed {result!r}")
 
         log.debug(f"Fit tail_side = {tail_side}")
         log.debug(f"mu    = {mu_fit:.6g} ± {mu_err:.3g}")
@@ -179,7 +180,7 @@ def fit_gaussian_tail_to_histogram(
             model,
         )
 
-    except Exception as e:
+    except Exception:
         log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed", exc_info=True)
 
         return np.nan, np.nan, np.nan, np.nan, None, None, model
@@ -205,21 +206,23 @@ def extract_gaussian_trends(
         values = np.asarray(lq_over_e[idx], dtype=float)
         values = values[np.isfinite(values)]
 
-        #this determins what values we are fitting
+        # this determins what values we are fitting
         if len(values) > 10:
-
             # -------------------------------
             # Estimate binning
             # -------------------------------
             fit_min, fit_max = get_fit_range(values)
-            #fit_max += (fit_max-fit_min)/4 # increase high side range by 50% to help tail fit
-            if np.sum((values >= fit_min) & (values <= fit_max) & np.isfinite(values)) <= 10:
+            # fit_max += (fit_max-fit_min)/4 # increase high side range by 50% to help tail fit
+            if (
+                np.sum((values >= fit_min) & (values <= fit_max) & np.isfinite(values))
+                <= 10
+            ):
                 continue
             bin_width = fd_bin_width(values)
             if bin_width is None or bin_width <= 0:
                 bins = 30
             else:
-                bins = max(10, int(np.ceil( (fit_max - fit_min) / bin_width)))
+                bins = max(10, int(np.ceil((fit_max - fit_min) / bin_width)))
 
             hist = Hist(Regular(bins, fit_min, fit_max))
             hist.fill(values)
@@ -273,7 +276,7 @@ def extract_gaussian_trends(
 class MeanModel:
     @staticmethod
     def __call__(E, mu_slope, mu_offset):
-        return mu_slope*E + mu_offset
+        return mu_slope * E + mu_offset
 
     @staticmethod
     def grad(E, mu_slope, mu_offset):
@@ -287,6 +290,7 @@ class MeanModel:
     def parnames():
         return ["mu_slope", "mu_offset"]
 
+
 def fit_mean_model(bin_centers, means, mean_errs):
     # Linear model: mean(E) = mE + b
 
@@ -295,7 +299,10 @@ def fit_mean_model(bin_centers, means, mean_errs):
     # Clean input data
     # again added the mean errers being less than 1 bit....
     mask = (
-        ~np.isnan(bin_centers) & ~np.isnan(means) & ~np.isnan(mean_errs) & (mean_errs > 1e-8)
+        ~np.isnan(bin_centers)
+        & ~np.isnan(means)
+        & ~np.isnan(mean_errs)
+        & (mean_errs > 1e-8)
     )  # & (mean_errs <=1)
     x = np.asarray(bin_centers[mask], dtype=float)
     y = np.asarray(means[mask], dtype=float)
@@ -327,10 +334,9 @@ def fit_mean_model(bin_centers, means, mean_errs):
         perr = np.array(result.errors)
         return popt, perr, model
 
-    except Exception as e:
+    except Exception:
         log.error("Mean linear fit failed", exc_info=True)
         return [np.nan, np.nan], [np.nan, np.nan], model
-
 
 
 class SigmaModel:
@@ -341,7 +347,7 @@ class SigmaModel:
     @staticmethod
     def grad(E, A, B):
         sig = np.sqrt(A**2 / (E**2) + B**2)
-        return np.array([ A/E**2/sig, B/sig ])
+        return np.array([A / E**2 / sig, B / sig])
 
     @staticmethod
     def name(energy_par):
@@ -351,28 +357,34 @@ class SigmaModel:
     def parnames():
         return ["a_sigma", "b_sigma"]
 
+
 def fit_sigma_model(bin_centers, sigmas, sigma_errs):
     # 1. Fixed model: Ensure all inputs are float64 and handle potential negative inside sqrt
     model = SigmaModel()
 
-    mask = ~np.isnan(bin_centers) & ~np.isnan(sigmas) & ~np.isnan(sigma_errs) & (sigma_errs > 1e-8)
+    mask = (
+        ~np.isnan(bin_centers)
+        & ~np.isnan(sigmas)
+        & ~np.isnan(sigma_errs)
+        & (sigma_errs > 1e-8)
+    )
     x = bin_centers[mask]
     y = sigmas[mask]
     s = sigma_errs[mask]
 
     try:
-        initial_guess = [np.nanmean(x*y), np.nanmean(y)]
+        initial_guess = [np.nanmean(x * y), np.nanmean(y)]
 
         nll = cost.LeastSquares(x, y, s, model, grad=model.grad)
         fitter = Minuit(nll, *initial_guess)
-        fitter.limits[0] = (0, np.max(x*y))
+        fitter.limits[0] = (0, np.max(x * y))
         fitter.limits[1] = (0, np.max(y))
         result = fitter.migrad()
         popt = np.array(result.values)
         perr = np.array(result.errors)
         return np.abs(popt), perr, model
-    except Exception as e:
-        log.error(f"Sigma model fit failed", exc_info=True)
+    except Exception:
+        log.error("Sigma model fit failed", exc_info=True)
         return [np.nan, np.nan], [np.nan, np.nan], model
 
 
@@ -739,9 +751,11 @@ class LQCal:
     ):
         try:
             df[out_param] = df[lq_param].to_numpy() / df[cal_energy_param].to_numpy()
-            self.update_cal_dicts({out_param: {"expression": f"{lq_param}/{cal_energy_param}"} } )
+            self.update_cal_dicts(
+                {out_param: {"expression": f"{lq_param}/{cal_energy_param}"}}
+            )
 
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
             log.error("LQ over correction failed", exc_info=True)
@@ -765,7 +779,7 @@ class LQCal:
                     df[cal_energy_param].to_numpy(),
                     np.linspace(250, 2650, 25),
                 )
-            ) 
+            )
             # fit a linear model to mu vs E. outputs are used only in plots?
             popt_mean, perr_mean, mean_model = fit_mean_model(
                 bin_centers, means, mean_errs
@@ -785,7 +799,7 @@ class LQCal:
             width_sigma = sigma_model(df[cal_energy_param], *popt_sigma)
             df[out_param] = (df[lq_param] - mean) / width_sigma
 
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
             log.error("LQ energy width correction failed", exc_info=True)
@@ -1015,7 +1029,7 @@ class LQCal:
                     }
                 )
                 log.info("LQ time correction finished")
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
             log.error("LQ time correction failed", exc_info=True)
@@ -1119,10 +1133,12 @@ class LQCal:
                 )
                 self.dt_fit_pars = result
 
-            except Exception as e:
+            except Exception:
                 if self.debug_mode:
                     raise
-                log.error("LQ drift time correction (linear mode) failed", exc_info=True)
+                log.error(
+                    "LQ drift time correction (linear mode) failed", exc_info=True
+                )
                 self.dt_fit_pars = (np.nan, np.nan)
 
         elif mode == "LR-MCD":
@@ -1166,7 +1182,7 @@ class LQCal:
                 lr_mcd = LinearRegression().fit(inlier_dt.reshape(-1, 1), inlier_lq)
                 self.dt_fit_pars = (lr_mcd.coef_[0], lr_mcd.intercept_)
 
-            except Exception as e:
+            except Exception:
                 if self.debug_mode:
                     raise
                 log.error("LQ drift time correction (MCD mode) failed", exc_info=True)
@@ -1249,7 +1265,7 @@ class LQCal:
                 msg = "applying LQ classifier/cut to data failed"
                 raise RuntimeError(msg) from e
 
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
             log.error("LQ cut determination failed", exc_info=True)
@@ -1315,12 +1331,12 @@ class LQCal:
 
         self.update_cal_dicts(
             {
-                lq_over_e_name: { "expression": "np.nan" },
-                timecorr_name: { "expression": "np.nan" },
-                dt_corrected_name: { "expression": "np.nan" },
-                corrected_name: { "expression": "np.nan" },
-                classifier_name: { "expression": "np.nan" },
-                cut_name: { "expression": "np.nan" },
+                lq_over_e_name: {"expression": "np.nan"},
+                timecorr_name: {"expression": "np.nan"},
+                dt_corrected_name: {"expression": "np.nan"},
+                corrected_name: {"expression": "np.nan"},
+                classifier_name: {"expression": "np.nan"},
+                cut_name: {"expression": "np.nan"},
             }
         )
 
@@ -1439,7 +1455,7 @@ class LQCal:
                     )
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
-            except Exception as e:
+            except Exception:
                 if self.debug_mode:
                     raise
                 self.low_side_sf = pd.concat(
@@ -2002,7 +2018,9 @@ def plot_gaussian_trends_hist(
                     h.plot(ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV")
 
                     if popt is not None and model is not None:
-                        x_fit = np.linspace(h.axes.edges[0][0], h.axes.edges[0][-1], 1000)
+                        x_fit = np.linspace(
+                            h.axes.edges[0][0], h.axes.edges[0][-1], 1000
+                        )
                         y_fit = model(x_fit, *popt)
 
                         ax.plot(
