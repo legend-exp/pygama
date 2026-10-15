@@ -901,7 +901,7 @@ class LQCal:
     ):
         try:
             df[out_param] = df[lq_param].to_numpy() / df[cal_energy_param].to_numpy()
-            self.update_cal_dicts({out_param: f"{lq_param}/{cal_energy_param}"} )
+            self.update_cal_dicts({out_param: {"expression": f"{lq_param}/{cal_energy_param}"} } )
 
         except Exception as e:
             if self.debug_mode:
@@ -980,7 +980,7 @@ class LQCal:
         self.update_cal_dicts(
             {
                 out_param: {
-                    "expression": f"({mean_model_str})/(np.sqrt({sig_model_str})",
+                    "expression": f"({lq_param} - ({mean_model_str}))/({sig_model_str})",
                     "parameters": {
                         mean_model.parnames()[0]: popt_mean[0],
                         mean_model.parnames()[1]: popt_mean[1],
