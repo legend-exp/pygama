@@ -40,27 +40,8 @@ from pygama.pargen.survival_fractions import compton_sf_sweep, get_sf_sweep
 
 log = logging.getLogger(__name__)
 
-##################################
-# functions not copied over
-# load_and_filter_data
-# get_tcm_pulser_ids_1
-# get_tcm_pulser_ids_2
-# get_fit_range
-# initialize_detector_json
-# append_to_detector_json
-# plot_lq_over_e_2d_hist
-
-
-# okay I will add Harissree's code in here
-########
-import math
-
-import mplhep as hep
-
-# for plotting
 from hist import Hist
 from hist.axis import Regular
-from scipy.optimize import curve_fit
 from scipy.stats import exponnorm, norm
 
 
@@ -75,42 +56,9 @@ def fd_bin_width(data):
     return 2 * iqr / np.cbrt(n)
 
 
-def detect_tail_side(y_values):
-    """
-    Automatically detect whether the distribution has a stronger left or right tail.
-
-    Uses robust quantile distances around the median:
-        left_tail  = q50 - q10
-        right_tail = q90 - q50
-
-    Returns
-    -------
-    tail_side : {"left", "right"}
-    """
-
-    y_values = np.asarray(y_values, dtype=float)
-    y_values = y_values[np.isfinite(y_values)]
-
-    if len(y_values) < 10:
-        return "right"
-
-    q10, q50, q90 = np.percentile(y_values, [10, 50, 90])
-
-    left_tail = q50 - q10
-    right_tail = q90 - q50
-
-    log.debug(f"q10={q10:.5g}, q50={q50:.5g}, q90={q90:.5g}")
-    log.debug(f"left_tail={left_tail:.5g}, right_tail={right_tail:.5g}")
-
-    if right_tail >= left_tail:
-        return "right"
-    return "left"
-
-
 def fit_gaussian_tail_to_histogram(
-    y_values,
+    hist,
     tail_side="auto",
-    return_full=True,
 ):
     """
     Fit histogram with Gaussian + smooth one-sided EMG tail.
@@ -127,74 +75,46 @@ def fit_gaussian_tail_to_histogram(
         Which side gets the smooth EMG tail.
         If "auto", the function detects the stronger tail automatically.
 
-    return_full : bool
-        If False, returns mu, sigma, mu_err, sigma_err.
-        If True, also returns popt, perr, model, bin_centers, hist.
-
     Returns
     -------
     mu_fit, sigma_fit, mu_err, sigma_err
         Core Gaussian mean/sigma and errors.
     """
 
-    y_values = np.asarray(y_values, dtype=float)
-    y_values = y_values[np.isfinite(y_values)]
+    N = np.sum(hist.values())
+    if N < 10:
+        return np.nan, np.nan, np.nan, np.nan, None, None, None, None, None
 
-    if len(y_values) < 10:
-        if return_full:
-            return np.nan, np.nan, np.nan, np.nan, None, None, None, None, None
-        return np.nan, np.nan, np.nan, np.nan
+    # get 10%/50%/90% quantile estimates
+    cdf = np.cumsum(hist.values())
+    cdf = cdf/N
+    quant_bins = np.searchsorted(cdf, [0.1, 0.5, 0.9])
+    q10, q50, q90 = hist.axes.centers[0][quant_bins]
 
-    # -------------------------------
     # Automatically detect tail side
-    # -------------------------------
     if tail_side == "auto":
-        tail_side = detect_tail_side(y_values)
-
-        log.debug(f"Automatically selected tail_side = {tail_side}")
+        tail_side = "right" if (q90 - q50) > (q50 - q10) else "left"
+        log.debug(f"Using {tail_side} tail: q90-q50 = {q90 - q50}, q50-q10 = {q50 - q10}")
 
     if tail_side not in ["right", "left"]:
         raise ValueError("tail_side must be 'auto', 'right', or 'left'.")
 
-    # -------------------------------
-    # Estimate binning
-    # -------------------------------
-    bin_width = fd_bin_width(y_values)
-
-    if bin_width is None or bin_width <= 0:
-        bins = 30
-    else:
-        bins = max(10, int(np.ceil((np.max(y_values) - np.min(y_values)) / bin_width)))
-
-    hist, bin_edges = np.histogram(y_values, bins=bins, density=False)
-    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
-
-    bin_width_eff = np.median(np.diff(bin_edges))
-
-    # -------------------------------
     # Model: Gaussian + smooth EMG tail
-    # -------------------------------
     def model_right(x, A_g, mu, sigma, A_t, tau):
-        sigma = np.maximum(sigma, 1e-12)
-        tau = np.maximum(tau, 1e-12)
-
         gaussian = A_g * norm.pdf(x, mu, sigma)
 
         K = tau / sigma
         tail = A_t * exponnorm.pdf(x, K, loc=mu, scale=sigma)
 
-        return bin_width_eff * (gaussian + tail)
+        return gaussian + tail
 
     def model_left(x, A_g, mu, sigma, A_t, tau):
-        sigma = np.maximum(sigma, 1e-12)
-        tau = np.maximum(tau, 1e-12)
-
         gaussian = A_g * norm.pdf(x, mu, sigma)
 
         K = tau / sigma
         tail = A_t * exponnorm.pdf(-x, K, loc=-mu, scale=sigma)
 
-        return bin_width_eff * (gaussian + tail)
+        return gaussian + tail
 
     if tail_side == "right":
         model = model_right
@@ -204,8 +124,8 @@ def fit_gaussian_tail_to_histogram(
     # -------------------------------
     # Initial guesses
     # -------------------------------
-    mu0 = np.median(y_values)
-    sigma0 = np.std(y_values)
+    mu0 = np.searchsorted(cdf, 0.5)
+    sigma0 = (q90-q10)/2.5
 
     if not np.isfinite(sigma0) or sigma0 <= 0:
         sigma0 = 1.0
@@ -213,99 +133,33 @@ def fit_gaussian_tail_to_histogram(
     # Since the model returns expected bin counts,
     # A_g and A_t are approximately event-count amplitudes.
     # As a starting point, assume about 80% of the events belong to the Gaussian core and 20% belong to the tail
-
-    A_total0 = len(y_values)
-    A_g0 = 0.8 * A_total0
-    A_t0 = 0.2 * A_total0
+    A_g0 = 0.8 * N
+    A_t0 = 0.2 * N
     tau0 = sigma0
 
-    p0 = [A_g0, mu0, sigma0, A_t0, tau0]
-
-    # Bounds keep sigma/tau positive
-    bounds = (
-        [0, np.min(y_values), 1e-12, 0, 1e-12],
-        [np.inf, np.max(y_values), np.inf, np.inf, np.inf],
-    )
-
     try:
-        popt, pcov, _, mesg, ier = curve_fit(
-            # popt, pcov = curve_fit(
+        nll = cost.ExtendedBinnedNLL(
+            hist.values(),
+            hist.axes.edges[0],
             model,
-            bin_centers,
-            hist,
-            p0=p0,
-            bounds=bounds,
-            maxfev=50000,
-            full_output=True,  # this can be turned off when not debugging
-            absolute_sigma=True,  # adding this for testing, should be set to false
+            use_pdf="approximate",
         )
+        fitter = Minuit(nll, A_g0, mu0, sigma0, A_t0, tau0)
+        fitter.limits[0] = (0, N)
+        fitter.limits[1] = (hist.axes.edges[0][0], hist.axes.edges[0][-1])
+        fitter.limits[2] = (0, hist.axes.edges[0][-1] - hist.axes.edges[0][0])
+        fitter.limits[3] = (0, N)
+        fitter.limits[4] = (0, 5*(hist.axes.edges[0][-1] - hist.axes.edges[0][0]))
+        result = fitter.migrad()
 
-        perr = np.sqrt(np.diag(pcov))
-
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
         A_g_fit, mu_fit, sigma_fit, A_t_fit, tau_fit = popt
         A_g_err, mu_err, sigma_err, A_t_err, tau_err = perr
 
         ##########
-        if mu_err > 1 or sigma_err > 0.01:
-            log.warning(f"message from fit is: {mesg}")
-            log.warning(f"ier = {ier}")
-            log.warning(f"pcov: {pcov}")
-            log.warning(f"perr: {np.sqrt(np.diag(pcov))}")
-            log.warning(
-                f"corr: {pcov / np.outer(np.sqrt(np.diag(pcov)), np.sqrt(np.diag(pcov)))}"
-            )
-
-        """
-        # -------------------------------------------------
-        # Fit diagnostics / degeneracy detection
-        # -------------------------------------------------
-        
-        # Correlation matrix
-        with np.errstate(divide="ignore", invalid="ignore"):
-            corr = pcov / np.outer(perr, perr)
-        
-        # Key correlations:
-        #   0 = A_g
-        #   1 = mu
-        #   2 = sigma
-        #   3 = A_t
-        #   4 = tau
-        
-        # Strong degeneracy between Gaussian and tail amplitudes
-        amp_degeneracy = np.abs(corr[0, 3]) > 0.999
-        
-        # Strong degeneracy between mu and sigma
-        mu_sigma_degeneracy = np.abs(corr[1, 2]) > 0.999
-        
-        # Strong degeneracy involving mu and the component amplitudes
-        mu_amplitude_degeneracy = (
-            np.abs(corr[1, 0]) > 0.999 or
-            np.abs(corr[1, 3]) > 0.999
-        )
-        
-        # Overall degeneracy flag
-        degenerate = (
-            amp_degeneracy or
-            mu_sigma_degeneracy or
-            mu_amplitude_degeneracy
-        )
-        
-        # Check for non-finite covariance
-        covariance_valid = np.all(np.isfinite(pcov)) and np.all(np.isfinite(perr))
-        
-        # Check optimizer convergence
-        converged = ier in {1, 2, 3, 4}
-        
-        fit_quality = {
-            "converged": converged,
-            "covariance_valid": covariance_valid,
-            "degenerate": degenerate,
-            "amp_degeneracy": amp_degeneracy,
-            "mu_sigma_degeneracy": mu_sigma_degeneracy,
-            "mu_amplitude_degeneracy": mu_amplitude_degeneracy,
-        }
-        """
-        ##########
+        if not result.accurate or not result.valid:
+            log.warning(f"Fit failed {repr(result)}")
 
         log.debug(f"Fit tail_side = {tail_side}")
         log.debug(f"mu    = {mu_fit:.6g} ± {mu_err:.3g}")
@@ -315,28 +169,20 @@ def fit_gaussian_tail_to_histogram(
         log.debug(f"tau   = {tau_fit:.6g} ± {tau_err:.3g}")
 
         # TO DO: return information about the fit quality
-        if return_full:
-            return (
-                mu_fit,
-                sigma_fit,
-                mu_err,
-                sigma_err,
-                popt,
-                perr,
-                model,
-                bin_centers,
-                hist,
-            )
-
-        return mu_fit, sigma_fit, mu_err, sigma_err
+        return (
+            mu_fit,
+            sigma_fit,
+            mu_err,
+            sigma_err,
+            popt,
+            perr,
+            model,
+        )
 
     except Exception as e:
         log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed", exc_info=True)
 
-        if return_full:
-            return np.nan, np.nan, np.nan, np.nan, None, None, model, bin_centers, hist
-
-        return np.nan, np.nan, np.nan, np.nan
+        return np.nan, np.nan, np.nan, np.nan, None, None, model
 
 
 def extract_gaussian_trends(
@@ -361,25 +207,26 @@ def extract_gaussian_trends(
 
         #this determins what values we are fitting
         if len(values) > 10:
-            #adding in a try/except statement bc we were getting an error sometimes 
-            try:
-                fit_min, fit_max = get_fit_range(values)
-            #except:
-            except Exception as e:
-                print(f"An error occured! : {e}")
-                mu_except = np.median(values)
-                sigma_except = np.std(values) if np.std(values) > 0 else 1.0
-                fit_min, fit_max = mu_except - 2.5 * sigma_except, mu_except + 2.5 * sigma_except
-                
-            filtered_values = values[(values >= fit_min) & (values <= fit_max)]
 
-            if len(filtered_values) <= 10:
+            # -------------------------------
+            # Estimate binning
+            # -------------------------------
+            fit_min, fit_max = get_fit_range(values)
+            #fit_max += (fit_max-fit_min)/4 # increase high side range by 50% to help tail fit
+            if np.sum((values >= fit_min) & (values <= fit_max) & np.isfinite(values)) <= 10:
                 continue
+            bin_width = fd_bin_width(values)
+            if bin_width is None or bin_width <= 0:
+                bins = 30
+            else:
+                bins = max(10, int(np.ceil( (fit_max - fit_min) / bin_width)))
+
+            hist = Hist(Regular(bins, fit_min, fit_max))
+            hist.fill(values)
 
             result = fit_gaussian_tail_to_histogram(
-                filtered_values,
+                hist,
                 tail_side=tail_side,
-                return_full=True,
             )
 
             (
@@ -390,8 +237,6 @@ def extract_gaussian_trends(
                 popt,
                 perr,
                 model,
-                fit_bin_centers,
-                fit_hist,
             ) = result
 
             if np.isfinite(mean) and np.isfinite(sigma):
@@ -403,9 +248,9 @@ def extract_gaussian_trends(
 
                 hist_panels.append(
                     {
+                        "hist": hist,
                         "lo": lo,
                         "hi": hi,
-                        "values": filtered_values,
                         "popt": popt,
                         "model": model,
                         "mean": mean,
@@ -431,6 +276,10 @@ class MeanModel:
         return mu_slope*E + mu_offset
 
     @staticmethod
+    def grad(E, mu_slope, mu_offset):
+        return np.array([E, np.ones_like(E)])
+
+    @staticmethod
     def name(energy_par):
         return f"mu_slope*{energy_par} + mu_offset"
 
@@ -446,7 +295,7 @@ def fit_mean_model(bin_centers, means, mean_errs):
     # Clean input data
     # again added the mean errers being less than 1 bit....
     mask = (
-        ~np.isnan(bin_centers) & ~np.isnan(means) & ~np.isnan(mean_errs)
+        ~np.isnan(bin_centers) & ~np.isnan(means) & ~np.isnan(mean_errs) & (mean_errs > 1e-8)
     )  # & (mean_errs <=1)
     x = np.asarray(bin_centers[mask], dtype=float)
     y = np.asarray(means[mask], dtype=float)
@@ -471,17 +320,12 @@ def fit_mean_model(bin_centers, means, mean_errs):
     p0 = [0.0, np.nanmean(y)]
 
     try:
-        popt, pcov = curve_fit(
-            model,
-            x,
-            y,
-            p0=p0,
-            # this is a test to turn if off. remember to turn it back on or figure something out
-            sigma=s,
-            absolute_sigma=True,  # can use absolute_sigma variable here i guess if we want
-            maxfev=10000,
-        )
-        return popt, np.sqrt(np.diag(pcov)), model
+        nll = cost.LeastSquares(x, y, s, model, grad=model.grad)
+        fitter = Minuit(nll, *p0)
+        result = fitter.migrad()
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
+        return popt, perr, model
 
     except Exception as e:
         log.error("Mean linear fit failed", exc_info=True)
@@ -495,6 +339,11 @@ class SigmaModel:
         return np.sqrt(A**2 / (E**2) + B**2)
 
     @staticmethod
+    def grad(E, A, B):
+        sig = np.sqrt(A**2 / (E**2) + B**2)
+        return np.array([ A/E**2/sig, B/sig ])
+
+    @staticmethod
     def name(energy_par):
         return f"np.sqrt((a_sigma**2/{energy_par}**2)+b_sigma**2)"
 
@@ -506,33 +355,22 @@ def fit_sigma_model(bin_centers, sigmas, sigma_errs):
     # 1. Fixed model: Ensure all inputs are float64 and handle potential negative inside sqrt
     model = SigmaModel()
 
-    # 2. Initial guess (p0) is crucial for nonlinear models
-    # Estimate p0 based on data properties
-    initial_guess = [100, np.nanmean(sigmas)]
-
-    # 3. Clean input data: Remove NaN/Inf
-    mask = ~np.isnan(bin_centers) & ~np.isnan(sigmas) & ~np.isnan(sigma_errs)
+    mask = ~np.isnan(bin_centers) & ~np.isnan(sigmas) & ~np.isnan(sigma_errs) & (sigma_errs > 1e-8)
     x = bin_centers[mask]
     y = sigmas[mask]
     s = sigma_errs[mask]
 
-    # 4. Handle zeros in error to avoid division by zero
-    s = np.where(s == 0, 1e-8, s)
-    s = s + 1e-8  # Ensure strict positivity
-
     try:
-        # Use 'trf' method for better handling of parameter bounds if needed
-        popt, pcov = curve_fit(
-            model,
-            x,
-            y,
-            p0=initial_guess,
-            sigma=s,
-            maxfev=10000,
-            absolute_sigma=True,  # Optional: use if errors are absolute standard devs
-            bounds=([-np.inf, 0], [np.inf, np.inf]),
-        )
-        return np.abs(popt), np.sqrt(np.diag(pcov)), model
+        initial_guess = [np.nanmean(x*y), np.nanmean(y)]
+
+        nll = cost.LeastSquares(x, y, s, model, grad=model.grad)
+        fitter = Minuit(nll, *initial_guess)
+        fitter.limits[0] = (0, np.max(x*y))
+        fitter.limits[1] = (0, np.max(y))
+        result = fitter.migrad()
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
+        return np.abs(popt), perr, model
     except Exception as e:
         log.error(f"Sigma model fit failed", exc_info=True)
         return [np.nan, np.nan], [np.nan, np.nan], model
@@ -951,9 +789,13 @@ class LQCal:
             if self.debug_mode:
                 raise
             log.error("LQ energy width correction failed", exc_info=True)
+            means = []
+            mean_errs = []
             popt_mean = [np.nan, np.nan]
             perr_mean = [np.nan, np.nan]
             mean_model = MeanModel
+            sigmas = []
+            sigma_errs = []
             popt_sigma = [np.nan, np.nan]
             perr_sigma = [np.nan, np.nan]
             sigma_model = SigmaModel
@@ -2127,7 +1969,7 @@ def plot_gaussian_trends_hist(
             if len(hist_panels) > 0:
                 n_panels = len(hist_panels)
                 ncols = min(max_cols, n_panels)
-                nrows = math.ceil(n_panels / ncols)
+                nrows = int(np.ceil(n_panels / ncols))
 
                 if adjust_fig_height:
                     fig.set_figheight(fig.get_figwidth() * 0.8 * nrows / ncols)
@@ -2140,38 +1982,21 @@ def plot_gaussian_trends_hist(
                 axs_flat = axs.ravel()
 
                 for ax, panel in zip(axs_flat, hist_panels):
-                    values = panel["values"]
+                    h = panel["hist"]
                     lo = panel["lo"]
                     hi = panel["hi"]
                     popt = panel["popt"]
                     model = panel["model"]
 
-                    # Robust histogram range
-                    x_low, x_high = np.percentile(values, [0.5, 99.5])
-                    pad = 0.05 * (x_high - x_low)
-                    x_low -= pad
-                    x_high += pad
-
-                    # Bin count using existing FD logic, with fallback
-                    bin_width = fd_bin_width(values)
-                    if bin_width is None or bin_width <= 0:
-                        nbins = 30
-                    else:
-                        nbins = max(10, int(np.ceil((x_high - x_low) / bin_width)))
-
-                    h = Hist(Regular(nbins, x_low, x_high, label=""))
-                    h.fill(values)
-                    hep.histplot(
-                        h, ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV"
-                    )
+                    h.plot(ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV")
 
                     if popt is not None and model is not None:
-                        x_fit = np.linspace(x_low, x_high, 1000)
+                        x_fit = np.linspace(h.axes.edges[0][0], h.axes.edges[0][-1], 1000)
                         y_fit = model(x_fit, *popt)
 
                         ax.plot(
                             x_fit,
-                            y_fit,
+                            y_fit * np.median(h.axes.widths[0]),
                             color="red",
                             lw=2,
                             label=(
