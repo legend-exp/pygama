@@ -153,6 +153,9 @@ def build_hit(
                 outcol = outtbl_obj.eval(
                     info["expression"], info.get("parameters", None)
                 )
+                if isinstance(outcol, lgdo.Scalar):
+                    outcol = lgdo.Array(fill_val = outcol.value, shape=len(outtbl_obj))
+
                 if "lgdo_attrs" in info:
                     outcol.attrs |= info["lgdo_attrs"]
 
