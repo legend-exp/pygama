@@ -566,7 +566,7 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     right_guess = np.nanpercentile(lq, 95)
     test_range = (left_guess, right_guess)
 
-    hist, bins, _ = pgh.get_hist(lq, bins=100, range=test_range)
+    hist, bins, _ = pgh.get_hist(lq, bins=50, range=test_range)
     bin_centers = (bins[:-1] + bins[1:]) / 2
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
