@@ -86,3 +86,12 @@ def test_lq_cal_suffix(lgnd_test_data):
     assert "LQ_Classifier_alt" in data_df
     assert "LQ_Cut_alt" in data_df
     assert cal_dict["LQ_Cut_alt"]["expression"] == "(LQ_Classifier_alt < a)"
+
+    # the plot helpers must be steerable to the suffixed cut: only the
+    # suffixed columns exist here, so with the default cut_param the queries
+    # fail (swallowed) and the pass/fail histograms never get drawn
+    fig = lq.plot_spectra(lqcal, data_df, cut_param="LQ_Cut_alt")
+    assert len(fig.axes[0].patches) >= 3
+    fig = lq.plot_sf_vs_energy(lqcal, data_df, cut_param="LQ_Cut_alt")
+    assert fig.axes
+    assert len(fig.axes[0].lines) == 1

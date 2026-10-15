@@ -3198,7 +3198,7 @@ def hpge_fit_energy_cal_func(
         c.loss = "soft_l1"
         m = Minuit(c, *poly_pars)
         if fixed is not None:
-            for idx in list(fixed):
+            for idx in fixed:
                 m.fixed[idx] = True
         m.simplex()
         m.migrad()
