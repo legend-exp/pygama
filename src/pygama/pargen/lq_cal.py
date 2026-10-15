@@ -1313,6 +1313,17 @@ class LQCal:
         classifier_name = _n("LQ_Classifier")
         cut_name = _n("LQ_Cut")
 
+        self.update_cal_dicts(
+            {
+                lq_over_e_name: { "expression": "np.nan" },
+                timecorr_name: { "expression": "np.nan" },
+                dt_corrected_name: { "expression": "np.nan" },
+                corrected_name: { "expression": "np.nan" },
+                classifier_name: { "expression": "np.nan" },
+                cut_name: { "expression": "np.nan" },
+            }
+        )
+
         self.get_lq_over_e(
             df,
             initial_lq_param,
