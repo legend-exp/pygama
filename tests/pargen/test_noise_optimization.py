@@ -171,6 +171,14 @@ def test_display_path_batches_and_does_not_mutate(monkeypatch):
     assert len(plot_dict["nopt"]["fft"]["frequency"]) == len(
         plot_dict["nopt"]["fft"]["psd"]
     )
+    # the data behind the grid-search plots is saved alongside the figures
+    trap = plot_dict["nopt"]["trap"]
+    assert set(trap["distribution_data"]) == {"1.0", "2.0"}
+    dist = trap["distribution_data"]["1.0"]
+    assert len(dist["counts"]) == len(dist["edges"]) - 1
+    opt = trap["optimization_data"]
+    np.testing.assert_array_equal(opt["par"], [1.0, 2.0])
+    assert len(opt["spline_x"]) == len(opt["spline_y"])
     # grid-search runs saw outputs without the fft field
     grid_calls = [c for c in calls if c["outputs"] != ["wf_psd"]]
     assert all(c["outputs"] == ["energy"] for c in grid_calls)

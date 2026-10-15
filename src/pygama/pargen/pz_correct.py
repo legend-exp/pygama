@@ -601,7 +601,8 @@ class PZCorrect:
         Returns
         -------
         plot_dict
-            Dictionary ``{"waveforms": fig}`` containing the matplotlib figure.
+            ``{"waveforms": fig, "waveforms_data": {"samples", "waveforms", "ylim"}}``:
+            the figure and the plotted (downsampled) waveforms.
         """
         tb_out = opt.run_one_dsp(tb_data, self.dsp_config, db_dict=self.output_dict)
         wfs = tb_out[wf_field]["values"].nda
@@ -624,7 +625,15 @@ class PZCorrect:
             plt.ylim(ylim)
         plt.xlabel("Samples")
         plt.ylabel("ADU")
-        plot_dict = {"waveforms": fig}
+        samples = np.arange(int(xlim[0]), min(int(xlim[1]), wfs.shape[1]), downsample)
+        plot_dict = {
+            "waveforms": fig,
+            "waveforms_data": {
+                "samples": samples,
+                "waveforms": np.asarray(wfs[:, samples], dtype=np.float32),
+                "ylim": np.asarray(ylim if ylim is not None else [np.nan, np.nan]),
+            },
+        }
         if display > 1:
             plt.show()
         else:
@@ -667,8 +676,9 @@ class PZCorrect:
         Returns
         -------
         out_plot_dict
-            Dictionary ``{"slopes": fig}`` or ``{"corrected_slope": fig}``
-            containing the matplotlib figure.
+            ``{"slope": fig, "slope_data": {...}}`` (``corrected_slope`` if
+            *with_correction*): the figure and its histogram ``edges``/``counts``,
+            plus ``mode``, ``stdev`` and the ``inset`` histogram when fitted.
         """
         tb_out = opt.run_one_dsp(
             tb_data,
@@ -686,7 +696,8 @@ class PZCorrect:
             np.nanpercentile(slopes, 99),
             np.nanpercentile(slopes, 51) - np.nanpercentile(slopes, 50),
         )
-        _counts, bins, _bars = ax.hist(slopes, bins=bins, histtype="step")
+        counts, bins, _bars = ax.hist(slopes, bins=bins, histtype="step")
+        plot_data = {"edges": np.asarray(bins), "counts": np.asarray(counts)}
         plt.xlabel("Slope")
         plt.ylabel("Counts")
         if "single_decay_constant" in self.results_dict:
@@ -696,15 +707,21 @@ class PZCorrect:
             in_min = high_bin - 4 * sigma
             in_max = high_bin + 4 * sigma
             axins = ax.inset_axes([0.6, 0.6, 0.4, 0.4])
-            axins.hist(
+            in_counts, in_bins, _ = axins.hist(
                 slopes[(slopes > in_min) & (slopes < in_max)],
                 bins=50,
                 histtype="step",
             )
+            plot_data.update(
+                mode=float(high_bin),
+                stdev=float(sigma),
+                inset={"edges": np.asarray(in_bins), "counts": np.asarray(in_counts)},
+            )
             axins.axvline(high_bin, color="red")
             axins.set_xlim(in_min, in_max)
             ax.set_xlim(np.nanpercentile(slopes, 1), np.nanpercentile(slopes, 99))
-        out_plot_dict = {"corrected_slope": fig} if with_correction else {"slope": fig}
+        key = "corrected_slope" if with_correction else "slope"
+        out_plot_dict = {key: fig, f"{key}_data": plot_data}
         if display > 1:
             plt.show()
         else:
