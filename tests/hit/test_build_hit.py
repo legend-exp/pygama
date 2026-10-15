@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import awkward as ak
+import lgdo
 import lh5
 import numpy as np
 import pytest
@@ -104,6 +105,112 @@ def test_lh5_table_configs(dsp_test_file, tmp_dir):
 
     assert Path(outfile).exists()
     assert lh5.ls(outfile, "/ch1084803/") == ["ch1084803/hit"]
+
+
+def test_input_types(dsp_test_file, tmp_dir):
+    # Test with lh5 file input
+    outfile1 = f"{tmp_dir}/test_hit_file_in.lh5"
+    build_hit(
+        dsp_test_file,
+        outfile=outfile1,
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile1).exists()
+    assert lh5.ls(outfile1, "/ch1084803/") == ["ch1084803/hit"]
+
+    tbl = lh5.read("ch1084803/hit", outfile1)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
+    # test with lgdo.Struct input
+    outfile2 = f"{tmp_dir}/test_hit_struct_in.lh5"
+    struct = lgdo.Struct(
+        {
+            "ch1084803/dsp": lh5.read("ch1084803/dsp", dsp_test_file),
+            "ch1084804/dsp": lh5.read("ch1084804/dsp", dsp_test_file),
+            "ch1121600/dsp": lh5.read("ch1121600/dsp", dsp_test_file),
+        }
+    )
+    build_hit(
+        struct,
+        outfile=outfile2,
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile2).exists()
+    assert lh5.ls(outfile2, "/ch1084803/") == ["ch1084803/hit"]
+
+    tbl = lh5.read("ch1084803/hit", outfile2)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
+    # test with lgdo.Table input
+    outfile3 = f"{tmp_dir}/test_hit_tb_in.lh5"
+    tb = lh5.read("ch1084803/dsp", dsp_test_file)
+    print(outfile3)
+    build_hit(
+        tb,
+        outfile=outfile3,
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile3).exists()
+    assert lh5.ls(outfile3, "/") == ["hit"]
+
+    tbl = lh5.read("/hit", outfile3)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
+    # test with lgdo.Table input and lh5_tables
+    outfile4 = f"{tmp_dir}/test_hit_tb_in2.lh5"
+    tb = lh5.read("ch1084803/dsp", dsp_test_file)
+    build_hit(
+        tb,
+        outfile=outfile4,
+        lh5_tables=["ch1084803/dsp"],
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile4).exists()
+    assert lh5.ls(outfile4, "/ch1084803/") == ["ch1084803/hit"]
+
+    tbl = lh5.read("ch1084803/hit", outfile4)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
+    # test with LH5Iterator input
+    outfile5 = f"{tmp_dir}/test_hit_it_in.lh5"
+    it = lh5.LH5Iterator(dsp_test_file, "ch1084803/dsp")
+    build_hit(
+        it,
+        outfile=outfile5,
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile5).exists()
+    assert lh5.ls(outfile5, "/") == ["hit"]
+
+    tbl = lh5.read("hit", outfile5)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
+
+    # test with LH5Iterator input and lh5_tables
+    outfile6 = f"{tmp_dir}/test_hit_it_in2.lh5"
+    it = lh5.LH5Iterator(dsp_test_file, "ch1084803/dsp")
+    build_hit(
+        it,
+        outfile=outfile6,
+        lh5_tables=["ch1084803/dsp"],
+        hit_config=f"{config_dir}/basic-hit-config.json",
+        wo_mode="overwrite",
+    )
+
+    assert Path(outfile6).exists()
+    assert lh5.ls(outfile6, "/ch1084803/") == ["ch1084803/hit"]
+
+    tbl = lh5.read("ch1084803/hit", outfile6)
+    assert tbl.calE.attrs == {"datatype": "array<1>{real}", "units": "keV"}
 
 
 def test_outputs_specification(dsp_test_file, tmp_dir):

@@ -20,12 +20,13 @@ log = logging.getLogger(__name__)
 
 
 def build_hit(
-    infile: str,
+    in_data: str | lgdo.Struct | lgdo.Table | LH5Iterator,
     outfile: str | None = None,
     hit_config: str | Mapping | None = None,
     lh5_tables: Iterable[str] | None = None,
     lh5_tables_config: str | Mapping[str, Mapping] | None = None,
     n_max: int = np.inf,  # noqa: ARG001
+    lh5_store: lh5.LH5Store | None = None,
     wo_mode: str = "write_safe",
     buffer_len: int = 3200,
 ) -> None:
@@ -39,8 +40,18 @@ def build_hit(
 
     Parameters
     ----------
-    infile
-        input LH5 file name containing tables to be processed.
+    in_data
+        input data. Can be:
+
+        - ``str``: name of file
+        - :class:`lgdo.Struct`: lgdo Struct
+        - :class:`lgdo.Table`: lgdo Table; same table will be used for all
+          ``lh5_tables``/``lh5_tables_config``. If these are not provided,
+          output table will be called ``/hit``.
+        - :class:`lgdo.LH5Iterator`: lgdo Table; same tables will be used for all
+          ``lh5_tables``/``lh5_tables_config``. If these are not provided,
+          output table will be called ``/hit``.
+
     outfile
         name of the output LH5 file. If ``None``, create a file in the same
         directory and append `_hit` to its name.
@@ -70,13 +81,15 @@ def build_hit(
         `dsp` will be searched for in the file, even nested by one level.
     lh5_tables_config
         dictionary or JSON file defining the mapping between LH5 tables in
-        `infile` and hit configuration. Table names can be directly mapped to
+        `in_data` and hit configuration. Table names can be directly mapped to
         configuration blocks or to JSON files containing them. This option is
         mutually exclusive with `hit_config` and `lh5_tables`.
     n_max
         maximum number of rows to process
+    lh5_store
+        lh5_store for output file; use this to keep a file open outside of build_hit
     wo_mode
-        forwarded to :func:`lh5.io.core.write`.
+        forwarded to :func:`lh5.io.core.write`. Ignored if lh5_store is provided
 
     See Also
     --------
@@ -112,20 +125,35 @@ def build_hit(
             hit_config = utils.load_dict(hit_config)
 
         lh5_tables_config = {}
-        if lh5_tables is None:
-            if "dsp" in ls(infile):
+        if lh5_tables is not None:
+            for tbl in lh5_tables:
+                lh5_tables_config[tbl] = hit_config
+        elif isinstance(in_data, str):
+            if "dsp" in ls(in_data):
                 log.debug("found candidate table /dsp")
                 lh5_tables_config["dsp"] = hit_config
-            for el in ls(infile):
-                if f"{el}/dsp" in ls(infile, f"{el}/"):
+            for el in ls(in_data):
+                if f"{el}/dsp" in ls(in_data, f"{el}/"):
+                    log.debug("found candidate table /%s/dsp", el)
+                    lh5_tables_config[f"{el}/dsp"] = hit_config
+        elif type(in_data) is lgdo.Struct:
+            if isinstance(in_data.get("dsp"), lgdo.Table):
+                log.debug("found candidate table /dsp")
+                lh5_tables_config["dsp"] = hit_config
+            for el, st in in_data.items():
+                if isinstance(st, lgdo.Struct) and isinstance(
+                    st.get("dsp"), lgdo.Table
+                ):
                     log.debug("found candidate table /%s/dsp", el)
                     lh5_tables_config[f"{el}/dsp"] = hit_config
         else:
-            for tbl in lh5_tables:
-                lh5_tables_config[tbl] = hit_config
+            lh5_tables_config["hit"] = hit_config
 
     if outfile is None:
-        outfile = Path(infile).stem
+        if not isinstance(in_data, str):
+            msg = "Must provide outfile if in_data is not a file"
+            raise ValueError()
+        outfile = Path(in_data).stem
         outfile = outfile.removesuffix("_dsp") + "_hit.lh5"
 
     # reorder blocks in "operations" based on dependency
@@ -133,17 +161,30 @@ def build_hit(
     for cfg in lh5_tables_config.values():
         cfg["operations"] = _reorder_table_operations(cfg["operations"])
 
-    wo_current = wo_mode
+    lh5_st = (
+        lh5.LH5Store(keep_open=True, default_mode=wo_mode)
+        if lh5_store is None
+        else lh5_store
+    )
     for tbl, cfg in lh5_tables_config.items():
-        lh5_it = LH5Iterator(infile, tbl, buffer_len=buffer_len)
+        if isinstance(in_data, str):
+            lh5_it = LH5Iterator(in_data, tbl, buffer_len=buffer_len)
+        elif type(in_data) is lgdo.Struct:
+            lh5_it = [in_data[tbl]]
+        elif isinstance(in_data, lgdo.Table):
+            lh5_it = [in_data]
+        elif isinstance(in_data, LH5Iterator):
+            lh5_it = in_data
+        else:
+            msg = f"Cannot process in_data of type {type(in_data)}"
+            raise ValueError(msg)
+
         write_offset = 0
 
-        log.info("Processing table '%s' in file %s", tbl, infile)
-        if wo_mode in ("overwrite", "o"):
-            wo_current = "o"
+        log.info("Processing table '%s'", tbl)
 
         for tbl_obj in lh5_it:
-            start_row = lh5_it.current_i_entry
+            start_row = lh5_it.current_i_entry if isinstance(lh5_it, LH5Iterator) else 0
 
             # create a new table object that links all the columns in the
             # current table (i.e. no copy)
@@ -154,7 +195,7 @@ def build_hit(
                     info["expression"], info.get("parameters", None)
                 )
                 if isinstance(outcol, lgdo.Scalar):
-                    outcol = lgdo.Array(fill_val = outcol.value, shape=len(outtbl_obj))
+                    outcol = lgdo.Array(fill_val=outcol.value, shape=len(outtbl_obj))
 
                 if "lgdo_attrs" in info:
                     outcol.attrs |= info["lgdo_attrs"]
@@ -203,16 +244,16 @@ def build_hit(
                     if col not in cfg["outputs"]:
                         outtbl_obj.remove_column(col, delete=True)
 
-            lh5.write(
+            lh5_st.write(
                 obj=outtbl_obj,
                 name=tbl.replace("/dsp", "/hit"),
                 lh5_file=outfile,
                 n_rows=len(tbl_obj),
-                wo_mode=wo_current,
                 write_start=write_offset + start_row,
             )
 
-            wo_current = "append"
+    if lh5_store is None:
+        lh5_st.close()
 
 
 def _reorder_table_operations(
