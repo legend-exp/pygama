@@ -28,7 +28,7 @@ def build_hit(
     n_max: int = np.inf,  # noqa: ARG001
     lh5_store: lh5.LH5Store | None = None,
     wo_mode: str = "write_safe",
-    buffer_len: int = 3200,
+    buffer_len: int = "100*MB",
 ) -> None:
     """
     Transform a :class:`~lgdo.types.table.Table` into a new
