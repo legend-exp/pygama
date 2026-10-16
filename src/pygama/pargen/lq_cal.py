@@ -3,7 +3,6 @@ Calibration routines for the Late Charge (LQ) parameter in HPGe detectors.
 
 LQ is computed from the ratio of the late-charge integral to the total charge
 and is sensitive to multi-site events.  This module provides functions to
-
 * determine the fit range and histogram the LQ distribution,
 * fit the distribution with a Gaussian model,
 * perform a drift-time correction for the time-dependent LQ shift,
@@ -19,6 +18,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+import traceback
 from datetime import datetime
 
 import matplotlib.colors as mcolors
@@ -29,6 +29,8 @@ import pandas as pd
 from iminuit import Minuit, cost
 from matplotlib.colors import LogNorm
 from scipy.stats import linregress
+from sklearn.covariance import MinCovDet
+from sklearn.linear_model import LinearRegression
 
 import pygama.math.histogram as pgh
 import pygama.pargen.AoE_cal as AoE
@@ -36,6 +38,357 @@ from pygama.math.distributions import gaussian
 from pygama.pargen.survival_fractions import compton_sf_sweep, get_sf_sweep
 
 log = logging.getLogger(__name__)
+
+from hist import Hist
+from hist.axis import Regular
+from scipy.stats import exponnorm, norm
+
+
+def fd_bin_width(data):
+    """Freedman-Diaconis bin width: best for general use and skewed data."""
+    data = np.asarray(data)
+    q25, q75 = np.percentile(data, [25, 75])
+    iqr = q75 - q25
+    n = len(data)
+    if iqr == 0 or n == 0:
+        return None
+    return 2 * iqr / np.cbrt(n)
+
+
+def fit_gaussian_tail_to_histogram(
+    hist,
+    tail_side="auto",
+):
+    """
+    Fit histogram with Gaussian + smooth one-sided EMG tail.
+
+    Model:
+        Gaussian core + smooth right/left exponentially modified Gaussian tail.
+
+    Parameters
+    ----------
+    y_values : array-like
+        Values to histogram and fit.
+
+    tail_side : {"auto", "right", "left"}, optional
+        Which side gets the smooth EMG tail.
+        If "auto", the function detects the stronger tail automatically.
+
+    Returns
+    -------
+    mu_fit, sigma_fit, mu_err, sigma_err
+        Core Gaussian mean/sigma and errors.
+    """
+
+    N = np.sum(hist.values())
+    if N < 10:
+        return np.nan, np.nan, np.nan, np.nan, None, None, None, None, None
+
+    # get 10%/50%/90% quantile estimates
+    cdf = np.cumsum(hist.values())
+    cdf = cdf / N
+    quant_bins = np.searchsorted(cdf, [0.1, 0.5, 0.9])
+    q10, q50, q90 = hist.axes.centers[0][quant_bins]
+
+    # Automatically detect tail side
+    if tail_side == "auto":
+        tail_side = "right" if (q90 - q50) > (q50 - q10) else "left"
+        log.debug(
+            f"Using {tail_side} tail: q90-q50 = {q90 - q50}, q50-q10 = {q50 - q10}"
+        )
+
+    if tail_side not in ["right", "left"]:
+        raise ValueError("tail_side must be 'auto', 'right', or 'left'.")
+
+    # Model: Gaussian + smooth EMG tail
+    def model_right(x, A_g, mu, sigma, A_t, tau):
+        gaussian = A_g * norm.pdf(x, mu, sigma)
+
+        K = tau / sigma
+        tail = A_t * exponnorm.pdf(x, K, loc=mu, scale=sigma)
+
+        return gaussian + tail
+
+    def model_left(x, A_g, mu, sigma, A_t, tau):
+        gaussian = A_g * norm.pdf(x, mu, sigma)
+
+        K = tau / sigma
+        tail = A_t * exponnorm.pdf(-x, K, loc=-mu, scale=sigma)
+
+        return gaussian + tail
+
+    if tail_side == "right":
+        model = model_right
+    else:
+        model = model_left
+
+    # -------------------------------
+    # Initial guesses
+    # -------------------------------
+    mu0 = np.searchsorted(cdf, 0.5)
+    sigma0 = (q90 - q10) / 2.5
+
+    if not np.isfinite(sigma0) or sigma0 <= 0:
+        sigma0 = 1.0
+
+    # Since the model returns expected bin counts,
+    # A_g and A_t are approximately event-count amplitudes.
+    # As a starting point, assume about 80% of the events belong to the Gaussian core and 20% belong to the tail
+    A_g0 = 0.8 * N
+    A_t0 = 0.2 * N
+    tau0 = sigma0
+
+    try:
+        nll = cost.ExtendedBinnedNLL(
+            hist.values(),
+            hist.axes.edges[0],
+            model,
+            use_pdf="approximate",
+        )
+        fitter = Minuit(nll, A_g0, mu0, sigma0, A_t0, tau0)
+        fitter.limits[0] = (0, N)
+        fitter.limits[1] = (hist.axes.edges[0][0], hist.axes.edges[0][-1])
+        fitter.limits[2] = (0, hist.axes.edges[0][-1] - hist.axes.edges[0][0])
+        fitter.limits[3] = (0, N)
+        fitter.limits[4] = (0, 5 * (hist.axes.edges[0][-1] - hist.axes.edges[0][0]))
+        result = fitter.migrad()
+
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
+        A_g_fit, mu_fit, sigma_fit, A_t_fit, tau_fit = popt
+        A_g_err, mu_err, sigma_err, A_t_err, tau_err = perr
+
+        ##########
+        if not result.accurate or not result.valid:
+            log.warning(f"Fit failed {result!r}")
+
+        log.debug(f"Fit tail_side = {tail_side}")
+        log.debug(f"mu    = {mu_fit:.6g} ± {mu_err:.3g}")
+        log.debug(f"sigma = {sigma_fit:.6g} ± {sigma_err:.3g}")
+        log.debug(f"A_g   = {A_g_fit:.6g} ± {A_g_err:.3g}")
+        log.debug(f"A_t   = {A_t_fit:.6g} ± {A_t_err:.3g}")
+        log.debug(f"tau   = {tau_fit:.6g} ± {tau_err:.3g}")
+
+        # TO DO: return information about the fit quality
+        return (
+            mu_fit,
+            sigma_fit,
+            mu_err,
+            sigma_err,
+            popt,
+            perr,
+            model,
+        )
+
+    except Exception:
+        log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed", exc_info=True)
+
+        return np.nan, np.nan, np.nan, np.nan, None, None, model
+
+
+def extract_gaussian_trends(
+    lq_over_e,
+    energy,
+    energy_windows,
+    #    lq_filter,
+    #    det,
+    tail_side="auto",
+    max_cols=3,
+):
+    means, mean_errors, sigmas, sigma_errs, bin_centers = [], [], [], [], []
+
+    hist_panels = []
+
+    for i in range(len(energy_windows) - 1):
+        lo, hi = energy_windows[i], energy_windows[i + 1]
+
+        idx = (energy > lo) & (energy < hi)
+        values = np.asarray(lq_over_e[idx], dtype=float)
+        values = values[np.isfinite(values)]
+
+        # this determins what values we are fitting
+        if len(values) > 10:
+            # -------------------------------
+            # Estimate binning
+            # -------------------------------
+            fit_min, fit_max = get_fit_range(values)
+            # fit_max += (fit_max-fit_min)/4 # increase high side range by 50% to help tail fit
+            if (
+                np.sum((values >= fit_min) & (values <= fit_max) & np.isfinite(values))
+                <= 10
+            ):
+                continue
+            bin_width = fd_bin_width(values)
+            if bin_width is None or bin_width <= 0:
+                bins = 30
+            else:
+                bins = max(10, int(np.ceil((fit_max - fit_min) / bin_width)))
+
+            hist = Hist(Regular(bins, fit_min, fit_max))
+            hist.fill(values)
+
+            result = fit_gaussian_tail_to_histogram(
+                hist,
+                tail_side=tail_side,
+            )
+
+            (
+                mean,
+                sigma,
+                mean_err,
+                sigma_err,
+                popt,
+                perr,
+                model,
+            ) = result
+
+            if np.isfinite(mean) and np.isfinite(sigma):
+                means.append(mean)
+                mean_errors.append(mean_err)
+                sigmas.append(sigma)
+                sigma_errs.append(sigma_err)
+                bin_centers.append(0.5 * (lo + hi))
+
+                hist_panels.append(
+                    {
+                        "hist": hist,
+                        "lo": lo,
+                        "hi": hi,
+                        "popt": popt,
+                        "model": model,
+                        "mean": mean,
+                        "sigma": sigma,
+                        "mean_err": mean_err,
+                        "sigma_err": sigma_err,
+                    }
+                )
+
+    return (
+        np.array(bin_centers),
+        np.array(means),
+        np.array(mean_errors),
+        np.array(sigmas),
+        np.array(sigma_errs),
+        hist_panels,
+    )
+
+
+class MeanModel:
+    @staticmethod
+    def __call__(E, mu_slope, mu_offset):
+        return mu_slope * E + mu_offset
+
+    @staticmethod
+    def grad(E, mu_slope, mu_offset):
+        return np.array([E, np.ones_like(E)])
+
+    @staticmethod
+    def name(energy_par):
+        return f"mu_slope*{energy_par} + mu_offset"
+
+    @staticmethod
+    def parnames():
+        return ["mu_slope", "mu_offset"]
+
+
+def fit_mean_model(bin_centers, means, mean_errs):
+    # Linear model: mean(E) = mE + b
+
+    model = MeanModel()
+
+    # Clean input data
+    # again added the mean errers being less than 1 bit....
+    mask = (
+        ~np.isnan(bin_centers)
+        & ~np.isnan(means)
+        & ~np.isnan(mean_errs)
+        & (mean_errs > 1e-8)
+    )  # & (mean_errs <=1)
+    x = np.asarray(bin_centers[mask], dtype=float)
+    y = np.asarray(means[mask], dtype=float)
+    s = np.asarray(mean_errs[mask], dtype=float)
+
+    # Avoid zero / negative uncertainties
+    # s = np.where(s <= 0, 1e-8, s)
+
+    # to avoid zero and negative uncertainties, but without making them to small
+    valid_s = s[np.isfinite(s) & (s > 0)]
+    s_median = np.median(s)
+    if len(valid_s) == 0:
+        # No usable uncertainties
+        s = np.ones_like(y)
+        absolute_sigma = False
+    else:
+        s_median = np.median(valid_s)
+        s = np.where(np.isfinite(s) & (s > 0), s, s_median)
+        absolute_sigma = True
+
+    # Initial guess: slope and intercept
+    p0 = [0.0, np.nanmean(y)]
+
+    try:
+        nll = cost.LeastSquares(x, y, s, model, grad=model.grad)
+        fitter = Minuit(nll, *p0)
+        result = fitter.migrad()
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
+        return popt, perr, model
+
+    except Exception:
+        log.error("Mean linear fit failed", exc_info=True)
+        return [np.nan, np.nan], [np.nan, np.nan], model
+
+
+class SigmaModel:
+    @staticmethod
+    def __call__(E, A, B):
+        return np.sqrt(A**2 / (E**2) + B**2)
+
+    @staticmethod
+    def grad(E, A, B):
+        sig = np.sqrt(A**2 / (E**2) + B**2)
+        return np.array([A / E**2 / sig, B / sig])
+
+    @staticmethod
+    def name(energy_par):
+        return f"np.sqrt((a_sigma**2/{energy_par}**2)+b_sigma**2)"
+
+    @staticmethod
+    def parnames():
+        return ["a_sigma", "b_sigma"]
+
+
+def fit_sigma_model(bin_centers, sigmas, sigma_errs):
+    # 1. Fixed model: Ensure all inputs are float64 and handle potential negative inside sqrt
+    model = SigmaModel()
+
+    mask = (
+        ~np.isnan(bin_centers)
+        & ~np.isnan(sigmas)
+        & ~np.isnan(sigma_errs)
+        & (sigma_errs > 1e-8)
+    )
+    x = bin_centers[mask]
+    y = sigmas[mask]
+    s = sigma_errs[mask]
+
+    try:
+        initial_guess = [np.nanmean(x * y), np.nanmean(y)]
+
+        nll = cost.LeastSquares(x, y, s, model, grad=model.grad)
+        fitter = Minuit(nll, *initial_guess)
+        fitter.limits[0] = (0, np.max(x * y))
+        fitter.limits[1] = (0, np.max(y))
+        result = fitter.migrad()
+        popt = np.array(result.values)
+        perr = np.array(result.errors)
+        return np.abs(popt), perr, model
+    except Exception:
+        log.error("Sigma model fit failed", exc_info=True)
+        return [np.nan, np.nan], [np.nan, np.nan], model
+
+
+##################################
 
 
 def get_fit_range(lq: np.array) -> tuple(float, float):
@@ -63,7 +416,7 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     right_guess = np.nanpercentile(lq, 95)
     test_range = (left_guess, right_guess)
 
-    hist, bins, _ = pgh.get_hist(lq, bins=100, range=test_range)
+    hist, bins, _ = pgh.get_hist(lq, bins=50, range=test_range)
     bin_centers = (bins[:-1] + bins[1:]) / 2
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
@@ -200,7 +553,7 @@ def binned_lq_fit(
     mu = bin_centers[np.argmax(hist)]
     _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
 
-    c1 = cost.BinnedNLL(hist, bins, gaussian.get_cdf, verbose=0)
+    c1 = cost.BinnedNLL(hist, bins, gaussian.get_cdf)
     m1 = Minuit(c1, mu=mu, sigma=sigma)
     m1.simplex().migrad()
     m1.hesse()
@@ -377,7 +730,9 @@ class LQCal:
         update_dict
             Dictionary of new calibration entries to merge.
         """
-        if re.match(r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))):
+        if len(self.cal_dicts) > 0 and re.match(
+            r"(\d{8})T(\d{6})Z", next(iter(self.cal_dicts))
+        ):
             for tstamp in self.cal_dicts:
                 if tstamp in update_dict:
                     self.cal_dicts[tstamp].update(update_dict[tstamp])
@@ -386,7 +741,120 @@ class LQCal:
         else:
             self.cal_dicts.update(update_dict)
 
-    def lq_timecorr(self, df, lq_param, output_name="LQ_Timecorr", display=0):  # noqa: ARG002
+    ######################
+    def get_lq_over_e(
+        self,
+        df: pd.DataFrame(),
+        lq_param,
+        cal_energy_param: str,
+        out_param: str = "LQ_over_E",
+    ):
+        try:
+            df[out_param] = df[lq_param].to_numpy() / df[cal_energy_param].to_numpy()
+            self.update_cal_dicts(
+                {out_param: {"expression": f"{lq_param}/{cal_energy_param}"}}
+            )
+
+        except Exception:
+            if self.debug_mode:
+                raise
+            log.error("LQ over correction failed", exc_info=True)
+
+    def energy_width_correction(
+        self,
+        df: pd.DataFrame(),
+        lq_param,
+        cal_energy_param: str,
+        out_param: str = "LQ_Corrected",
+    ):
+        """
+        performs an energy width correction to the LQ/E distribution. Fits across the energy range 250keV to 2650keV in 25keV
+        """
+        log.info("Starting LQ energy width correction")
+
+        try:
+            bin_centers, means, mean_errs, sigmas, sigma_errs, hist_panels = (
+                extract_gaussian_trends(
+                    df[lq_param].to_numpy(),
+                    df[cal_energy_param].to_numpy(),
+                    np.linspace(250, 2650, 25),
+                )
+            )
+            # fit a linear model to mu vs E. outputs are used only in plots?
+            popt_mean, perr_mean, mean_model = fit_mean_model(
+                bin_centers, means, mean_errs
+            )
+
+            # Fit sqrt(A/E^2+B) analytical model to sigma vs E
+            popt_sigma, perr_sigma, sigma_model = fit_sigma_model(
+                bin_centers, sigmas, sigma_errs
+            )
+
+            # for plotting later...
+            self.gauss_trends_hist = hist_panels
+            self.energy_bin_centers = bin_centers
+
+            # update the dataframe...
+            mean = mean_model(df[cal_energy_param], *popt_mean)
+            width_sigma = sigma_model(df[cal_energy_param], *popt_sigma)
+            df[out_param] = (df[lq_param] - mean) / width_sigma
+
+        except Exception:
+            if self.debug_mode:
+                raise
+            log.error("LQ energy width correction failed", exc_info=True)
+            means = []
+            mean_errs = []
+            popt_mean = [np.nan, np.nan]
+            perr_mean = [np.nan, np.nan]
+            mean_model = MeanModel
+            sigmas = []
+            sigma_errs = []
+            popt_sigma = [np.nan, np.nan]
+            perr_sigma = [np.nan, np.nan]
+            sigma_model = SigmaModel
+            df[out_param] = np.nan
+
+        self.mean_cor_res = {
+            "means": means,
+            "mean_errs": mean_errs,
+            "model": mean_model,
+            "popt": popt_mean,
+            "perr": perr_mean,
+        }
+        self.sig_cor_res = {
+            "sigmas": sigmas,
+            "sigma_errs": sigma_errs,
+            "model": sigma_model,
+            "popt": popt_sigma,
+            "perr": perr_sigma,
+        }
+
+        mean_model_str = mean_model.name(cal_energy_param)
+        sig_model_str = sigma_model.name(cal_energy_param)
+        # save the fit parameters
+        self.update_cal_dicts(
+            {
+                out_param: {
+                    "expression": f"({lq_param} - ({mean_model_str}))/({sig_model_str})",
+                    "parameters": {
+                        mean_model.parnames()[0]: popt_mean[0],
+                        mean_model.parnames()[1]: popt_mean[1],
+                        sigma_model.parnames()[0]: popt_sigma[0],
+                        sigma_model.parnames()[1]: popt_sigma[1],
+                    },
+                }
+            }
+        )
+
+    ######################
+
+    def lq_timecorr(
+        self,
+        df,
+        lq_param,
+        output_name="LQ_Timecorr",
+    ):
         """
         Normalise LQ by the time-varying DEP mean.
 
@@ -407,18 +875,18 @@ class LQCal:
             Name of the raw LQ parameter column.
         output_name
             Name of the output time-corrected LQ column.
-        display
-            Verbosity level (currently unused).
         """
 
         log.info("Starting LQ time correction")
         self.timecorr_df = pd.DataFrame()
+
         try:
+            df_sel = df.query(self.selection_string) if self.selection_string else df
             if "run_timestamp" in df:
-                for tstamp, time_df in df.groupby("run_timestamp", sort=True):
+                for tstamp, time_df in df_sel.groupby("run_timestamp", sort=True):
                     try:
                         pars, errs = calculate_time_means(
-                            time_df.query(f"{self.selection_string}"),
+                            time_df,
                             lq_param,
                             self.cal_energy_param,
                             peak=1592.5,
@@ -498,7 +966,7 @@ class LQCal:
             else:
                 try:
                     pars, errs = calculate_time_means(
-                        df.query(f"{self.selection_string}"),
+                        df_sel,
                         lq_param,
                         self.cal_energy_param,
                         peak=1592.5,
@@ -561,10 +1029,10 @@ class LQCal:
                     }
                 )
                 log.info("LQ time correction finished")
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ time correction failed: %s", e)
+            log.error("LQ time correction failed", exc_info=True)
             self.update_cal_dicts(
                 {
                     output_name: {
@@ -579,8 +1047,8 @@ class LQCal:
         df: pd.DataFrame,
         lq_param,
         cal_energy_param: str,  # noqa: ARG002
-        display: int = 0,  # noqa: ARG002
-        out_param: str = "LQ_Corrected",
+        out_param: str = "LQ_DT_Corrected",
+        mode: str = "linear",
     ):
         """
         Remove the linear drift-time dependence from the LQ distribution.
@@ -599,25 +1067,47 @@ class LQCal:
             Name of the LQ parameter column to correct.
         cal_energy_param
             Name of the calibrated energy column.
-        display
-            Verbosity level (currently unused).
         out_param
             Name of the output drift-time-corrected LQ column.
+        mode
+            Method used to correct drift time. Options are "linear" and "LR-MCD".
         """
 
         log.info("Starting LQ drift time correction")
+        log.info(f"Drift time correction mode: {mode}")
+
+        # perform a check on the range of values seen in the DEP and use that to maybe edit the mode.
         try:
+            dep_events = df.query(
+                f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
+            )
+
+            dt_range = [
+                np.nanpercentile(dep_events[self.dt_param], 10),
+                np.nanpercentile(dep_events[self.dt_param], 95),
+            ]
+
+            if (dt_range[1] - dt_range[0]) > 200:
+                mode = "LR-MCD"
+            elif (dt_range[1] - dt_range[0]) <= 200:
+                mode = "linear"
+
+            log.info(f"Drift time correction mode after range checks: {mode}")
+
+        except Exception as e:
+            msg = "DEP event selection for mode determination failed"
+            raise RuntimeError(msg) from e
+
+        self.dt_correction_mode = mode
+
+        if mode == "linear":
             try:
                 pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[
                     0
                 ]
-            except Exception as e:
-                msg = "binned LQ fit at DEP failed"
-                raise RuntimeError(msg) from e
-            mean = pars[0]
-            sigma = pars[1]
+                mean = pars[0]
+                sigma = pars[1]
 
-            try:
                 dep_events = df.query(
                     f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
                 )
@@ -635,37 +1125,81 @@ class LQCal:
                 final_df = dep_events.query(
                     f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
                 )
-            except Exception as e:
-                msg = "DEP event selection failed"
-                raise RuntimeError(msg) from e
 
-            try:
                 result = linregress(
                     final_df[self.dt_param],
                     final_df[lq_param],
                     alternative="greater",
                 )
-            except Exception as e:
-                msg = "drift-time linear regression failed"
-                raise RuntimeError(msg) from e
-            self.dt_fit_pars = result
+                self.dt_fit_pars = result
 
-            try:
-                df[out_param] = (
-                    df[lq_param]
-                    - df[self.dt_param] * self.dt_fit_pars[0]
-                    - self.dt_fit_pars[1]
+            except Exception:
+                if self.debug_mode:
+                    raise
+                log.error(
+                    "LQ drift time correction (linear mode) failed", exc_info=True
                 )
-            except Exception as e:
-                msg = "applying LQ drift-time correction failed"
-                raise RuntimeError(msg) from e
+                self.dt_fit_pars = (np.nan, np.nan)
 
+        elif mode == "LR-MCD":
+            # want to try with keeping the same dataselection as for the "linear" method
+            try:
+                pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[
+                    0
+                ]
+                mean = pars[0]
+                sigma = pars[1]
+
+                dep_events = df.query(
+                    f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
+                )
+
+                dt_range = [
+                    np.nanpercentile(dep_events[self.dt_param], 10),
+                    np.nanpercentile(dep_events[self.dt_param], 95),
+                ]
+
+                lq_range = [mean - 2 * sigma, mean + 2 * sigma]
+
+                self.lq_range = lq_range
+                self.dt_range = dt_range
+
+                final_df = dep_events.query(
+                    f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
+                )
+
+                ###########here is the difference between linear and LR-MCD #############
+                data_dep = final_df[[self.dt_param, lq_param]]
+                mcd = MinCovDet().fit(data_dep.to_numpy())
+                inliers = data_dep[mcd.support_]
+
+                # ------------------------------------------------------------------
+                # LR-MCD
+                # ------------------------------------------------------------------
+                inlier_dt = inliers.to_numpy()[:, 0]
+                inlier_lq = inliers.to_numpy()[:, 1]
+
+                lr_mcd = LinearRegression().fit(inlier_dt.reshape(-1, 1), inlier_lq)
+                self.dt_fit_pars = (lr_mcd.coef_[0], lr_mcd.intercept_)
+
+            except Exception:
+                if self.debug_mode:
+                    raise
+                log.error("LQ drift time correction (MCD mode) failed", exc_info=True)
+                self.dt_fit_pars = (np.nan, np.nan)
+
+        # update dataframe
+        try:
+            df[out_param] = (
+                df[lq_param]
+                - df[self.dt_param] * self.dt_fit_pars[0]
+                - self.dt_fit_pars[1]
+            )
         except Exception as e:
-            if self.debug_mode:
-                raise
-            log.error("LQ drift time correction failed: %s", e)
-            self.dt_fit_pars = (np.nan, np.nan)
+            msg = "applying LQ drift-time correction failed"
+            raise RuntimeError(msg) from e
 
+        # add parameters to
         self.update_cal_dicts(
             {
                 out_param: {
@@ -674,6 +1208,8 @@ class LQCal:
                 }
             }
         )
+
+    ##################################
 
     def get_cut_lq_dep(
         self,
@@ -729,10 +1265,10 @@ class LQCal:
                 msg = "applying LQ classifier/cut to data failed"
                 raise RuntimeError(msg) from e
 
-        except Exception as e:
+        except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ cut determination failed: %s", e)
+            log.error("LQ cut determination failed", exc_info=True)
             self.cut_val = np.nan
             c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
             m = Minuit(c, np.full(2, np.nan))
@@ -784,21 +1320,56 @@ class LQCal:
 
         _n = (lambda base: f"{base}_{suffix}") if suffix else (lambda base: base)
 
+        lq_over_e_name = _n("LQ_over_E")
         timecorr_name = _n("LQ_Timecorr")
+        # corrected_name = _n("LQ_Corrected")
+        dt_corrected_name = _n("LQ_DT_Corrected")
+        # energy_corrected_name = _n("LQ_Energy_Corrected")
         corrected_name = _n("LQ_Corrected")
         classifier_name = _n("LQ_Classifier")
         cut_name = _n("LQ_Cut")
 
-        self.lq_timecorr(df, initial_lq_param, output_name=timecorr_name)
+        self.update_cal_dicts(
+            {
+                lq_over_e_name: {"expression": "np.nan"},
+                timecorr_name: {"expression": "np.nan"},
+                dt_corrected_name: {"expression": "np.nan"},
+                corrected_name: {"expression": "np.nan"},
+                classifier_name: {"expression": "np.nan"},
+                cut_name: {"expression": "np.nan"},
+            }
+        )
+
+        self.get_lq_over_e(
+            df,
+            initial_lq_param,
+            cal_energy_param=self.cal_energy_param,
+            out_param=lq_over_e_name,
+        )
+
+        self.lq_timecorr(
+            df,
+            lq_over_e_name,
+            output_name=timecorr_name,
+        )
         log.info("Finished LQ Time Correction")
 
         self.drift_time_correction(
             df,
             lq_param=timecorr_name,
             cal_energy_param=self.cal_energy_param,
-            out_param=corrected_name,
+            out_param=dt_corrected_name,
+            mode="LR-MCD",
         )
         log.info("Finished LQ Drift Time Correction")
+
+        self.energy_width_correction(
+            df,
+            lq_param=dt_corrected_name,
+            cal_energy_param=self.cal_energy_param,
+            out_param=corrected_name,
+        )
+        log.info("Finished LQ E width Correction")
 
         self.get_cut_lq_dep(
             df,
@@ -819,7 +1390,11 @@ class LQCal:
         for i, peak in enumerate(peaks_of_interest):
             try:
                 try:
-                    select_df = df.query(f"{self.selection_string}")
+                    select_df = (
+                        df.query(f"{self.selection_string}")
+                        if self.selection_string
+                        else df
+                    )
                 except Exception as e:
                     msg = "event selection failed"
                     raise RuntimeError(msg) from e
@@ -880,7 +1455,7 @@ class LQCal:
                     )
                     self.low_side_peak_dfs[peak] = cut_df
                 log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
-            except Exception as e:
+            except Exception:
                 if self.debug_mode:
                     raise
                 self.low_side_sf = pd.concat(
@@ -890,387 +1465,775 @@ class LQCal:
                     ]
                 )
                 log.error(
-                    "LQ survival fraction determination failed for %s peak: %s",
-                    peak,
-                    e,
+                    f"LQ survival fraction determination failed for {peak} peak",
+                    exc_info=True,
                 )
         self.low_side_sf = self.low_side_sf.set_index("peak")
 
 
 def plot_lq_mean_time(
     lq_class,
-    data,  # noqa: ARG001
+    data=None,  # noqa: ARG001
     lq_param="LQ_Timecorr",
-    figsize=(12, 8),
-    fontsize=12,
-) -> plt.figure:
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
     """Plots the mean LQ value calculated for each given timestamp"""
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-    fig, ax = plt.subplots(1, 1)
-    try:
-        ax.errorbar(
-            [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
-                for tstamp in lq_class.timecorr_df.index
-            ],
-            lq_class.timecorr_df["mean"],
-            yerr=lq_class.timecorr_df["mean_err"],
-            linestyle=" ",
-        )
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "lower right",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-        grouped_means = [
-            cal_dict[lq_param]["parameters"]["a"]
-            for tstamp, cal_dict in lq_class.cal_dicts.items()
-        ]
-        ax.step(
-            [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
-                for tstamp in lq_class.cal_dicts
-            ],
-            grouped_means,
-            where="post",
-        )
-        ax.fill_between(
-            [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
-                for tstamp in lq_class.cal_dicts
-            ],
-            y1=np.array(grouped_means) - 0.2 * np.array(lq_class.timecorr_df["res"]),
-            y2=np.array(grouped_means) + 0.2 * np.array(lq_class.timecorr_df["res"]),
-            color="green",
-            alpha=0.2,
-        )
-        ax.fill_between(
-            [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
-                for tstamp in lq_class.cal_dicts
-            ],
-            y1=np.array(grouped_means) - 0.4 * np.array(lq_class.timecorr_df["res"]),
-            y2=np.array(grouped_means) + 0.4 * np.array(lq_class.timecorr_df["res"]),
-            color="yellow",
-            alpha=0.2,
-        )
-    except Exception:
-        pass
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
+
+        try:
+            ax.errorbar(
+                [
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    for tstamp in lq_class.timecorr_df.index
+                ],
+                lq_class.timecorr_df["mean"],
+                yerr=lq_class.timecorr_df["mean_err"],
+                linestyle=" ",
+            )
+
+            grouped_means = [
+                cal_dict[lq_param]["parameters"]["a"]
+                for tstamp, cal_dict in lq_class.cal_dicts.items()
+            ]
+            ax.step(
+                [
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    for tstamp in lq_class.cal_dicts
+                ],
+                grouped_means,
+                where="post",
+            )
+            ax.fill_between(
+                [
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    for tstamp in lq_class.cal_dicts
+                ],
+                y1=np.array(grouped_means)
+                - 0.2 * np.array(lq_class.timecorr_df["res"]),
+                y2=np.array(grouped_means)
+                + 0.2 * np.array(lq_class.timecorr_df["res"]),
+                color="green",
+                alpha=0.2,
+            )
+            ax.fill_between(
+                [
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    for tstamp in lq_class.cal_dicts
+                ],
+                y1=np.array(grouped_means)
+                - 0.4 * np.array(lq_class.timecorr_df["res"]),
+                y2=np.array(grouped_means)
+                + 0.4 * np.array(lq_class.timecorr_df["res"]),
+                color="yellow",
+                alpha=0.2,
+            )
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
     ax.set_xlabel("time")
     ax.set_ylabel("LQ mean")
     myfmt = mdates.DateFormatter("%b %d")
     ax.xaxis.set_major_formatter(myfmt)
-    plt.close()
+
     return fig
 
 
 def plot_drift_time_correction(
-    lq_class, data, lq_param="LQ_Timecorr", figsize=(12, 8), fontsize=12
-) -> plt.figure:
+    lq_class,
+    data: pd.DataFrame,
+    lq_param="LQ_Timecorr",
+    lq_corr_param="LQ_DT_Corrected",
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
     """Plots a 2D histogram of LQ versus effective drift time in a 6 keV
     window around the DEP. Additionally plots the fit results for the
     drift time correction."""
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-    fig, _ax = plt.subplots(1, 1)
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "lower right",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-    try:
-        dep_range = (1590, 1595)
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True)
+        else:
+            ax1, ax2 = fig.subplots(2, 1, sharex=True)
 
-        initial_df = data[
-            (data[lq_class.cal_energy_param] > dep_range[0])
-            & (data[lq_class.cal_energy_param] < dep_range[1])
-        ]
-        max_dt = 1500
-        max_lq = 2.5
+        try:
+            dep_range = (1590, 1595)
 
-        plt.hist2d(
-            initial_df["dt_eff"],
-            initial_df[lq_param],
-            bins=100,
-            range=((0, max_dt), (0, max_lq)),
-            norm=mcolors.LogNorm(),
-        )
+            initial_df = data.query(
+                f"{lq_class.cal_energy_param} > {dep_range[0]} & {lq_class.cal_energy_param} < {dep_range[1]}"
+            )
+            dt_range = (0, lq_class.dt_range[1] * 1.5)
+            # take MCD lq_range and double width while keeping same center
+            lq_range = (
+                lq_class.lq_range[0] * 1.5 - lq_class.lq_range[1] * 0.5,
+                lq_class.lq_range[1] * 1.5 - lq_class.lq_range[0] * 0.5,
+            )
 
-        x = np.linspace(0, max_dt, 100)
-        model = lq_class.dt_fit_pars[0] * x + lq_class.dt_fit_pars[1]
+            ax1.hist2d(
+                initial_df[lq_class.dt_param],
+                initial_df[lq_param],
+                bins=100,
+                range=(dt_range, lq_range),
+                norm=mcolors.LogNorm(),
+            )
 
-        plt.plot(x, model, color="r")
+            x = np.linspace(*dt_range, 100)
+            model = lq_class.dt_fit_pars[0] * x + lq_class.dt_fit_pars[1]
 
-        plt.axvline(lq_class.dt_range[0], color="k")
-        plt.axvline(lq_class.dt_range[1], color="k")
-        plt.axhline(lq_class.lq_range[0], color="k")
-        plt.axhline(lq_class.lq_range[1], color="k")
+            ax1.plot(x, model, color="r")
 
-        plt.xlabel("Drift Time (ns)")
-        plt.ylabel("LQ")
+            ax1.axvline(lq_class.dt_range[0], color="k")
+            ax1.axvline(lq_class.dt_range[1], color="k")
+            ax1.axhline(lq_class.lq_range[0], color="k")
+            ax1.axhline(lq_class.lq_range[1], color="k")
 
-        plt.title("LQ versus Drift Time for DEP")
+            ax1.set_ylabel("LQ (no DT corr)")
 
-    except Exception:
-        pass
+            lq_range2 = (
+                lq_class.lq_range[0] - lq_class.lq_range[1],
+                lq_class.lq_range[1] - lq_class.lq_range[0],
+            )
+            ax2.hist2d(
+                initial_df[lq_class.dt_param],
+                initial_df[lq_corr_param],
+                bins=100,
+                range=(dt_range, lq_range2),
+                norm=mcolors.LogNorm(),
+            )
+            ax2.axhline(0, color="k", ls=":")
+            ax2.set_ylabel("LQ (DT corr)")
+            ax2.set_xlabel("Drift Time (ns)")
 
-    plt.tight_layout()
-    plt.close()
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
     return fig
 
 
-def plot_lq_cut_fit(lq_class, data, figsize=(12, 8), fontsize=12) -> plt.figure:  # noqa: ARG001
+def plot_lq_cut_fit(
+    lq_class,
+    data: pd.DataFrame | None = None,  # noqa: ARG001
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
     """Plots the final histogram of LQ values for events in the
     DEP, and the fit results used for determining the cut
     value"""
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
-    fig, (ax1, ax2) = plt.subplots(2, 1)
-    try:
-        hist, bins = lq_class.fit_hist
-        fit_pars = lq_class.cut_fit_pars
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "upper left",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-        x_low = bins[0]
-        x_high = bins[-1]
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, (ax1, ax2) = plt.subplots(2, 1)
+        else:
+            (ax1, ax2) = fig.subplots(2, 1)
 
-        ax1.stairs(hist, bins, label="data")
-        xs = np.linspace(round(bins[0], 3), round(bins[-1], 3), len(bins) - 1)
-        ls = np.sum(hist)
-        dx = np.diff(bins)
-        ax1.plot(
-            xs,
-            gaussian.pdf_norm(xs, x_low, x_high, fit_pars[0], fit_pars[1]) * dx * ls,
-            label="Gaussian Fit",
-        )
+        try:
+            hist, bins = lq_class.fit_hist
+            fit_pars = lq_class.cut_fit_pars
 
-        # ax1.set_xlabel('LQ')
-        ax1.set_title("Fit of LQ events in DEP")
-        ax1.legend()
+            x_low = bins[0]
+            x_high = bins[-1]
 
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-        reses = (
-            hist
-            - (
+            ax1.stairs(hist, bins, label="data")
+            xs = np.linspace(round(bins[0], 3), round(bins[-1], 3), len(bins) - 1)
+            ls = np.sum(hist)
+            dx = np.diff(bins)
+            ax1.plot(
+                xs,
+                gaussian.pdf_norm(xs, x_low, x_high, fit_pars[0], fit_pars[1])
+                * dx
+                * ls,
+                label="Gaussian Fit",
+            )
+
+            # ax1.set_xlabel('LQ')
+            # ax1.set_title("Fit of LQ events in DEP")
+            ax1.legend()
+
+            bin_centers = (bins[:-1] + bins[1:]) / 2
+            reses = (
+                hist
+                - (
+                    gaussian.pdf_norm(
+                        bin_centers, x_low, x_high, fit_pars[0], fit_pars[1]
+                    )
+                    * dx
+                    * ls
+                )
+            ) / (
                 gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
                 * dx
                 * ls
             )
-        ) / (
-            gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
-            * dx
-            * ls
-        )
-        ax2.plot(bin_centers, reses, marker="s", linestyle="")
-        ax2.set_xlabel("LQ")
-        ax2.set_ylabel("residuals")
+            ax2.plot(bin_centers, reses, marker="s", linestyle="")
+            ax2.set_xlabel("LQ")
+            ax2.set_ylabel("residuals")
 
-    except Exception:
-        pass
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
 
-    plt.tight_layout()
-    plt.close()
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
     return fig
 
 
 def plot_survival_fraction_curves(
     lq_class,
-    data,  # noqa: ARG001
-    figsize=(12, 8),
-    fontsize=12,
-) -> plt.figure:
+    data: pd.DataFrame | None = None,  # noqa: ARG001
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
     """Plots the survival fraction curves as a function of
     LQ cut values for every peak of interest"""
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "lower right",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
 
-    fig = plt.figure()
-    try:
-        plt.vlines(
-            lq_class.cut_val,
-            0,
-            100,
-            label=f"cut value: {lq_class.cut_val:1.2f}",
-            color="black",
-        )
+        try:
+            ax.vlines(
+                lq_class.cut_val,
+                0,
+                100,
+                label=f"cut value: {lq_class.cut_val:1.2f}",
+                color="black",
+            )
 
-        for peak, survival_df in lq_class.low_side_peak_dfs.items():
-            with contextlib.suppress(Exception):
-                plt.errorbar(
-                    survival_df.index,
-                    survival_df["sf"],
-                    yerr=survival_df["sf_err"],
-                    label=f"{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]['sf']:2.1f} +/- {lq_class.low_side_sf.loc[peak]['sf_err']:2.1f} %",
-                )
-    except Exception:
-        pass
-    vals, _labels = plt.yticks()
-    plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
-    plt.legend(loc="lower right")
-    plt.xlabel("cut value")
-    plt.ylabel("survival percentage")
-    plt.ylim([0, 105])
-    plt.close()
+            for peak, survival_df in lq_class.low_side_peak_dfs.items():
+                with contextlib.suppress(Exception):
+                    ax.errorbar(
+                        survival_df.index,
+                        survival_df["sf"],
+                        yerr=survival_df["sf_err"],
+                        label=f"{AoE.get_peak_label(peak)} {peak} keV: {lq_class.low_side_sf.loc[peak]['sf']:2.1f} +/- {lq_class.low_side_sf.loc[peak]['sf_err']:2.1f} %",
+                    )
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
+    vals = ax.get_yticks()
+    ax.set_yticks(vals, [f"{x:,.0f} %" for x in vals])
+    ax.legend()
+    ax.set_xlabel("cut value")
+    ax.set_ylabel("survival percentage")
+    ax.set_ylim([0, 105])
+
     return fig
 
 
 def plot_sf_vs_energy(
     lq_class,
-    data,
+    data: pd.DataFrame,
     xrange=(900, 3000),
     n_bins=701,
-    figsize=(12, 8),
-    fontsize=12,
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
     cut_param="LQ_Cut",
-) -> plt.figure:
+) -> plt.Figure:
     """Plots the survival fraction as a function of energy"""
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "upper left",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
 
-    fig = plt.figure()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        counts_pass, bins_pass, _ = pgh.get_hist(
-            data.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-        )
-        counts, bins, _ = pgh.get_hist(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-        )
-        survival_fracs = counts_pass / (counts + 10**-99)
+        try:
+            if lq_class.selection_string:
+                data = data.query(lq_class.selection_string)
 
-        plt.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
-    except Exception:
-        pass
-    plt.ylim([0, 100])
-    vals, _labels = plt.yticks()
-    plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
-    plt.xlabel("energy (keV)")
-    plt.ylabel("survival percentage")
-    plt.close()
+            bins = np.linspace(xrange[0], xrange[1], n_bins)
+            counts_pass, bins_pass, _ = pgh.get_hist(
+                data.query(f"{cut_param}")[lq_class.cal_energy_param],
+                bins=bins,
+            )
+            counts, bins, _ = pgh.get_hist(
+                data[lq_class.cal_energy_param],
+                bins=bins,
+            )
+            survival_fracs = counts_pass / (counts + 10**-99)
+
+            ax.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
+    ax.set_ylim([0, 100])
+    vals = ax.get_yticks()
+    ax.set_yticks(vals, [f"{x:,.0f} %" for x in vals])
+    ax.set_xlabel("energy (keV)")
+    ax.set_ylabel("survival percentage")
+
     return fig
 
 
 def plot_spectra(
     lq_class,
-    data,
+    data: pd.DataFrame,
     xrange=(900, 3000),
     n_bins=2101,
     xrange_inset=(1580, 1640),
     n_bins_inset=200,
-    figsize=(12, 8),
-    fontsize=12,
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
     cut_param="LQ_Cut",
-) -> plt.figure:
+) -> plt.Figure:
     """Plots a 2D histogram of the LQ classifier vs calibrated energy"""
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "upper left",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
 
-    fig, ax = plt.subplots()
-    try:
-        bins = np.linspace(xrange[0], xrange[1], n_bins)
-        ax.hist(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-            label="before PSD",
-        )
-        # ax.hist(
-        #     data.query(f"{lq_class.selection_string}&AoE_Double_Sided_Cut")[
-        #         lq_class.cal_energy_param
-        #     ],
-        #     bins=bins,
-        #     histtype="step",
-        #     label="after double sided A/E cut",
-        # )
-        ax.hist(
-            data.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="after LQ cut",
-        )
-        ax.hist(
-            data.query(f"{lq_class.selection_string} & (~{cut_param})")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-            label="rejected by LQ cut",
-        )
+        try:
+            if lq_class.selection_string:
+                data = data.query(lq_class.selection_string)
 
-        axins = ax.inset_axes([0.25, 0.07, 0.4, 0.3])
-        bins = np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
-        select_df = data.query(
-            f"{lq_class.cal_energy_param}<{xrange_inset[1]}&{lq_class.cal_energy_param}>{xrange_inset[0]}"
-        )
-        axins.hist(
-            select_df.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            bins=bins,
-            histtype="step",
-        )
-        # axins.hist(
-        #     select_df.query(f"{lq_class.selection_string}&AoE_Double_Sided_Cut")[
-        #         lq_class.cal_energy_param
-        #     ],
-        #     bins=bins,
-        #     histtype="step",
-        # )
-        axins.hist(
-            select_df.query(f"{lq_class.selection_string}&{cut_param}")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-        axins.hist(
-            select_df.query(f"{lq_class.selection_string} & (~{cut_param})")[
-                lq_class.cal_energy_param
-            ],
-            bins=bins,
-            histtype="step",
-        )
-    except Exception:
-        pass
+            bins = np.linspace(xrange[0], xrange[1], n_bins)
+            ax.hist(
+                data[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+                label="before PSD",
+            )
+            ax.hist(
+                data.query(f"{cut_param}")[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+                label="after LQ cut",
+            )
+            ax.hist(
+                data.query(f"~{cut_param}")[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+                label="rejected by LQ cut",
+            )
+
+            axins = ax.inset_axes([0.25, 0.07, 0.4, 0.3])
+            bins = np.linspace(xrange_inset[0], xrange_inset[1], n_bins_inset)
+            select_df = data.query(
+                f"{lq_class.cal_energy_param}<{xrange_inset[1]}&{lq_class.cal_energy_param}>{xrange_inset[0]}"
+            )
+            axins.hist(
+                select_df[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+            )
+            axins.hist(
+                select_df.query(f"{cut_param}")[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+            )
+            axins.hist(
+                select_df.query(f"(~{cut_param})")[lq_class.cal_energy_param],
+                bins=bins,
+                histtype="step",
+            )
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
     ax.set_xlim(xrange)
     ax.set_yscale("log")
-    plt.xlabel("energy (keV)")
-    plt.ylabel("counts")
-    plt.legend(loc="upper left")
-    plt.close()
+    ax.set_xlabel("energy (keV)")
+    ax.set_ylabel("counts")
+    ax.legend()
+
     return fig
 
 
 def plot_classifier(
     lq_class,
-    data,
+    data: pd.DataFrame,
     lq_param="LQ_Classifier",
     xrange=(800, 3000),
     yrange=(-10, 30),
     xn_bins=700,
     yn_bins=500,
-    figsize=(12, 8),
-    fontsize=12,
-) -> plt.figure:
-    plt.rcParams["figure.figsize"] = figsize
-    plt.rcParams["font.size"] = fontsize
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "upper left",
+    }
+    if rcParams is not None:
+        rc |= rcParams
 
-    fig = plt.figure()
-    with contextlib.suppress(Exception):
-        plt.hist2d(
-            data.query(lq_class.selection_string)[lq_class.cal_energy_param],
-            data.query(lq_class.selection_string)[lq_param],
-            bins=[
-                np.linspace(xrange[0], xrange[1], xn_bins),
-                np.linspace(yrange[0], yrange[1], yn_bins),
-            ],
-            norm=LogNorm(),
-        )
-    plt.xlabel("energy (keV)")
-    plt.ylabel(lq_param)
-    plt.xlim(xrange)
-    plt.ylim(yrange)
-    plt.close()
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
+
+        try:
+            if lq_class.selection_string:
+                data = data.query(lq_class.selection_string)
+            h = Hist(
+                Regular(
+                    xn_bins, xrange[0], xrange[1], name="energy", label="Energy (keV)"
+                ),
+                Regular(yn_bins, yrange[0], yrange[1], name=lq_param, label=lq_param),
+            )
+            h.fill(data[lq_class.cal_energy_param], data[lq_param])
+            h.plot2d(ax=ax, norm=LogNorm(), cbar=False)
+            ax.set_xlim(xrange)
+            ax.set_ylim(yrange)
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
+    return fig
+
+
+# ------------------------------------------------------------------------------------
+
+
+def plot_gaussian_trends_hist(
+    lq_class,
+    data: pd.DataFrame | None = None,
+    lq_param="LQ_classifier",
+    max_cols=3,
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+) -> plt.Figure:
+    rc = {
+        "figure.titlesize": "large",
+        "figure.constrained_layout.use": True,
+        "axes.titlesize": "medium",
+        "axes.labelsize": "small",
+        "xtick.labelsize": "x-small",
+        "ytick.labelsize": "x-small",
+        "legend.fontsize": "x-small",
+        "legend.loc": "lower center",
+    }
+    if rcParams is not None:
+        rc |= rcParams
+
+    with plt.rc_context(rc=rc):
+        adjust_fig_height = False
+        if fig is None:
+            fig = plt.figure()
+            adjust_fig_height = True
+
+        try:
+            hist_panels = lq_class.gauss_trends_hist
+
+            if len(hist_panels) > 0:
+                n_panels = len(hist_panels)
+                ncols = min(max_cols, n_panels)
+                nrows = int(np.ceil(n_panels / ncols))
+
+                if adjust_fig_height:
+                    fig.set_figheight(fig.get_figwidth() * 0.8 * nrows / ncols)
+                axs = fig.subplots(
+                    nrows,
+                    ncols,
+                    squeeze=False,
+                )
+
+                axs_flat = axs.ravel()
+
+                for ax, panel in zip(axs_flat, hist_panels):
+                    h = panel["hist"]
+                    lo = panel["lo"]
+                    hi = panel["hi"]
+                    popt = panel["popt"]
+                    model = panel["model"]
+
+                    h.plot(ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV")
+
+                    if popt is not None and model is not None:
+                        x_fit = np.linspace(
+                            h.axes.edges[0][0], h.axes.edges[0][-1], 1000
+                        )
+                        y_fit = model(x_fit, *popt)
+
+                        ax.plot(
+                            x_fit,
+                            y_fit * np.median(h.axes.widths[0]),
+                            color="red",
+                            lw=2,
+                            label=(
+                                rf"$\mu={panel['mean']:.3g}$"
+                                + "\n"
+                                + rf"$\sigma={panel['sigma']:.3g}$"
+                            ),
+                        )
+
+                    ax.set_xlabel("")
+                    ax.grid(True)
+
+                    ax.legend()
+
+                # only add axis titles at edges
+                fig.supxlabel(f"{lq_param}/E")
+                fig.supylabel("Counts")
+
+                # Turn off unused subplots
+                for ax in axs_flat[len(hist_panels) :]:
+                    ax.axis("off")
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
+    return fig
+
+
+def plot_mean_vs_energy(
+    lq_class,
+    data: pd.DataFrame | None = None,  # noqa: ARG001
+    lq_param="LQ_classifier",
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+):
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "best",
+    }
+    if rcParams is not None:
+        rc |= rcParams
+
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
+
+        try:
+            bin_centers = lq_class.energy_bin_centers
+            means = lq_class.mean_cor_res["means"]
+            mean_errs = lq_class.mean_cor_res["mean_errs"]
+            model = lq_class.mean_cor_res["model"]
+            popt = lq_class.mean_cor_res["popt"]
+            perr = lq_class.mean_cor_res["perr"]
+
+            # -----------------------------
+            # Clean data
+            # -----------------------------
+            mask = (
+                np.isfinite(bin_centers) & np.isfinite(means) & np.isfinite(mean_errs)
+            )
+            x = np.asarray(bin_centers[mask], dtype=float)
+            y = np.asarray(means[mask], dtype=float)
+            yerr = np.asarray(mean_errs[mask], dtype=float)
+
+            if len(x) == 0:
+                log.warning("No valid fit results")
+                return None
+
+            # Add error bars manually
+            ax.errorbar(x, y, yerr=yerr, fmt="o", color="black", capsize=2)
+
+            # -----------------------------
+            # Fit overlay
+            # -----------------------------
+            if not np.isnan(popt).any():
+                x_fit = np.linspace(np.min(x), np.max(x), 1000)
+                y_fit = model(x_fit, *popt)
+
+                m_fit, b_fit = popt
+                m_err, b_err = perr
+
+                # Chi-square
+                s_data = np.where(yerr <= 0, 1e-8, yerr)
+                y_model = model(x, *popt)
+                chi2 = np.sum(((y - y_model) / s_data) ** 2)
+                dof = len(x) - len(popt)
+                chi2_red = chi2 / dof if dof > 0 else np.nan
+
+                label = (
+                    r"Fit: $mE + b$"
+                    + "\n"
+                    + rf"$m = {m_fit:.3g} \pm {m_err:.3g}$"
+                    + "\n"
+                    + rf"$b = {b_fit:.3g} \pm {b_err:.3g}$"
+                    + "\n"
+                    + rf"$\chi^2_{{\mathrm{{red}}}} = {chi2_red:.3f}$"
+                )
+
+                ax.plot(x_fit, y_fit, "-", color="red", label=label)
+
+            # -----------------------------
+            # Formatting
+            # -----------------------------
+            ax.set_xlabel("Energy [keV]")
+            ax.set_ylabel(f"Mean ({lq_param}/E)")
+            ax.grid()
+            ax.legend()
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
+    return fig
+
+
+def plot_sigma_vs_energy(
+    lq_class,
+    data: pd.DataFrame | None = None,  # noqa: ARG001
+    lq_param="LQ_classifier",
+    fig: plt.Figure | None = None,
+    rcParams: dict | None = None,
+):
+    rc = {
+        "figure.constrained_layout.use": True,
+        "legend.loc": "best",
+    }
+    if rcParams is not None:
+        rc |= rcParams
+
+    with plt.rc_context(rc=rc):
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.subplots()
+
+        try:
+            bin_centers = lq_class.energy_bin_centers
+            sigmas = lq_class.sig_cor_res["sigmas"]
+            sigma_errs = lq_class.sig_cor_res["sigma_errs"]
+            model = lq_class.sig_cor_res["model"]
+            popt = lq_class.sig_cor_res["popt"]
+            perr = lq_class.sig_cor_res["perr"]
+
+            # -----------------------------
+            # Clean data
+            # -----------------------------
+            mask = (
+                np.isfinite(bin_centers) & np.isfinite(sigmas) & np.isfinite(sigma_errs)
+            )
+            x = np.asarray(bin_centers[mask], dtype=float)
+            y = np.asarray(sigmas[mask], dtype=float)
+            yerr = np.asarray(sigma_errs[mask], dtype=float)
+
+            if len(x) == 0:
+                log.warning("No valid sigma data")
+                return None
+
+            ax.errorbar(x, y, yerr=yerr, fmt="o", color="black", capsize=2)
+
+            # -----------------------------
+            # Fit overlay
+            # -----------------------------
+            if not np.isnan(popt).any():
+                x_fit = np.linspace(np.min(x), np.max(x), 1000)
+                y_fit = model(x_fit, *popt)
+
+                A_fit, B_fit = popt
+                A_err, B_err = perr
+
+                s_data = np.where(yerr <= 0, 1e-8, yerr)
+
+                y_model = model(x, *popt)
+                residuals = y - y_model
+                chi2 = np.sum((residuals / s_data) ** 2)
+                dof = len(x) - len(popt)
+                chi2_red = chi2 / dof if dof > 0 else np.nan
+
+                label = (
+                    r"Fit: $\sqrt{\left| \frac{A^2}{E^2} + B^2 \right|}$"
+                    + "\n"
+                    + rf"$A = {A_fit:.3f} \pm {A_err:.3f}$"
+                    + "\n"
+                    + rf"$B = {B_fit:.3f} \pm {B_err:.3f}$"
+                    + "\n"
+                    + rf"$\chi^2_{{\mathrm{{red}}}} = {chi2_red:.3f}$"
+                )
+
+                ax.plot(x_fit, y_fit, "-", color="red", label=label)
+
+            ax.set_xlabel("Energy [keV]")
+            ax.set_ylabel(f"σ ({lq_param}/E)")
+            ax.grid()
+            ax.legend()
+
+        except Exception as e:
+            tb_list = traceback.format_tb(e.__traceback__, limit=2)
+            compact_tb = "".join(tb_list)
+
+            msg = f"\n{compact_tb}{type(e).__name__}: {e}"
+            log.warning(msg)
+
     return fig
