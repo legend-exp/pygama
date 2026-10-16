@@ -60,7 +60,7 @@ class TestDataCleaning:
             dc.get_keys(42, {"cut": {"cut_parameter": "bl_std"}})
 
     def test_generate_cuts_wrong_data_type(self):
-        with pytest.raises(ValueError, match="got list"):
+        with pytest.raises(TypeError, match="got list"):
             dc.generate_cuts(
                 [1, 2, 3],
                 {

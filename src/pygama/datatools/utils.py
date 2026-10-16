@@ -136,5 +136,5 @@ def _read_dataflow_config(dataflow_config="$REFPROD/dataflow-config.yaml"):
         df_config = dataflow_config
     else:
         msg = "dataflow_config must be a str, Path, or Mapping"
-        raise ValueError(msg)
+        raise TypeError(msg)
     return df_config, df_config["paths"], df_config.get("query", {})

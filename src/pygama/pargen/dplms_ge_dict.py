@@ -224,6 +224,7 @@ def dplms_ge_dict(
                 pl_coeff,
                 ft_coeff,
                 e,
+                exc_info=True,
             )
             continue
 

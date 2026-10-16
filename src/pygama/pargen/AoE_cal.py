@@ -8,7 +8,7 @@ import contextlib
 import logging
 import re
 from collections.abc import Callable
-from datetime import datetime
+from datetime import datetime, timezone
 
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -2532,7 +2532,7 @@ def plot_aoe_mean_time(
     try:
         ax.errorbar(
             [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
                 for tstamp in aoe_class.timecorr_df.index
             ],
             aoe_class.timecorr_df["mean"],
@@ -2547,7 +2547,7 @@ def plot_aoe_mean_time(
         ]
         ax.step(
             [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
                 for tstamp in aoe_class.cal_dicts
             ],
             grouped_means,
@@ -2555,7 +2555,7 @@ def plot_aoe_mean_time(
         )
         ax.fill_between(
             [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
                 for tstamp in aoe_class.cal_dicts
             ],
             y1=np.array(grouped_means) - 0.2 * np.array(aoe_class.timecorr_df["sigma"]),
@@ -2565,7 +2565,7 @@ def plot_aoe_mean_time(
         )
         ax.fill_between(
             [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
                 for tstamp in aoe_class.cal_dicts
             ],
             y1=np.array(grouped_means) - 0.4 * np.array(aoe_class.timecorr_df["sigma"]),
@@ -2574,7 +2574,7 @@ def plot_aoe_mean_time(
             alpha=0.2,
         )
     except Exception:
-        pass
+        log.debug("plot_aoe_mean_time: plotting failed", exc_info=True)
     ax.set_xlabel("time")
     ax.set_ylabel("A/E mean")
     myfmt = mdates.DateFormatter("%b %d")
@@ -2592,7 +2592,7 @@ def plot_aoe_res_time(
     with contextlib.suppress(Exception):
         ax.errorbar(
             [
-                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
                 for tstamp in aoe_class.timecorr_df.index
             ],
             aoe_class.timecorr_df["res"],
@@ -2717,7 +2717,7 @@ def drifttime_corr_plot(
         plt.tight_layout()
         plt.xlim(bins[0], bins[-1])
     except Exception:
-        pass
+        log.debug("drifttime_corr_plot: plotting failed", exc_info=True)
     plt.close()
     return fig
 
@@ -2762,7 +2762,7 @@ def plot_compt_bands_overlayed(
                 density=density,
             )
         except Exception:
-            pass
+            log.debug("plot_compt_bands_overlayed: plotting failed", exc_info=True)
     plt.ylabel("counts")
     plt.xlabel(aoe_param)
     plt.title(title)
@@ -2817,7 +2817,7 @@ def plot_dt_dep(
             else:
                 plt.title(titles[i])
         except Exception:
-            pass
+            log.debug("plot_dt_dep: plotting failed", exc_info=True)
     plt.tight_layout()
     plt.close()
     return fig
@@ -2890,7 +2890,7 @@ def plot_mean_fit(aoe_class, _data, figsize=(12, 8), fontsize=12) -> plt.figure:
             c="g",
         )
     except Exception:
-        pass
+        log.debug("plot_mean_fit: plotting failed", exc_info=True)
     ax2.set_ylabel("residuals %", ha="right", y=1)
     ax2.set_xlabel("energy (keV)", ha="right", x=1)
     plt.tight_layout()
@@ -2960,7 +2960,7 @@ def plot_sigma_fit(aoe_class, _data, figsize=(12, 8), fontsize=12) -> plt.figure
             c="g",
         )
     except Exception:
-        pass
+        log.debug("plot_sigma_fit: plotting failed", exc_info=True)
     ax2.set_ylabel("residuals", ha="right", y=1)
     ax2.set_xlabel("energy (keV)", ha="right", x=1)
     plt.tight_layout()
@@ -3007,7 +3007,7 @@ def plot_cut_fit(
         plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
         plt.ylim([np.nanmin(aoe_class.cut_fits["sf"]) * 0.9, 102])
     except Exception:
-        pass
+        log.debug("plot_cut_fit: plotting failed", exc_info=True)
     plt.xlabel("cut value")
     plt.ylabel("survival percentage")
     plt.close()
@@ -3053,7 +3053,7 @@ def plot_survival_fraction_curves(
                     label=f"{get_peak_label(peak)} {peak} keV: {aoe_class.low_side_sfs.loc[peak]['sf']:2.1f} +/- {aoe_class.low_side_sfs.loc[peak]['sf_err']:2.1f} %",
                 )
     except Exception:
-        pass
+        log.debug("plot_survival_fraction_curves: plotting failed", exc_info=True)
     vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])
     plt.legend(loc="upper right")
@@ -3143,7 +3143,7 @@ def plot_spectra(
             histtype="step",
         )
     except Exception:
-        pass
+        log.debug("plot_spectra: plotting failed", exc_info=True)
     ax.set_xlim(xrange)
     ax.set_yscale("log")
     plt.xlabel("energy (keV)")
@@ -3176,7 +3176,7 @@ def plot_sf_vs_energy(
 
         plt.step(pgh.get_bin_centers(bins_pass), 100 * survival_fracs)
     except Exception:
-        pass
+        log.debug("plot_sf_vs_energy: plotting failed", exc_info=True)
     plt.ylim([0, 100])
     vals, _labels = plt.yticks()
     plt.yticks(vals, [f"{x:,.0f} %" for x in vals])

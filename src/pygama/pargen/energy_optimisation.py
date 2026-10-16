@@ -51,7 +51,7 @@ def _fit_bounds_by_index(func, pars, minuit_fit):
         names = [str(n) for n in minuit_fit.parameters]
         limits = dict(zip(names, minuit_fit.limits, strict=True))
     except Exception as e:
-        log.debug("could not read fit limits for %s: %s", func, e)
+        log.debug("could not read fit limits for %s: %s", func, e, exc_info=True)
         return None
 
     bounds = {}
@@ -357,6 +357,7 @@ def get_peak_fwhm_with_dt_corr(
             peak,
             e,
         )
+        log.debug("get_peak_fwhm_with_dt_corr: traceback", exc_info=True)
         return (
             np.nan,
             np.nan,
@@ -383,7 +384,11 @@ def get_peak_fwhm_with_dt_corr(
             plt.plot(xs_plot, func.get_pdf(xs_plot, *energy_pars))
             plt.show()
         except Exception as e:
-            log.debug("get_peak_fwhm_with_dt_corr: fit display plot failed: %s", e)
+            log.debug(
+                "get_peak_fwhm_with_dt_corr: fit display plot failed: %s",
+                e,
+                exc_info=True,
+            )
 
     if display > 1:
         try:
@@ -394,7 +399,9 @@ def get_peak_fwhm_with_dt_corr(
             plt.show()
         except Exception as e:
             log.debug(
-                "get_peak_fwhm_with_dt_corr: bootstrap display plot failed: %s", e
+                "get_peak_fwhm_with_dt_corr: bootstrap display plot failed: %s",
+                e,
+                exc_info=True,
             )
 
     if display > 0:
@@ -411,7 +418,11 @@ def get_peak_fwhm_with_dt_corr(
             )
             plt.show()
         except Exception as e:
-            log.debug("get_peak_fwhm_with_dt_corr: fill display plot failed: %s", e)
+            log.debug(
+                "get_peak_fwhm_with_dt_corr: fill display plot failed: %s",
+                e,
+                exc_info=True,
+            )
 
     if kev is True:
         fwhm *= peak / energy_pars["mu"]
@@ -656,6 +667,7 @@ def fom_fwhm_with_alpha_fit(
             parameter,
             e,
         )
+        log.debug("fom_fwhm_with_alpha_fit: traceback", exc_info=True)
         return {
             "fwhm": np.nan,
             "fwhm_err": np.nan,

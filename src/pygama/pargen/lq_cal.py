@@ -19,7 +19,7 @@ import contextlib
 import logging
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
 import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
@@ -94,11 +94,15 @@ def fit_gaussian_tail_to_histogram(
     if tail_side == "auto":
         tail_side = "right" if (q90 - q50) > (q50 - q10) else "left"
         log.debug(
-            f"Using {tail_side} tail: q90-q50 = {q90 - q50}, q50-q10 = {q50 - q10}"
+            "Using %s tail: q90-q50 = %s, q50-q10 = %s",
+            tail_side,
+            q90 - q50,
+            q50 - q10,
         )
 
     if tail_side not in ["right", "left"]:
-        raise ValueError("tail_side must be 'auto', 'right', or 'left'.")
+        msg = "tail_side must be 'auto', 'right', or 'left'."
+        raise ValueError(msg)
 
     # Model: Gaussian + smooth EMG tail
     def model_right(x, A_g, mu, sigma, A_t, tau):
@@ -117,10 +121,7 @@ def fit_gaussian_tail_to_histogram(
 
         return gaussian + tail
 
-    if tail_side == "right":
-        model = model_right
-    else:
-        model = model_left
+    model = model_right if tail_side == "right" else model_left
 
     # -------------------------------
     # Initial guesses
@@ -160,14 +161,14 @@ def fit_gaussian_tail_to_histogram(
 
         ##########
         if not result.accurate or not result.valid:
-            log.warning(f"Fit failed {result!r}")
+            log.warning("Fit failed %r", result)
 
-        log.debug(f"Fit tail_side = {tail_side}")
-        log.debug(f"mu    = {mu_fit:.6g} ± {mu_err:.3g}")
-        log.debug(f"sigma = {sigma_fit:.6g} ± {sigma_err:.3g}")
-        log.debug(f"A_g   = {A_g_fit:.6g} ± {A_g_err:.3g}")
-        log.debug(f"A_t   = {A_t_fit:.6g} ± {A_t_err:.3g}")
-        log.debug(f"tau   = {tau_fit:.6g} ± {tau_err:.3g}")
+        log.debug("Fit tail_side = %s", tail_side)
+        log.debug("mu    = %.6g ± %.3g", mu_fit, mu_err)
+        log.debug("sigma = %.6g ± %.3g", sigma_fit, sigma_err)
+        log.debug("A_g   = %.6g ± %.3g", A_g_fit, A_g_err)
+        log.debug("A_t   = %.6g ± %.3g", A_t_fit, A_t_err)
+        log.debug("tau   = %.6g ± %.3g", tau_fit, tau_err)
 
         # TO DO: return information about the fit quality
         return (
@@ -181,7 +182,7 @@ def fit_gaussian_tail_to_histogram(
         )
 
     except Exception:
-        log.error(f"Gaussian + smooth {tail_side} EMG tail fit failed", exc_info=True)
+        log.exception("Gaussian + smooth %s EMG tail fit failed", tail_side)
 
         return np.nan, np.nan, np.nan, np.nan, None, None, model
 
@@ -193,7 +194,7 @@ def extract_gaussian_trends(
     #    lq_filter,
     #    det,
     tail_side="auto",
-    max_cols=3,
+    max_cols=3,  # noqa: ARG001
 ):
     means, mean_errors, sigmas, sigma_errs, bin_centers = [], [], [], [], []
 
@@ -206,7 +207,7 @@ def extract_gaussian_trends(
         values = np.asarray(lq_over_e[idx], dtype=float)
         values = values[np.isfinite(values)]
 
-        # this determins what values we are fitting
+        # this determines what values we are fitting
         if len(values) > 10:
             # -------------------------------
             # Estimate binning
@@ -238,7 +239,7 @@ def extract_gaussian_trends(
                 mean_err,
                 sigma_err,
                 popt,
-                perr,
+                _perr,
                 model,
             ) = result
 
@@ -279,7 +280,7 @@ class MeanModel:
         return mu_slope * E + mu_offset
 
     @staticmethod
-    def grad(E, mu_slope, mu_offset):
+    def grad(E, mu_slope, mu_offset):  # noqa: ARG004
         return np.array([E, np.ones_like(E)])
 
     @staticmethod
@@ -317,11 +318,9 @@ def fit_mean_model(bin_centers, means, mean_errs):
     if len(valid_s) == 0:
         # No usable uncertainties
         s = np.ones_like(y)
-        absolute_sigma = False
     else:
         s_median = np.median(valid_s)
         s = np.where(np.isfinite(s) & (s > 0), s, s_median)
-        absolute_sigma = True
 
     # Initial guess: slope and intercept
     p0 = [0.0, np.nanmean(y)]
@@ -335,7 +334,7 @@ def fit_mean_model(bin_centers, means, mean_errs):
         return popt, perr, model
 
     except Exception:
-        log.error("Mean linear fit failed", exc_info=True)
+        log.exception("Mean linear fit failed")
         return [np.nan, np.nan], [np.nan, np.nan], model
 
 
@@ -384,7 +383,7 @@ def fit_sigma_model(bin_centers, sigmas, sigma_errs):
         perr = np.array(result.errors)
         return np.abs(popt), perr, model
     except Exception:
-        log.error("Sigma model fit failed", exc_info=True)
+        log.exception("Sigma model fit failed")
         return [np.nan, np.nan], [np.nan, np.nan], model
 
 
@@ -758,7 +757,7 @@ class LQCal:
         except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ over correction failed", exc_info=True)
+            log.exception("LQ over correction failed")
 
     def energy_width_correction(
         self,
@@ -802,7 +801,7 @@ class LQCal:
         except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ energy width correction failed", exc_info=True)
+            log.exception("LQ energy width correction failed")
             means = []
             mean_errs = []
             popt_mean = [np.nan, np.nan]
@@ -1032,7 +1031,7 @@ class LQCal:
         except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ time correction failed", exc_info=True)
+            log.exception("LQ time correction failed")
             self.update_cal_dicts(
                 {
                     output_name: {
@@ -1074,7 +1073,7 @@ class LQCal:
         """
 
         log.info("Starting LQ drift time correction")
-        log.info(f"Drift time correction mode: {mode}")
+        log.info("Drift time correction mode: %s", mode)
 
         # perform a check on the range of values seen in the DEP and use that to maybe edit the mode.
         try:
@@ -1092,7 +1091,7 @@ class LQCal:
             elif (dt_range[1] - dt_range[0]) <= 200:
                 mode = "linear"
 
-            log.info(f"Drift time correction mode after range checks: {mode}")
+            log.info("Drift time correction mode after range checks: %s", mode)
 
         except Exception as e:
             msg = "DEP event selection for mode determination failed"
@@ -1136,9 +1135,7 @@ class LQCal:
             except Exception:
                 if self.debug_mode:
                     raise
-                log.error(
-                    "LQ drift time correction (linear mode) failed", exc_info=True
-                )
+                log.exception("LQ drift time correction (linear mode) failed")
                 self.dt_fit_pars = (np.nan, np.nan)
 
         elif mode == "LR-MCD":
@@ -1185,7 +1182,7 @@ class LQCal:
             except Exception:
                 if self.debug_mode:
                     raise
-                log.error("LQ drift time correction (MCD mode) failed", exc_info=True)
+                log.exception("LQ drift time correction (MCD mode) failed")
                 self.dt_fit_pars = (np.nan, np.nan)
 
         # update dataframe
@@ -1268,7 +1265,7 @@ class LQCal:
         except Exception:
             if self.debug_mode:
                 raise
-            log.error("LQ cut determination failed", exc_info=True)
+            log.exception("LQ cut determination failed")
             self.cut_val = np.nan
             c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
             m = Minuit(c, np.full(2, np.nan))
@@ -1464,9 +1461,8 @@ class LQCal:
                         pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
-                log.error(
-                    f"LQ survival fraction determination failed for {peak} peak",
-                    exc_info=True,
+                log.exception(
+                    "LQ survival fraction determination failed for %s peak", peak
                 )
         self.low_side_sf = self.low_side_sf.set_index("peak")
 
@@ -1496,7 +1492,9 @@ def plot_lq_mean_time(
         try:
             ax.errorbar(
                 [
-                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(
+                        tzinfo=timezone.utc
+                    )
                     for tstamp in lq_class.timecorr_df.index
                 ],
                 lq_class.timecorr_df["mean"],
@@ -1510,7 +1508,9 @@ def plot_lq_mean_time(
             ]
             ax.step(
                 [
-                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(
+                        tzinfo=timezone.utc
+                    )
                     for tstamp in lq_class.cal_dicts
                 ],
                 grouped_means,
@@ -1518,7 +1518,9 @@ def plot_lq_mean_time(
             )
             ax.fill_between(
                 [
-                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(
+                        tzinfo=timezone.utc
+                    )
                     for tstamp in lq_class.cal_dicts
                 ],
                 y1=np.array(grouped_means)
@@ -1530,7 +1532,9 @@ def plot_lq_mean_time(
             )
             ax.fill_between(
                 [
-                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ")
+                    datetime.strptime(tstamp, "%Y%m%dT%H%M%SZ").replace(
+                        tzinfo=timezone.utc
+                    )
                     for tstamp in lq_class.cal_dicts
                 ],
                 y1=np.array(grouped_means)
@@ -1547,6 +1551,7 @@ def plot_lq_mean_time(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_lq_mean_time: plotting failed", exc_info=True)
 
     ax.set_xlabel("time")
     ax.set_ylabel("LQ mean")
@@ -1635,6 +1640,7 @@ def plot_drift_time_correction(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_drift_time_correction: plotting failed", exc_info=True)
 
     return fig
 
@@ -1710,6 +1716,7 @@ def plot_lq_cut_fit(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_lq_cut_fit: plotting failed", exc_info=True)
 
     return fig
 
@@ -1759,6 +1766,7 @@ def plot_survival_fraction_curves(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_survival_fraction_curves: plotting failed", exc_info=True)
 
     vals = ax.get_yticks()
     ax.set_yticks(vals, [f"{x:,.0f} %" for x in vals])
@@ -1816,6 +1824,7 @@ def plot_sf_vs_energy(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_sf_vs_energy: plotting failed", exc_info=True)
 
     ax.set_ylim([0, 100])
     vals = ax.get_yticks()
@@ -1902,6 +1911,7 @@ def plot_spectra(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_spectra: plotting failed", exc_info=True)
 
     ax.set_xlim(xrange)
     ax.set_yscale("log")
@@ -1956,6 +1966,7 @@ def plot_classifier(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_classifier: plotting failed", exc_info=True)
 
     return fig
 
@@ -1965,7 +1976,7 @@ def plot_classifier(
 
 def plot_gaussian_trends_hist(
     lq_class,
-    data: pd.DataFrame | None = None,
+    data: pd.DataFrame | None = None,  # noqa: ARG001
     lq_param="LQ_classifier",
     max_cols=3,
     fig: plt.Figure | None = None,
@@ -2008,14 +2019,14 @@ def plot_gaussian_trends_hist(
 
                 axs_flat = axs.ravel()
 
-                for ax, panel in zip(axs_flat, hist_panels):
+                for ax, panel in zip(axs_flat, hist_panels, strict=False):
                     h = panel["hist"]
                     lo = panel["lo"]
                     hi = panel["hi"]
                     popt = panel["popt"]
                     model = panel["model"]
 
-                    h.plot(ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV")
+                    h.plot(ax=ax, histtype="step", label=f"{lo:.0f}–{hi:.0f} keV")  # noqa: RUF001
 
                     if popt is not None and model is not None:
                         x_fit = np.linspace(
@@ -2054,6 +2065,7 @@ def plot_gaussian_trends_hist(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_gaussian_trends_hist: plotting failed", exc_info=True)
 
     return fig
 
@@ -2146,6 +2158,7 @@ def plot_mean_vs_energy(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_mean_vs_energy: plotting failed", exc_info=True)
 
     return fig
 
@@ -2225,7 +2238,7 @@ def plot_sigma_vs_energy(
                 ax.plot(x_fit, y_fit, "-", color="red", label=label)
 
             ax.set_xlabel("Energy [keV]")
-            ax.set_ylabel(f"σ ({lq_param}/E)")
+            ax.set_ylabel(f"σ ({lq_param}/E)")  # noqa: RUF001
             ax.grid()
             ax.legend()
 
@@ -2235,5 +2248,6 @@ def plot_sigma_vs_energy(
 
             msg = f"\n{compact_tb}{type(e).__name__}: {e}"
             log.warning(msg)
+            log.debug("plot_sigma_vs_energy: plotting failed", exc_info=True)
 
     return fig
