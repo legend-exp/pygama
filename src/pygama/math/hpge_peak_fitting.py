@@ -97,7 +97,7 @@ def bootstrap_valid_pars(
                 continue
             try:
                 value = evaluate(p)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - evaluate is caller-supplied
                 # a draw that violates a bounded parameter is simply rejected
                 last_error = e
                 continue
@@ -190,7 +190,7 @@ def hpge_peak_fwhm(
             e_max,
             args=(sigma, htail, tau, half_max),
         )
-    except Exception:
+    except (ValueError, RuntimeError):
         lower_hm = brentq(
             hpge_peak_peak_bgfree_halfmax,
             -(5 * sigma + htail * tau),
@@ -204,7 +204,7 @@ def hpge_peak_fwhm(
             2.5 * sigma / 2,
             args=(sigma, htail, tau, half_max),
         )
-    except Exception:
+    except (ValueError, RuntimeError):
         upper_hm = brentq(
             hpge_peak_peak_bgfree_halfmax,
             e_max,
@@ -271,7 +271,7 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max=0.5, cov=None):
             e_max,
             args=(sigma, htail, tau, val_frac_max),
         )
-    except Exception:
+    except (ValueError, RuntimeError):
         lower_hm = brentq(
             radford_peak_bgfree_fracmax,
             -(5 * sigma + htail * tau),
@@ -285,7 +285,7 @@ def hpge_peak_fwfm(sigma, htail, tau, frac_max=0.5, cov=None):
             2.5 * sigma / 2,
             args=(sigma, htail, tau, val_frac_max),
         )
-    except Exception:
+    except (ValueError, RuntimeError):
         upper_hm = brentq(
             radford_peak_bgfree_fracmax,
             e_max,

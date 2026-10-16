@@ -254,7 +254,7 @@ def query_meta(
 
         if not isinstance(meta, MetadataRepository):
             msg = "metadata must be a MetadataRepository derived class"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         # if using a string for chan_db, get it set up
         if chan_db is None:
