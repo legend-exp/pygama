@@ -15,9 +15,66 @@ import numpy as np
 import pygama.math.distributions as pgd
 import pygama.math.histogram as pgh
 import pygama.pargen.energy_cal as pgc
+from pygama.math.hpge_peak_fitting import bootstrap_valid_pars
 from pygama.pargen.utils import convert_to_minuit, require_config_keys, return_nans
 
 log = logging.getLogger(__name__)
+
+
+def _fit_at_limit(minuit_fit):
+    """Report whether a completed minuit fit left a parameter on a limit.
+
+    HESSE covariances are not meaningful at a limit, so any uncertainty derived
+    from one is unreliable.  Tolerates a missing or partial fit object, since
+    the caller only uses this to decide whether to warn.
+    """
+    return bool(
+        getattr(getattr(minuit_fit, "fmin", None), "has_parameters_at_limit", False)
+    )
+
+
+def _fit_bounds_by_index(func, pars, minuit_fit):
+    """Translate the limits minuit actually used into a ``{index: (lo, hi)}`` map.
+
+    The limits are read back off the fit object rather than rebuilt from
+    :func:`~pygama.pargen.energy_cal.get_hpge_energy_bounds`, because some of
+    them are derived from other parameters — ``tau`` is bounded by
+    ``(0.1, 5) * sigma`` of the *initial guess*, not of the fit result — so
+    recomputing them at the fitted values can produce a range that excludes the
+    fitted point itself.
+
+    Returns ``None`` if the limits are unavailable, in which case the caller
+    falls back to the evaluator's own validity checks.
+    """
+    try:
+        req_args = [str(a) for a in func.required_args()]
+        names = [str(n) for n in minuit_fit.parameters]
+        limits = dict(zip(names, minuit_fit.limits, strict=True))
+    except Exception as e:
+        log.debug("could not read fit limits for %s: %s", func, e)
+        return None
+
+    bounds = {}
+    for idx, name in enumerate(req_args):
+        limit = limits.get(name)
+        if limit is None:
+            continue
+        lo, hi = (None if v is None or not np.isfinite(v) else v for v in limit)
+        if lo is None and hi is None:
+            continue
+        # the fitted point must lie inside its own limits; if it does not, the
+        # names are misaligned and using the bound would reject every draw
+        if (lo is not None and pars[idx] < lo) or (hi is not None and pars[idx] > hi):
+            log.debug(
+                "fitted %s=%s outside its limit %s, dropping that bootstrap bound",
+                name,
+                pars[idx],
+                limit,
+            )
+            continue
+        bounds[idx] = (lo, hi)
+
+    return bounds or None
 
 
 def simple_guess(energy, func, fit_range=None, bin_width=None):
@@ -227,7 +284,7 @@ def get_peak_fwhm_with_dt_corr(
                 func,
                 _,
                 _,
-                _,
+                minuit_fit,
             ) = pgc.unbinned_staged_energy_fit(
                 ct_energy[win_idxs],
                 func=func,
@@ -244,6 +301,16 @@ def get_peak_fwhm_with_dt_corr(
             msg = "staged energy fit failed"
             raise RuntimeError(msg) from e
 
+        # a parameter sitting on a limit (typically htail pinned at 0) makes the
+        # HESSE covariance meaningless, so every uncertainty derived from it
+        # below is unreliable — surface that rather than reporting it silently
+        if _fit_at_limit(minuit_fit):
+            log.warning(
+                "get_peak_fwhm_with_dt_corr: fit for peak %s has parameters at a "
+                "limit, its covariance and the uncertainties from it are unreliable",
+                peak,
+            )
+
         try:
             fwhm = func.get_fwfm(energy_pars, frac_max=frac_max)
 
@@ -257,24 +324,29 @@ def get_peak_fwhm_with_dt_corr(
 
         try:
             rng = np.random.default_rng(1)
-            # generate set of bootstrapped parameters
-            par_b = rng.multivariate_normal(energy_pars, cov, size=100)
+            # generate set of bootstrapped parameters, drawing from the support
+            # the fit itself was constrained to rather than from a wider region
+            # it could never have reached
+            par_b, y_b, _, _ = bootstrap_valid_pars(
+                rng,
+                energy_pars,
+                cov,
+                lambda p: func.get_fwfm(p, frac_max=frac_max),
+                size=100,
+                bounds=_fit_bounds_by_index(func, energy_pars, minuit_fit),
+            )
+            if len(y_b) == 0:
+                msg = "no valid bootstrap draws"
+                raise RuntimeError(msg)
+
             y_max = np.array([func.get_pdf(xs, *p) for p in par_b])
             maxs = np.nanmax(y_max, axis=1)
 
-            y_b = np.zeros(len(par_b))
-            for i, p in enumerate(par_b):
-                try:
-                    y_b[i] = func.get_fwfm(p, frac_max=frac_max)
-                except Exception as e:
-                    log.debug(
-                        "bootstrap fwfm evaluation failed for sample %s, filling nan: %s",
-                        i,
-                        e,
-                    )
-                    y_b[i] = np.nan
-            fwhm_err = np.nanstd(y_b, axis=0)
-            fwhm_o_max_err = np.nanstd(y_b / maxs, axis=0)
+            # spread about the reported central value, not about the sample
+            # mean: one-sided truncation shifts the sample mean off the point
+            # estimate, and that offset belongs in the quoted uncertainty
+            fwhm_err = np.sqrt(np.nanmean((y_b - fwhm) ** 2))
+            fwhm_o_max_err = np.sqrt(np.nanmean((y_b / maxs - fwhm_o_max) ** 2))
         except Exception as e:
             msg = "bootstrap fwhm uncertainty estimation failed"
             raise RuntimeError(msg) from e
