@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import re
 from collections.abc import Collection, Mapping
 from concurrent.futures import Executor
 from contextlib import ExitStack
@@ -14,7 +13,14 @@ from dbetto import TextDB
 from rich.console import Console
 from rich.status import Status
 
-from .utils import _read_dataflow_config, _setup_executor, _setup_spinner, get_recursive
+from .cycle_record import CycleRecord
+from .utils import (
+    _read_dataflow_config,
+    _setup_executor,
+    _setup_spinner,
+    _tiers_to_dict,
+    get_recursive,
+)
 
 
 def query_runs(
@@ -46,7 +52,8 @@ def query_runs(
     ----------
     runs
         boolean python expression for selecting runs, using column names defined
-        in ``cycle_def`` as variables.
+        in ``cycle_def``, plus ``relpath`` and ``cycle`` as variables. Note that
+        tier paths are not included as variables.
 
         Examples:
 
@@ -67,8 +74,7 @@ def query_runs(
         if ``None`` (default) return a flat array with all cycles. If one or more fields
         are provided, group entries by these fields (using :meth:`ak.run_lengths`, so group
         consecutive equal values; this is done after sorting, so be careful if sorting
-        changes order!) Fields that vary within groups will be un-flattened into 2-D ragged
-        arrays. Note that ``runs`` query cannot act collectively on grouped cycles.
+        changes order!) Note that ``runs`` query cannot act collectively on grouped cycles.
 
     sort_by
         field by which to sort table, or list of fields in order by priority
@@ -112,6 +118,8 @@ def query_runs(
     library
         format of returned table. Can be ``ak`` (default), ``pd`` or ``np``
 
+        Note: ``np`` will break if ``None`` values appear in table (e.g. outer join)
+
     progress:
         if ``True`` draw progress spinner; can also provide a :class:`rich.Status`
         or:class:`rich.Console`
@@ -127,30 +135,19 @@ def query_runs(
                 raise ValueError(msg)
             cycle_def = query_config["cycle_def"]
 
-        # turn tiers into list of tier-name/path pairs
-        if tiers is None:
-            tiers = query_config.get("tiers", ["raw"])
-        if isinstance(tiers, str):
-            tiers = [tiers]
-        if isinstance(tiers, Mapping):
-            tier_list = [(f"tier_{t}", p) for t, p in tiers.items()]
-        else:
-            tier_list = [(f"tier_{t}", df_paths[f"tier_{t}"]) for t in tiers]
+        tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
         if ignored_cycles is None:
             ignored_cycles = query_config.get("ignored_cycles", None)
 
-        if join == "inner":
-            this_tier = tier_list[0]
-            other_tiers = tier_list[1:]
-        elif join == "outer":
-            this_tier = tier_list[0]
-            other_tiers = []
-        elif this_tier := next((t for t in tier_list if f"tier_{join}" == t[0]), False):
+        if join in ("inner", "outer"):
+            # fancy one-liner to split first item from remaining items
+            this_tier, other_tiers = (next(it := iter(tiers.items())), dict(it))
+        elif this_tier := next((t for t in tiers.items() if join == t[0]), False):
             # if join is a tier name, find the matching entry in tiers
-            other_tiers = [t for t in tier_list if t != this_tier]
+            other_tiers = {t: p for t, p in tiers.items() if t != this_tier[0]}
         else:
-            msg = f"invalid join argument {join}"
+            msg = f"invalid join argument {join}. Valid options: inner, outer, {', '.join(tiers)}"
             raise ValueError(msg)
         base_path = this_tier[1]
 
@@ -177,9 +174,13 @@ def query_runs(
             if join == "inner":
                 for subdir in copy(dirnames):
                     if not all(
-                        Path(p, relpath, subdir).is_dir() for _, p in other_tiers
+                        Path(p, relpath, subdir).is_dir()
+                        for _, p in other_tiers.items()
                     ):
                         dirnames.remove(subdir)
+
+            if len(files) == 0:
+                continue
 
             if executor is None:
                 records += _get_run_records_loop(
@@ -187,7 +188,7 @@ def query_runs(
                     relpath,
                     col_names,
                     this_tier,
-                    other_tiers,
+                    other_tiers if join != "outer" else {},
                     join == "inner",
                     removed,
                     runs,
@@ -200,7 +201,7 @@ def query_runs(
                         relpath,
                         col_names,
                         this_tier,
-                        other_tiers,
+                        other_tiers if join != "outer" else {},
                         join == "inner",
                         removed,
                         runs,
@@ -211,13 +212,13 @@ def query_runs(
             records = [r for recs in records for r in recs.result()]
 
         # If outer join, recursively query other tiers and perform outer join
-        if join == "outer" and len(tiers) > 1:
+        if join == "outer" and len(other_tiers) > 0:
             other = query_runs(
                 runs=runs,
                 dataflow_config=dataflow_config,
                 group_by=None,
                 sort_by=sort_by,
-                tiers=tiers[1:],
+                tiers=other_tiers,
                 join="outer",
                 ignored_cycles=ignored_cycles,
                 processes=processes,
@@ -227,9 +228,14 @@ def query_runs(
             )
 
             if len(other) == 0:
-                records = [r | {f"tier_{t}": None for t in tiers[1:]} for r in records]
+                records = [
+                    r | {f"tier_{t}": None for t in other_tiers} for r in records
+                ]
             elif len(records) == 0:
-                records = [r | {f"tier_{this_tier}": None} for r in other]
+                records = [
+                    r | {f"tier_{this_tier[0]}": None}
+                    for r in other.to_dict(orient="records")
+                ]
             else:
                 records = (
                     ak.to_dataframe(records)
@@ -238,9 +244,10 @@ def query_runs(
                         on=["cycle", "relpath", *col_names],
                         how="outer",
                     )
-                    .where(records.notna(), None)
-                    .to_dict(orient="records")
+                    .fillna(np.nan)
+                    .replace([np.nan], None)
                 )
+                records = records.to_dict(orient="records")
 
         # Format and return results
         records.sort(
@@ -259,19 +266,12 @@ def query_runs(
                 lengths = [np.cumsum(ak.run_lengths(result[f])) for f in group_by]
             lengths = np.unique(np.concatenate([0, *lengths]))
             result = ak.unflatten(result, lengths[1:] - lengths[:-1])
-            result = ak.Array(
-                {
-                    f: ak.firsts(result[f])
-                    if ak.all(ak.all(result[f] == ak.firsts(result[f]), axis=1), axis=0)
-                    else result[f]
-                    for f in result.fields
-                }
-            )
 
         if library == "ak":
             return result
         if library == "pd":
-            return ak.to_dataframe(result)
+            # to_dataframe seems to turn None into 'nan'...
+            return ak.to_dataframe(result).replace("nan", None)
         if library == "np":
             return ak.to_numpy(result)
         msg = "library must be 'ak', 'pd' or 'np'"
@@ -282,7 +282,7 @@ def list_run_fields(
     dataflow_config: Path | str | Mapping = "$REFPROD/dataflow-config.yaml",
     cycle_def: str | None = None,
     tiers: str | Collection[str] | Mapping[str, str] | None = None,
-) -> list[str]:
+) -> set[str]:
     """
     List the fields that are available to :meth:`query_runs`.
 
@@ -316,75 +316,56 @@ def list_run_fields(
             msg = "cycle_def must be provided either as kwarg or in dataflow_config"
             raise ValueError(msg)
         cycle_def = query_config["cycle_def"]
+    tiers = _tiers_to_dict(tiers, df_paths, query_config)
 
-    # turn tiers into list of tier-name/path pairs
-    if tiers is None:
-        tiers = query_config.get("tiers", ["raw"])
-    if isinstance(tiers, str):
-        tiers = [tiers]
-    if isinstance(tiers, Mapping):
-        tiers = [(f"tier_{t}", p) for t, p in tiers.items()]
-    else:
-        tiers = [(f"tier_{t}", df_paths[f"tier_{t}"]) for t in tiers]
-
-    return {"relpath", "cycle"} | set(cycle_def.split("-")) | {t[0] for t in tiers}
+    return (
+        {"relpath", "cycle"} | set(cycle_def.split("-")) | {f"tier_{t}" for t in tiers}
+    )
 
 
 def _get_run_records_loop(
     files: list[str],
     relpath: str,
     col_names: list[str],
-    this_tier: tuple[str, str],
-    other_tiers: list[tuple[str, str]],
+    this_tier: dict[str, str],
+    other_tiers: dict[str, str],
     inner_join: bool,
     removed: set[str],
     runs,
 ):
     # Worker for query_runs to build a list of records for a directory
     records = []
-    # parser to identify data files
-    parse_cycle = re.compile(f"(.*)-{this_tier[0]}\\.lh5")
 
-    # parse file names for data
     for f in sorted(files):
-        record = dict.fromkeys(col_names)
-        record["relpath"] = relpath
-
-        match = parse_cycle.search(f)
+        # check if file name matches expected cycle patterns
+        match = CycleRecord.parse_cycle.search(f)
         if not match:
             continue
         cycle_name = match.group(1)
         if cycle_name in removed:
             continue
 
-        # extract fields from cycle name
-        cycle = cycle_name
-        cycle_vals = cycle_name.split("-")
-        if len(cycle_vals) != len(col_names):
+        # Create the record
+        record = {
+            "relpath": relpath,
+            "cycle": cycle_name,
+        }
+        try:
+            CycleRecord.update_cycle_fields(record, col_names)
+        except ValueError:
             continue
-
-        for k, v in zip(col_names, cycle_vals, strict=True):
-            record[k] = v
-        record["cycle"] = cycle
-        record[this_tier[0]] = f"{this_tier[1]}/{relpath}/{f}"
 
         # evaluate the selection
         select_run = eval(runs, {}, record) if runs else True
         if not bool(select_run):
             continue
 
-        # check if file exists in all tiers and add other tiers' files
-        for t, p in other_tiers:
-            path = f"{p}/{relpath}/{cycle}-{t}.lh5"
-            if not Path(path).exists():
-                if inner_join:
-                    record = None
-                    break
-                path = None
-            record[t] = path
-        if not record:
+        # update record with other tiers
+        record[f"tier_{this_tier[0]}"] = f"{this_tier[1]}/{relpath}/{f}"
+        try:
+            CycleRecord.update_tiers(record, other_tiers, raise_on_missing=inner_join)
+        except FileNotFoundError:
             continue
 
         records.append(record)
-
     return records
