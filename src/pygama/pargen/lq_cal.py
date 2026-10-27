@@ -212,7 +212,11 @@ def extract_gaussian_trends(
             # -------------------------------
             # Estimate binning
             # -------------------------------
-            fit_min, fit_max = get_fit_range(values)
+            try:
+                fit_min, fit_max = get_fit_range(values)
+            except (IndexError, ValueError):
+                log.warning("LQ fit range failed for %s-%s keV, skipping", lo, hi)
+                continue
             # fit_max += (fit_max-fit_min)/4 # increase high side range by 50% to help tail fit
             if (
                 np.sum((values >= fit_min) & (values <= fit_max) & np.isfinite(values))
@@ -772,10 +776,11 @@ class LQCal:
         log.info("Starting LQ energy width correction")
 
         try:
+            df_sel = df.query(self.selection_string) if self.selection_string else df
             bin_centers, means, mean_errs, sigmas, sigma_errs, hist_panels = (
                 extract_gaussian_trends(
-                    df[lq_param].to_numpy(),
-                    df[cal_energy_param].to_numpy(),
+                    df_sel[lq_param].to_numpy(),
+                    df_sel[cal_energy_param].to_numpy(),
                     np.linspace(250, 2650, 25),
                 )
             )
