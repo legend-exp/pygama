@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import lh5
 import numpy as np
+import pandas as pd
 
 import pygama.pargen.lq_cal as lq
 from pygama.math.distributions import gaussian
@@ -95,3 +96,35 @@ def test_lq_cal_suffix(lgnd_test_data):
     fig = lq.plot_sf_vs_energy(lqcal, data_df, cut_param="LQ_Cut_alt")
     assert fig.axes
     assert len(fig.axes[0].lines) == 1
+
+
+def test_energy_width_correction_skips_pulser():
+    # a pulser line with large LQ/E inside one energy window must be removed
+    # by the selection, else that window's fit range estimate fails
+    rng = np.random.default_rng(1)
+    n, n_puls = 200_000, 5_000
+    df = pd.DataFrame(
+        {
+            "cuspEmax_cal": np.r_[
+                rng.uniform(250, 2650, n), rng.normal(916, 0.7, n_puls)
+            ],
+            "LQ_Dtcorr": np.r_[rng.normal(0.8, 0.2, n), rng.normal(5, 0.1, n_puls)],
+            "is_pulser": np.r_[np.zeros(n, bool), np.ones(n_puls, bool)],
+        }
+    )
+
+    lqcal = lq.LQCal(
+        {},
+        "cuspEmax_cal",
+        "dt_eff",
+        lambda x: np.sqrt(1.5 + 0.1 * x),
+        selection_string="~is_pulser",
+        cdf=gaussian,
+        debug_mode=True,
+    )
+    lqcal.energy_width_correction(df, "LQ_Dtcorr", "cuspEmax_cal")
+
+    assert len(lqcal.gauss_trends_hist) == 24
+    assert np.all(np.isfinite(lqcal.mean_cor_res["popt"]))
+    assert np.all(np.isfinite(lqcal.sig_cor_res["popt"]))
+    assert df["LQ_Corrected"].notna().all()
