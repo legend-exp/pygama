@@ -280,7 +280,7 @@ class FileDB:
                 continue
 
         # sort rows according to timestamps
-        utils.inplace_sort(self.df, self.sortby)
+        self.df = utils.sort_df(self.df, self.sortby)
 
         # set file status and sizes
         self.set_file_status()
@@ -590,7 +590,7 @@ class FileDB:
         self.df = _df
         self.columns = _columns
 
-        utils.inplace_sort(self.df, self.sortby)
+        self.df = utils.sort_df(self.df, self.sortby)
 
     def to_disk(self, filename: str, wo_mode="write_safe") -> None:
         """Serializes database to disk.
