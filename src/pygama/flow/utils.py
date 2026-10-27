@@ -30,15 +30,13 @@ def to_unixtime(key: str) -> int:
     return int(to_datetime(key).timestamp())
 
 
-def inplace_sort(df: pd.DataFrame, by: str) -> None:
+def sort_df(df: pd.DataFrame, by: str) -> pd.DataFrame:
     # sort rows according to timestamps
     log.debug(f"sorting database entries according to {by}")
     if by == "timestamp":
-        df["_datetime"] = df["timestamp"].apply(to_datetime)
-        df.sort_values("_datetime", ignore_index=True, inplace=True)
-        df.drop("_datetime", axis=1, inplace=True)
-    else:
-        df.sort_values(by, ignore_index=True, inplace=True)
+        df = df.assign(_datetime=df["timestamp"].apply(to_datetime))
+        return df.sort_values("_datetime", ignore_index=True).drop(columns="_datetime")
+    return df.sort_values(by, ignore_index=True)
 
 
 def dict_to_table(col_dict: dict, attr_dict: dict):
