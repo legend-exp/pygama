@@ -1037,6 +1037,7 @@ class LQCal:
             if self.debug_mode:
                 raise
             log.exception("LQ time correction failed")
+            df[output_name] = np.nan  # later steps query this column
             self.update_cal_dicts(
                 {
                     output_name: {
@@ -1099,8 +1100,10 @@ class LQCal:
             log.info("Drift time correction mode after range checks: %s", mode)
 
         except Exception as e:
-            msg = "DEP event selection for mode determination failed"
-            raise RuntimeError(msg) from e
+            if self.debug_mode:
+                msg = "DEP event selection for mode determination failed"
+                raise RuntimeError(msg) from e
+            log.exception("DEP event selection for mode determination failed")
 
         self.dt_correction_mode = mode
 
