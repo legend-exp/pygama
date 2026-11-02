@@ -98,6 +98,37 @@ def test_lq_cal_suffix(lgnd_test_data):
     assert len(fig.axes[0].lines) == 1
 
 
+def test_drift_time_correction_mcd_reproducible():
+    # the LR-MCD drift fit must not depend on numpy's global random state
+    rng = np.random.default_rng(2)
+    n = 20_000
+    dt = rng.uniform(300, 1500, n)
+    df = pd.DataFrame(
+        {
+            "cuspEmax_cal": np.r_[
+                rng.uniform(1000, 2400, n - 3000), rng.normal(1592.5, 1.0, 3000)
+            ],
+            "dt_eff": dt,
+            "LQ": 1e-3 * (dt - 900) + rng.standard_t(3, n) * 0.5,
+        }
+    )
+    pars = []
+    for seed in (1, 2):
+        np.random.seed(seed)  # noqa: NPY002
+        lqcal = lq.LQCal(
+            {},
+            "cuspEmax_cal",
+            "dt_eff",
+            lambda x: np.sqrt(1.5 + 0.1 * x),
+            cdf=gaussian,
+            debug_mode=True,
+        )
+        lqcal.drift_time_correction(df, "LQ", "cuspEmax_cal", mode="LR-MCD")
+        assert lqcal.dt_correction_mode == "LR-MCD"
+        pars.append(lqcal.dt_fit_pars)
+    assert pars[0] == pars[1]
+
+
 def test_energy_width_correction_skips_pulser():
     # a pulser line with large LQ/E inside one energy window must be removed
     # by the selection, else that window's fit range estimate fails
