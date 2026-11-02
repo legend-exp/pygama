@@ -98,6 +98,40 @@ def test_lq_cal_suffix(lgnd_test_data):
     assert len(fig.axes[0].lines) == 1
 
 
+def test_lq_cal_failed_timecorr_gives_nan(lgnd_test_data, monkeypatch):
+    # a failed time correction must give NaN LQ parameters, not stop the calibration
+    data = lgnd_test_data.get_path(
+        "lh5/prod-ref-l200/generated/tier/dsp/cal/p03/r000/l200-p03-r000-cal-20230311T235840Z-tier_dsp.lh5"
+    )
+    data_df = lh5.read_as("ch1104000/dsp", data, "pd")
+    data_df["cuspEmax_cal"] = data_df["cuspEmax"] * 0.155
+    data_df["run_timestamp"] = "20230311T235840Z"
+    data_df["LQ_Ecorr"] = np.divide(data_df["lq80"], data_df["cuspEmax"])
+
+    def fail(*_args, **_kwargs):  # what get_fwfm raises for an edge peak
+        msg = "index 50 is out of bounds for axis 0 with size 50"
+        raise IndexError(msg)
+
+    monkeypatch.setattr(lq, "calculate_time_means", fail)
+
+    cal_dict = {"LQ_Ecorr": {"expression": "lq80/cuspEmax", "parameters": {}}}
+    lqcal = lq.LQCal(
+        cal_dict,
+        "cuspEmax_cal",
+        "dt_eff",
+        lambda x: np.sqrt(1.5 + 0.1 * x),
+        selection_string="index==index",
+        cdf=gaussian,
+        debug_mode=False,
+    )
+    lqcal.calibrate(data_df, "LQ_Ecorr")
+
+    assert data_df["LQ_Timecorr"].isna().all()
+    assert np.isnan(cal_dict["LQ_Timecorr"]["parameters"]["a"])
+    assert np.isnan(lqcal.cut_val)
+    assert np.isnan(cal_dict["LQ_Cut"]["parameters"]["a"])
+
+
 def test_drift_time_correction_mcd_reproducible():
     # the LR-MCD drift fit must not depend on numpy's global random state
     rng = np.random.default_rng(2)
