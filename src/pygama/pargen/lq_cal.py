@@ -1175,7 +1175,7 @@ class LQCal:
 
                 ###########here is the difference between linear and LR-MCD #############
                 data_dep = final_df[[self.dt_param, lq_param]]
-                mcd = MinCovDet().fit(data_dep.to_numpy())
+                mcd = MinCovDet(random_state=1).fit(data_dep.to_numpy())  # fixed seed
                 inliers = data_dep[mcd.support_]
 
                 # ------------------------------------------------------------------

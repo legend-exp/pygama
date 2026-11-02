@@ -1038,7 +1038,7 @@ def mcdrift(
         return 0, {}
 
     try:
-        mcd = MinCovDet().fit(subset)
+        mcd = MinCovDet(random_state=1).fit(subset)  # fixed seed
     except Exception as e:
         if debug_mode:
             raise
