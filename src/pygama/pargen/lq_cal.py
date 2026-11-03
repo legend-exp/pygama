@@ -895,6 +895,7 @@ class LQCal:
                             self.cal_energy_param,
                             peak=1592.5,
                         )
+                        log.info(f"  timestamp: {tstamp}  pars: {pars}  errs: {errs}")
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -918,7 +919,7 @@ class LQCal:
                     except Exception as e:
                         if self.debug_mode:
                             raise
-                        log.debug(
+                        log.warning(
                             "LQ time correction: fit failed for run_timestamp %s, filling nan: %s",
                             tstamp,
                             e,
@@ -975,6 +976,7 @@ class LQCal:
                         self.cal_energy_param,
                         peak=1592.5,
                     )
+                    log.info(f"  pars: {pars}  errs: {errs}")
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -1140,7 +1142,9 @@ class LQCal:
                 )
                 self.dt_fit_pars = result
 
-            except Exception:
+                log.info(f"  {result}")
+
+            except Exception as e:
                 if self.debug_mode:
                     raise
                 log.exception("LQ drift time correction (linear mode) failed")
@@ -1186,6 +1190,7 @@ class LQCal:
 
                 lr_mcd = LinearRegression().fit(inlier_dt.reshape(-1, 1), inlier_lq)
                 self.dt_fit_pars = (lr_mcd.coef_[0], lr_mcd.intercept_)
+                log.info(f"  {lr_mcd}")
 
             except Exception:
                 if self.debug_mode:
@@ -1262,6 +1267,8 @@ class LQCal:
             self.cut_fit_errs = errs
             self.fit_hist = (hist, bins)
             self.cut_val = 3
+
+            log.info(f"  pars: {self.cut_fit_pars}  errs: {self.cut_fit_errs}")
 
             try:
                 df[classifier_param] = np.divide(df[lq_param].to_numpy(), pars[1])
