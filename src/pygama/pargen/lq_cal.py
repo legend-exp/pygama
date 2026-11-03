@@ -1254,23 +1254,29 @@ class LQCal:
 
         log.info("Starting LQ Cut calculation")
         try:
-            try:
-                pars, errs, hist, bins = binned_lq_fit(
-                    df, lq_param, cal_energy_param, peak=1592.5
-                )
-            except Exception as e:
-                msg = "binned LQ fit at DEP failed"
-                raise RuntimeError(msg) from e
+            # Peak-sideband subtraction; use [E_peak-8, E_peak+5] for peak,
+            # and [E_peak+7, E_peak+20] for sideband, with 1592.5 keV peak
+            h = Hist(
+                Regular(100, -2.5, 2.5, label=lq_param),
+                Regular(28, 1584.5, 1612.5, label="Energy (keV)")
+            )
+            h.fill(df[lq_param], df[self.cal_energy_param])
+            h_lq = h[:, 0:13:sum] - h[:, 15:28:sum]
+            h_lq_unc = np.maximum(np.sqrt(h[:, 0:13:sum].variances() + h[:, 15:28:sum].variances()), 1)
+            c1 = cost.LeastSquares(h.axes[0].centers, h_lq.values(), h_lq_unc, lambda x, A, mu, sigma: A*np.exp(-0.5*(x-mu)**2/sigma**2))
+            m1 = Minuit(c1, A=np.max(h_lq), mu=0, sigma=1)
+            result = m1.migrad()
+            log.info(  f"{result}")
 
-            self.cut_fit_pars = pars
-            self.cut_fit_errs = errs
-            self.fit_hist = (hist, bins)
+            self.cut_fit_pars = result.values
+            self.cut_fit_errs = result.errors
+            self.fit_hist = h_lq
             self.cut_val = 3
 
             log.info(f"  pars: {self.cut_fit_pars}  errs: {self.cut_fit_errs}")
 
             try:
-                df[classifier_param] = np.divide(df[lq_param].to_numpy(), pars[1])
+                df[classifier_param] = np.divide(df[lq_param].to_numpy(), self.cut_fit_pars[2])
                 df[cut_param] = df[classifier_param] < self.cut_val
             except Exception as e:
                 msg = "applying LQ classifier/cut to data failed"
@@ -1281,15 +1287,13 @@ class LQCal:
                 raise
             log.exception("LQ cut determination failed")
             self.cut_val = np.nan
-            c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
-            m = Minuit(c, np.full(2, np.nan))
-            self.cut_fit_pars = pars = m.values  # noqa: PD011
+            self.cut_fit_pars = np.full(3, np.nan)  # noqa: PD011
 
         self.update_cal_dicts(
             {
                 classifier_param: {
                     "expression": f"({lq_param} / a)",
-                    "parameters": {"a": pars[1]},
+                    "parameters": {"a": self.cut_fit_pars[2]},
                 },
                 cut_param: {
                     "expression": f"({classifier_param} < a)",
@@ -1683,21 +1687,13 @@ def plot_lq_cut_fit(
             (ax1, ax2) = fig.subplots(2, 1)
 
         try:
-            hist, bins = lq_class.fit_hist
+            hist = lq_class.fit_hist
             fit_pars = lq_class.cut_fit_pars
 
-            x_low = bins[0]
-            x_high = bins[-1]
-
-            ax1.stairs(hist, bins, label="data")
-            xs = np.linspace(round(bins[0], 3), round(bins[-1], 3), len(bins) - 1)
-            ls = np.sum(hist)
-            dx = np.diff(bins)
+            hist.plot1d(ax=ax1, label="data", histtype='step')
             ax1.plot(
-                xs,
-                gaussian.pdf_norm(xs, x_low, x_high, fit_pars[0], fit_pars[1])
-                * dx
-                * ls,
+                hist.axes[0].edges,
+                fit_pars[0] * np.exp(-0.5*(hist.axes[0].edges-fit_pars[1])**2/fit_pars[2]**2),
                 label="Gaussian Fit",
             )
 
@@ -1705,22 +1701,12 @@ def plot_lq_cut_fit(
             # ax1.set_title("Fit of LQ events in DEP")
             ax1.legend()
 
-            bin_centers = (bins[:-1] + bins[1:]) / 2
             reses = (
-                hist
-                - (
-                    gaussian.pdf_norm(
-                        bin_centers, x_low, x_high, fit_pars[0], fit_pars[1]
-                    )
-                    * dx
-                    * ls
-                )
+                hist - fit_pars[0] * np.exp(-0.5*(hist.axes[0].centers-fit_pars[1])**2/fit_pars[2]**2),
             ) / (
-                gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
-                * dx
-                * ls
+                fit_pars[0] * np.exp(-0.5*(hist.axes[0].centers-fit_pars[1])**2/fit_pars[2]**2)
             )
-            ax2.plot(bin_centers, reses, marker="s", linestyle="")
+            ax2.plot(hist.axes[0].centers, reses.flatten(), marker="s", linestyle="")
             ax2.set_xlabel("LQ")
             ax2.set_ylabel("residuals")
 
