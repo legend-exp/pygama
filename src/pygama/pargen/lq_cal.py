@@ -419,10 +419,22 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     right_guess = np.nanpercentile(lq, 95)
     test_range = (left_guess, right_guess)
 
-    hist, bins, _ = pgh.get_hist(lq, bins=50, range=test_range)
-    bin_centers = (bins[:-1] + bins[1:]) / 2
-    mu = bin_centers[np.argmax(hist)]
-    _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+    # Scale is very uncertain; scan through different binnings until we get bins that are
+    # narrower than the sigma we find
+    nbins = 25
+    while True:
+        hist, bins, _ = pgh.get_hist(lq, bins=nbins, range=test_range)
+        try:
+            mu, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+            if sigma > 3*(bins[1]-bins[0]):
+                break
+        except IndexError:
+            # get_gaussian_guess errors if bins are too wide
+            pass
+        nbins *= 2
+        if nbins >= 100000:
+            log.warning("get_fit_range failed to find peak")
+            return (left_guess, right_guess)
 
     left_edge = mu - 2.5 * sigma
     right_edge = mu + 2.5 * sigma
