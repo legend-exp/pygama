@@ -1165,28 +1165,15 @@ class LQCal:
         elif mode == "LR-MCD":
             # want to try with keeping the same dataselection as for the "linear" method
             try:
-                pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[
-                    0
-                ]
-                mean = pars[0]
-                sigma = pars[1]
-
                 dep_events = df.query(
                     f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
                 )
 
-                dt_range = [
-                    np.nanpercentile(dep_events[self.dt_param], 10),
-                    np.nanpercentile(dep_events[self.dt_param], 95),
-                ]
-
-                lq_range = [mean - 2 * sigma, mean + 2 * sigma]
-
-                self.lq_range = lq_range
-                self.dt_range = dt_range
+                self.dt_range = np.nanpercentile(dep_events[self.dt_param], [10, 95])
+                self.lq_range = np.nanpercentile(dep_events[lq_param], [1, 95])
 
                 final_df = dep_events.query(
-                    f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
+                    f"{lq_param} > {self.lq_range[0]} & {lq_param} < {self.lq_range[1]} & {self.dt_param} > {self.dt_range[0]} & {self.dt_param} < {self.dt_range[1]}"
                 )
 
                 ###########here is the difference between linear and LR-MCD #############
