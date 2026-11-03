@@ -1396,13 +1396,14 @@ class LQCal:
         log.info("Finished Calculating the LQ Cut Value")
 
         final_lq_param = classifier_name
+        peak_names = ["dep_1592", "cc_2039", "sep_2103", "fep_2614"]
         peaks_of_interest = [1592.5, 2039, 2103.53, 2614.50]
         self.low_side_sf = pd.DataFrame()
         fit_widths = [(40, 25), (0, 0), (25, 40), (50, 50)]
         self.low_side_peak_dfs = {}
 
         log.info("Calculating peak survival fractions")
-        for i, peak in enumerate(peaks_of_interest):
+        for key, peak, (emin, emax) in zip(peak_names, peaks_of_interest, fit_widths):
             try:
                 try:
                     select_df = (
@@ -1436,12 +1437,11 @@ class LQCal:
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                            pd.DataFrame([{"peak": key, "sf": sf, "sf_err": sf_err}]),
                         ]
                     )
-                    self.low_side_peak_dfs[peak] = cut_df
+                    self.low_side_peak_dfs[key] = cut_df
                 else:
-                    emin, emax = fit_widths[i]
                     fit_range = (peak - emin, peak + emax)
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{fit_range[0]})&({self.cal_energy_param}<{fit_range[1]})"
@@ -1465,10 +1465,10 @@ class LQCal:
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                            pd.DataFrame([{"peak": key, "sf": sf, "sf_err": sf_err}]),
                         ]
                     )
-                    self.low_side_peak_dfs[peak] = cut_df
+                    self.low_side_peak_dfs[key] = cut_df
                 log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
             except Exception:
                 if self.debug_mode:
@@ -1476,7 +1476,7 @@ class LQCal:
                 self.low_side_sf = pd.concat(
                     [
                         self.low_side_sf,
-                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
+                        pd.DataFrame([{"peak": key, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
                 log.exception(
