@@ -62,7 +62,8 @@ def convert_rawid(
                     else "0000000"
                 )
                 for rawid in rawids
-            ]
+            ],
+            dtype=str,  # keep string type when empty
         )
         return types.VectorOfVectors(
             flattened_data=detector, cumulative_length=rawid_obj.cumulative_length
@@ -77,7 +78,8 @@ def convert_rawid(
                     else "0000000"
                 )
                 for rawid in rawids
-            ]
+            ],
+            dtype=str,  # keep string type when empty
         )
         return types.Array(detector)
     msg = "rawid_obj must be a VectorOfVectors or Array"
