@@ -225,8 +225,13 @@ def query_meta(
                 progress=status,
                 **query_run_kwargs,
             )
+        elif isinstance(runs, pd.DataFrame):
+            run_records = ak.Array(dict(runs.items()))
+        elif isinstance(runs, ak.Array):
+            run_records = runs
         else:
             run_records = ak.Array(runs)
+
         if len(run_records) == 0:
             msg = (
                 f'No run records were found for "{runs}". If your query seems correct, '
