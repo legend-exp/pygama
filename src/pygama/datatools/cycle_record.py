@@ -48,7 +48,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         """
         if not isinstance(record, CycleRecord):
             msg = "record must contain 'cycle' and 'relpath' fields"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if isinstance(record, Mapping):
             super().__init__(record)
@@ -190,7 +190,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         """
         if not isinstance(record, CycleRecord):
             msg = "record must contain 'cycle' and 'relpath' fields"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if not isinstance(tiers, Mapping):
             _, tiers, _ = _read_dataflow_config(dataflow_config)
