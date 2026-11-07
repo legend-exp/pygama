@@ -272,7 +272,7 @@ class SumDists(rv_continuous):
             ):
                 msg = f"Distribution at index {i} has value {dists[i]},\
                 and is an array and not a PygamaContinuous distribution"
-                raise ValueError(msg)
+                raise TypeError(msg)
 
         # Get the parameter names for later introspection
         # First, find the length of the eventual single parameter array

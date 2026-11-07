@@ -146,7 +146,7 @@ def test_set_cuts(test_dl):
     test_dl.set_output(columns=["is_valid_cal"], fmt="pd.DataFrame")
     data = test_dl.load()
 
-    assert (data.is_valid_cal == False).all()  # noqa: E712
+    assert (data.is_valid_cal == False).all()
 
 
 def test_setter_overwrite(test_dl):
