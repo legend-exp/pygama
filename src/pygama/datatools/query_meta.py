@@ -450,9 +450,12 @@ def query_meta(
             # some tuples may have NaN; replace with '' to get better behavior
             if isinstance(cols[0], tuple):
                 max_depth = max(len(c) for c in cols)
-                reduced_cols = [[name for name in c if not pd.isna(name) and not name==''] for c in cols]
+                reduced_cols = [
+                    [name for name in c if not pd.isna(name) and not name == ""]
+                    for c in cols
+                ]
                 result.columns = pd.MultiIndex.from_tuples(
-                    [tuple(c) + ("",)*(max_depth - len(c)) for c in reduced_cols]
+                    [tuple(c) + ("",) * (max_depth - len(c)) for c in reduced_cols]
                 )
         elif library == "np":
             if group_chans:
