@@ -29,7 +29,7 @@ def test_read_dataflow_config(test_refprod):
     assert tier_paths1 == tier_paths3
     assert query_config1 == query_config3
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         _read_dataflow_config(5)
 
 
