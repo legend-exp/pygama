@@ -88,6 +88,7 @@ the file will automatically be accessed from the referenced directory!
 from __future__ import annotations
 
 from .build_iterator import build_iterator
+from .cycle_record import CycleRecord
 from .query_data import query_data
 from .query_evt import query_evt
 from .query_hist import query_hist
@@ -95,6 +96,7 @@ from .query_meta import query_meta
 from .query_runs import list_run_fields, query_runs
 
 __all__ = [
+    "CycleRecord",
     "build_iterator",
     "list_run_fields",
     "query_data",

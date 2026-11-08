@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import keyword
+import multiprocessing
 import os
 import re
 import string
 from collections.abc import Mapping
 from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import ExitStack
+from functools import cache
 from pathlib import Path
 
 from dbetto import Props, TextDB
@@ -104,10 +106,16 @@ def _setup_spinner(
         return progress if progress._live.is_started else stack.enter_context(progress)
     if isinstance(progress, Console):
         return stack.enter_context(
-            progress.status("Querying runs...", spinner="betaWave")
+            progress.status(
+                "Querying runs...", spinner="betaWave", speed=0.25, refresh_per_second=6
+            )
         )
     if progress:
-        return stack.enter_context(Status("Querying runs...", spinner="betaWave"))
+        return stack.enter_context(
+            Status(
+                "Querying runs...", spinner="betaWave", speed=0.25, refresh_per_second=6
+            )
+        )
     return None
 
 
@@ -121,7 +129,11 @@ def _setup_executor(
         processes = executor._max_workers
 
     if executor is None and isinstance(processes, int):
-        executor = stack.enter_context(ProcessPoolExecutor(processes))
+        executor = stack.enter_context(
+            ProcessPoolExecutor(
+                processes, mp_context=multiprocessing.get_context("spawn")
+            )
+        )
 
     return processes, executor
 
@@ -129,12 +141,30 @@ def _setup_executor(
 def _read_dataflow_config(dataflow_config="$REFPROD/dataflow-config.yaml"):
     # helper to get configs
     if isinstance(dataflow_config, (Path, str)):
-        df_config = Props.read_from(
-            os.path.expandvars(dataflow_config), subst_pathvar=True
-        )
+        df_config = _read_config_file(os.path.expandvars(dataflow_config))
     elif isinstance(dataflow_config, Mapping):
         df_config = dataflow_config
     else:
         msg = "dataflow_config must be a str, Path, or Mapping"
         raise TypeError(msg)
     return df_config, df_config["paths"], df_config.get("query", {})
+
+
+def _tiers_to_dict(tiers, df_paths, query_config):
+    # turn tiers into list of tier-name/path pairs
+    if tiers is None:
+        tiers = query_config.get("tiers", ["raw"])
+    if isinstance(tiers, str):
+        tiers = [tiers]
+    if isinstance(tiers, Mapping):
+        return tiers
+    try:
+        return {t: df_paths[f"tier_{t}"] for t in tiers}
+    except KeyError as e:
+        msg = f"{e.args[0]} not found in dataflow paths"
+        raise ValueError(msg) from None
+
+
+@cache
+def _read_config_file(file):
+    return Props.read_from(file, subst_pathvar=True)
