@@ -14,6 +14,7 @@ def lgnd_test_data():
     ldata.checkout("3cb98cc")
     return ldata
 
+
 @pytest.fixture(scope="session")
 def tmp_dir(tmpdir_factory):
     out_dir = tmpdir_factory.mktemp("data")
