@@ -249,7 +249,10 @@ def build_tcm(
                         # count consecutive entries that do not change state
                         n_consecutive = np.sum(~np.diff(entry_mask) & entry_mask[1:])
 
-                        if np.sum(entry_mask) == 0 or n_consecutive / np.sum(entry_mask) < 0.8:
+                        if (
+                            np.sum(entry_mask) == 0
+                            or n_consecutive / np.sum(entry_mask) < 0.8
+                        ):
                             msg = "Using sparse channel view mode"
                             log.info(msg)
                             channel_views = "sparse"

@@ -303,8 +303,8 @@ def generate_tcm_cols(
         out_tbl.add_field(
             "i_event",
             Array(
-                nda = np.arange(i_event, i_event + len(cumulative_length)),
-            )
+                nda=np.arange(i_event, i_event + len(cumulative_length)),
+            ),
         )
         out_tbl.add_field(
             "table_key",
