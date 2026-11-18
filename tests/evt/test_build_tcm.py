@@ -7,7 +7,7 @@ import lgdo
 import lh5
 import numpy as np
 import pytest
-from lgdo.types import Table, VectorOfVectors
+from lgdo.types import Array, Table, VectorOfVectors
 
 from pygama import evt
 
@@ -26,10 +26,11 @@ def test_generate_tcm_cols(lgnd_test_data):
     )
 
     assert isinstance(tcm_cols, Table)
+    assert isinstance(tcm_cols.i_event, Array)
     assert isinstance(tcm_cols.table_key, VectorOfVectors)
     assert isinstance(tcm_cols.row_in_table, VectorOfVectors)
-    for v in tcm_cols.values():
-        assert np.issubdtype(v.flattened_data.nda.dtype, np.integer)
+    assert np.issubdtype(tcm_cols.table_key.flattened_data.nda.dtype, np.integer)
+    assert np.issubdtype(tcm_cols.row_in_table.flattened_data.nda.dtype, np.integer)
 
     # test attrs
     assert set(tcm_cols.attrs.keys()) == {"datatype", "hash_func", "tables"}
@@ -39,6 +40,7 @@ def test_generate_tcm_cols(lgnd_test_data):
     }
 
     # fmt: off
+    exp_i_event = Array(nda = np.arange(29))
     exp_keys = VectorOfVectors(
         cumulative_length = np.array(
             [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -64,6 +66,7 @@ def test_generate_tcm_cols(lgnd_test_data):
     )
 
     # fmt: on
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -119,6 +122,7 @@ def test_generate_tcm_cols(lgnd_test_data):
         channel_views=None,
     )
 
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -143,6 +147,7 @@ def test_generate_tcm_cols(lgnd_test_data):
         )
     )
     # fmt: on
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_idxs
     assert tcm_cols.row_in_table == exp_rows
 
@@ -289,8 +294,10 @@ def test_build_tcm_multiple_cols(lgnd_test_data):
         channel_views=None,
     )
     assert isinstance(tcm, Table)
+    assert isinstance(tcm.i_event, Array)
     assert isinstance(tcm.table_key, VectorOfVectors)
     assert isinstance(tcm.row_in_table, VectorOfVectors)
+    assert np.array_equal(tcm.i_event.nda, np.arange(30))
     # fmt: off
     assert np.array_equal(
         tcm.table_key.flattened_data.nda,
@@ -333,8 +340,9 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
     # fmt: off
+    exp_i_event = Array(nda = np.arange(29))
     exp_keys = VectorOfVectors(
         cumulative_length = np.array(
             [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20,
@@ -359,7 +367,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
         )
     )
     # fmt: on
-
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -375,7 +383,8 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -397,7 +406,8 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -421,8 +431,9 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(small_out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", small_out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
 
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -439,7 +450,8 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(small_out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", small_out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -462,7 +474,8 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(small_out_file).exists()
     tcm_cols = lh5.read("hardware_tcm", small_out_file)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
+    assert tcm_cols.i_event == exp_i_event
     assert tcm_cols.table_key == exp_keys
     assert tcm_cols.row_in_table == exp_rows
 
@@ -492,7 +505,7 @@ def test_build_tcm_write(lgnd_test_data, tmp_dir):
     assert Path(clone).exists()
     tcm_cols = lh5.read("tcm", clone)
     assert isinstance(tcm_cols, lgdo.Struct)
-    assert sorted(tcm_cols.keys()) == ["row_in_table", "table_key"]
+    assert sorted(tcm_cols.keys()) == ["i_event", "row_in_table", "table_key"]
 
 
 def test_build_tcm_multiple_files(lgnd_test_data, tmp_dir):  # noqa: ARG001

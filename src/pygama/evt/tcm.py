@@ -5,7 +5,7 @@ from collections import namedtuple
 
 import awkward as ak
 import numpy as np
-from lgdo.types import Table, VectorOfVectors
+from lgdo.types import Array, Table, VectorOfVectors
 
 # later on we might want a tcm class, or interface / inherit from an entry list
 # class. For now we just need the key clustering functionality
@@ -165,6 +165,7 @@ def generate_tcm_cols(
     _tk_sort = np.argsort(table_keys_np)
     _tk_unsort = np.argsort(_tk_sort)
     table_keys_sorted = table_keys_np[_tk_sort]
+    i_event = 0
 
     while not at_end.all():
         curr_mask = ~skip_mask & ~at_end
@@ -300,6 +301,12 @@ def generate_tcm_cols(
 
         out_tbl = Table(size=len(cumulative_length))
         out_tbl.add_field(
+            "i_event",
+            Array(
+                nda = np.arange(i_event, i_event + len(cumulative_length)),
+            )
+        )
+        out_tbl.add_field(
             "table_key",
             VectorOfVectors(
                 cumulative_length=cumulative_length,
@@ -324,5 +331,6 @@ def generate_tcm_cols(
                 )
 
         tcm = None if last_entry is None else tcm[last_entry:]
+        i_event += len(cumulative_length)
 
         yield out_tbl
