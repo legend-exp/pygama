@@ -1449,6 +1449,25 @@ class HPGeCalibration:
                     interp_vals = np.array(
                         [fwhm_func.func(energy, *par_b) for par_b in pars_b]
                     )
+                    # the resolution model is bounded (a, b >= 0) but the draw
+                    # is not, so draws with a negative radicand come back nan
+                    # and are dropped by nanstd; report that rather than
+                    # letting the sample silently shrink
+                    n_bad = int(np.count_nonzero(~np.isfinite(interp_vals)))
+                    if n_bad:
+                        message = (
+                            "FWHM interpolation at %s keV: %s/%s draws unusable, "
+                            "uncertainty taken over the remaining %s"
+                        )
+                        n_draws = len(interp_vals)
+                        args = (energy, n_bad, n_draws, n_draws - n_bad)
+                        if n_bad > 0.1 * n_draws:
+                            log.warning(message, *args)
+                        else:
+                            log.debug(message, *args)
+                    if n_bad == len(interp_vals):
+                        msg = "no usable draws for the FWHM interpolation"
+                        raise RuntimeError(msg)
                     interp_err = np.nanstd(interp_vals)
                     interp_fwhm = fwhm_func.func(energy, *fwhm_results["parameters"])
                 except Exception as e:
@@ -2152,7 +2171,7 @@ class HPGeCalibration:
                 low_lim = 0
             ax1.set_ylim([low_lim, None])
             ax1.set_ylabel("FWHM energy resolution (keV)")
-            for _, fwhm_dict in fwhm_dicts.items():
+            for fwhm_dict in fwhm_dicts.values():
                 ax2.plot(
                     fwhm_peaks,
                     (
@@ -3198,7 +3217,7 @@ def hpge_fit_energy_cal_func(
         c.loss = "soft_l1"
         m = Minuit(c, *poly_pars)
         if fixed is not None:
-            for idx in list(fixed):
+            for idx in fixed:
                 m.fixed[idx] = True
         m.simplex()
         m.migrad()

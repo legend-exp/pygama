@@ -88,7 +88,7 @@ class DataLoader:
     >>> dl.set_datastreams([0], "ch")
     >>> dl.set_cuts({"hit": "wf_max > 30000"})
     >>> el = dl.build_entry_list(tcm_level="tcm", mode="any")
-    >>> el.query("hit_table == 20", inplace=True)
+    >>> el = el.query("hit_table == 20")
     >>> dl.set_output(fmt="pd.DataFrame", columns=["daqenergy", "channel"])
     >>> data = dl.load(el)
     """
@@ -269,7 +269,7 @@ class DataLoader:
                 inds = list(self.filedb.df.index)
             else:
                 inds = list(
-                    self.filedb.df.query(query, engine="python", inplace=False).index
+                    self.filedb.df.query(query, engine="python").index
                 )
         else:
             raise ValueError("bad query format")
@@ -595,13 +595,13 @@ class DataLoader:
                 if isinstance(f_entries[col].dtype, AwkwardDtype):
                     f_entries[col] = f_entries[col].to_list()
             f_entries = f_entries.explode(list(f_entries.columns))
-            f_entries.reset_index(inplace=True)
+            f_entries = f_entries.reset_index()
             renaming = {
                 "index": f"{child}_idx",
                 self.tcms[tcm_level]["tcm_cols"]["parent_tb"]: f"{parent}_table",
                 self.tcms[tcm_level]["tcm_cols"]["parent_idx"]: f"{parent}_idx",
             }
-            f_entries.rename(columns=renaming, inplace=True)
+            f_entries = f_entries.rename(columns=renaming)
             if self.merge_files:
                 f_entries["file"] = file
             # At this point, should have a list of all available hits/evts joined by tcm
@@ -631,7 +631,7 @@ class DataLoader:
 
                 # Cut any rows of TCM not relating to requested tables
                 if level == parent:
-                    f_entries.query(f"{level}_table in {tables}", inplace=True)
+                    f_entries = f_entries.query(f"{level}_table in {tables}")
 
                 for tb in tables:
                     tb_table = None
@@ -668,7 +668,7 @@ class DataLoader:
                     if tb_table is None:
                         continue
                     tb_df = tb_table.view_as("pd")
-                    tb_df.query(cut, inplace=True)
+                    tb_df = tb_df.query(cut)
                     idx_match = f_entries.query(f"{level}_idx in {list(tb_df.index)}")
                     if level == parent:
                         idx_match = idx_match.query(f"{level}_table == {tb}")
@@ -677,7 +677,7 @@ class DataLoader:
                         drop_idx = set.symmetric_difference(
                             set(tcm_idx), list(keep_idx)
                         )
-                        f_entries.drop(drop_idx, inplace=True)
+                        f_entries = f_entries.drop(drop_idx)
                     elif mode == "any":
                         evts = idx_match[f"{child}_idx"].unique().tolist()
                         keep_idx = f_entries.query(f"{child}_idx in {evts}").index
@@ -698,9 +698,9 @@ class DataLoader:
 
             if mode == "any":
                 if drop_idx is not None:
-                    f_entries.drop(index=drop_idx, inplace=True)
+                    f_entries = f_entries.drop(index=drop_idx)
 
-            f_entries.reset_index(inplace=True, drop=True)
+            f_entries = f_entries.reset_index(drop=True)
 
             if in_memory:
                 entries[file] = f_entries
@@ -878,7 +878,7 @@ class DataLoader:
 
                     # convert to DataFrame and apply cuts
                     tb_df = tb_table.view_as("pd")
-                    tb_df.query(cut, inplace=True)
+                    tb_df = tb_df.query(cut)
                     tb_df[f"{low_level}_table"] = tb
                     tb_df[f"{low_level}_idx"] = tb_df.index
 

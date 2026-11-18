@@ -148,7 +148,7 @@ def query_hist(
         ax = [axes]
     else:
         msg = "axes must be axis or collection of axes"
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     entries_fields = parse_query_paths(entries)
 

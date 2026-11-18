@@ -60,7 +60,7 @@ class TestDataCleaning:
             dc.get_keys(42, {"cut": {"cut_parameter": "bl_std"}})
 
     def test_generate_cuts_wrong_data_type(self):
-        with pytest.raises(ValueError, match="got list"):
+        with pytest.raises(TypeError, match="got list"):
             dc.generate_cuts(
                 [1, 2, 3],
                 {
@@ -242,7 +242,7 @@ class TestStageTags:
                 df, lq_param="LQ_Timecorr", cal_energy_param="e_cal"
             )
         assert np.isnan(cal.dt_fit_pars).all()
-        assert "binned LQ fit at DEP failed" in caplog.text
+        assert "LQ drift time correction" in caplog.text
 
     def test_hpge_fit_energy_peaks_tags_fit_window(self, monkeypatch, caplog):
         rng = np.random.default_rng(0)

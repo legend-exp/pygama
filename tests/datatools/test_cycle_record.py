@@ -40,7 +40,7 @@ def test_cycle_record():
     bad_record = dict(record)
     del bad_record["cycle"]
     assert not isinstance(bad_record, CycleRecord)
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         CycleRecord(bad_record)
 
 
@@ -127,5 +127,5 @@ def test_get_tier_filepath(test_refprod):
         record.get_tier_filepath("psp")
 
     bad_record = {"cycle": "l200-p03-r000-cal-20230311T235840Z"}
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         CycleRecord.get_tier_filepath(bad_record, "raw")

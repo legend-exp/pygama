@@ -27,7 +27,7 @@ def test_two_distributions_no_par_array():
 
 
 def test_pygama_continuous_check():
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(TypeError) as exc_info:
         SumDists([(gaussian, [0, 1]), (norm, [1, 0])], [0], "fracs")
 
     exception_raised = exc_info.value

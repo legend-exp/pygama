@@ -259,7 +259,7 @@ def query_meta(
 
         if not isinstance(meta, MetadataRepository):
             msg = "metadata must be a MetadataRepository derived class"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         # if using a string for chan_db, get it set up
         if chan_db is None:
@@ -449,8 +449,13 @@ def query_meta(
             # if columns are nested, they will be tuples; if nesting is uneven,
             # some tuples may have NaN; replace with '' to get better behavior
             if isinstance(cols[0], tuple):
+                max_depth = max(len(c) for c in cols)
+                reduced_cols = [
+                    [name for name in c if not pd.isna(name) and name != ""]
+                    for c in cols
+                ]
                 result.columns = pd.MultiIndex.from_tuples(
-                    [[name if not pd.isna(name) else "" for name in c] for c in cols]
+                    [tuple(c) + ("",) * (max_depth - len(c)) for c in reduced_cols]
                 )
         elif library == "np":
             if group_chans:

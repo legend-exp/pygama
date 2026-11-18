@@ -4,6 +4,7 @@ import logging
 
 import lh5
 import numpy as np
+import pandas as pd
 import pytest
 
 import pygama.pargen.AoE_cal as Coe
@@ -143,3 +144,24 @@ def test_aoe_cal_override_partial_energy_warns(lgnd_test_data, caplog):
     # Normal energy correction still ran, so the cut should be valid.
     assert hasattr(aoe_partial, "low_cut_val")
     assert np.isfinite(aoe_partial.low_cut_val)
+
+
+def test_mcdrift_reproducible():
+    # the MCD drift fit must not depend on numpy's global random state
+    rng = np.random.default_rng(3)
+    n = 20_000
+    dt = rng.uniform(300, 1500, n)
+    df = pd.DataFrame(
+        {
+            "cuspEmax_cal": rng.uniform(1000, 2400, n),
+            "dt_eff": dt,
+            "AoE": 1 + 2e-5 * (dt - 900) + rng.standard_t(3, n) * 0.01,
+        }
+    )
+    alphas = []
+    for seed in (1, 2):
+        np.random.seed(seed)  # noqa: NPY002
+        alphas.append(
+            Coe.mcdrift(df, "AoE", "dt_eff", "index==index", "cuspEmax_cal")[0]
+        )
+    assert alphas[0] == alphas[1]

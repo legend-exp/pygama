@@ -39,7 +39,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
     (via dataflow_config) interface to the data in the row.
     """
 
-    parse_cycle = re.compile(r"(\w+(?:-\w+)*)-tier_(\w+)\.lh5")
+    parse_cycle = re.compile(r"(\w+(?:-\w+)*)-tier_(\w+)\.lh5$")
 
     def __init__(self, record):
         """Copy constructor; check if record a ``CycleRecord`` or compliant
@@ -48,7 +48,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         """
         if not isinstance(record, CycleRecord):
             msg = "record must contain 'cycle' and 'relpath' fields"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if isinstance(record, Mapping):
             super().__init__(record)
@@ -190,7 +190,7 @@ class CycleRecord(AttrsDict, metaclass=CycleRecordMeta):
         """
         if not isinstance(record, CycleRecord):
             msg = "record must contain 'cycle' and 'relpath' fields"
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if not isinstance(tiers, Mapping):
             _, tiers, _ = _read_dataflow_config(dataflow_config)

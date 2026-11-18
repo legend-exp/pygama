@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import keyword
+import multiprocessing
 import os
 import re
 import string
@@ -105,10 +106,16 @@ def _setup_spinner(
         return progress if progress._live.is_started else stack.enter_context(progress)
     if isinstance(progress, Console):
         return stack.enter_context(
-            progress.status("Querying runs...", spinner="betaWave")
+            progress.status(
+                "Querying runs...", spinner="betaWave", speed=0.25, refresh_per_second=6
+            )
         )
     if progress:
-        return stack.enter_context(Status("Querying runs...", spinner="betaWave"))
+        return stack.enter_context(
+            Status(
+                "Querying runs...", spinner="betaWave", speed=0.25, refresh_per_second=6
+            )
+        )
     return None
 
 
@@ -122,7 +129,11 @@ def _setup_executor(
         processes = executor._max_workers
 
     if executor is None and isinstance(processes, int):
-        executor = stack.enter_context(ProcessPoolExecutor(processes))
+        executor = stack.enter_context(
+            ProcessPoolExecutor(
+                processes, mp_context=multiprocessing.get_context("spawn")
+            )
+        )
 
     return processes, executor
 
@@ -135,7 +146,7 @@ def _read_dataflow_config(dataflow_config="$REFPROD/dataflow-config.yaml"):
         df_config = dataflow_config
     else:
         msg = "dataflow_config must be a str, Path, or Mapping"
-        raise ValueError(msg)
+        raise TypeError(msg)
     return df_config, df_config["paths"], df_config.get("query", {})
 
 

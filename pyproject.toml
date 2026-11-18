@@ -171,3 +171,4 @@ isort.required-imports = ["from __future__ import annotations"]
 "tests/**" = ["T20", "PLC0415"]
 "noxfile.py" = ["T20"]
 "docs/source/notebooks/*" = ["T201", "E402"]
+"src/pygama/pargen/AoE_cal.py" = ["N999"]  # public module name

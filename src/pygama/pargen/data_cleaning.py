@@ -153,6 +153,7 @@ def get_mode_stdev(par_array) -> tuple:
         log.debug(
             "get_mode_stdev: fwhm estimate failed, falling back to percentile bounds: %s",
             e,
+            exc_info=True,
         )
         lower_bound = np.nanpercentile(par_array, 5)
         upper_bound = np.nanpercentile(par_array, 95)
@@ -205,6 +206,7 @@ def get_mode_stdev(par_array) -> tuple:
             log.debug(
                 "get_mode_stdev: fwhm estimate failed, retrying with percentile bounds: %s",
                 e,
+                exc_info=True,
             )
             lower_bound = np.nanpercentile(par_array, 5)
             upper_bound = np.nanpercentile(par_array, 95)
@@ -230,6 +232,7 @@ def get_mode_stdev(par_array) -> tuple:
                 log.debug(
                     "get_mode_stdev: fwhm estimate failed, falling back to nanstd: %s",
                     e,
+                    exc_info=True,
                 )
                 mean = float(bin_centres[np.argmax(counts)])
                 std = np.nanstd(par_array)
@@ -539,7 +542,7 @@ def generate_cuts(
             "data must be a pandas DataFrame, lgdo Table or dict, "
             f"got {type(data).__name__}"
         )
-        raise ValueError(msg)
+        raise TypeError(msg)
     for out_par, cut in cut_dict.items():
         if "expression" in cut:
             output_dict[out_par] = {"expression": cut["expression"]}
@@ -692,7 +695,7 @@ def get_cut_indexes(data, cut_parameters):
         msg = (
             f"data must be an lgdo Table or pandas DataFrame, got {type(data).__name__}"
         )
-        raise ValueError(msg)
+        raise TypeError(msg)
 
     return ct_mask
 
@@ -787,7 +790,7 @@ def generate_cut_classifiers(
             "data must be a pandas DataFrame, lgdo Table or dict, "
             f"got {type(data).__name__}"
         )
-        raise ValueError(msg)
+        raise TypeError(msg)
     for out_par, cut in cut_dict.items():
         if "expression" in cut:
             output_dict[out_par] = {"expression": cut["expression"]}
@@ -1143,7 +1146,10 @@ def find_pulser_properties(df, energy="daqenergy"):
                 continue
         except Exception as ex:
             log.debug(
-                "find_pulser_properties: skipping candidate peak at %s: %s", e, ex
+                "find_pulser_properties: skipping candidate peak at %s: %s",
+                e,
+                ex,
+                exc_info=True,
             )
             continue
     return out_pulsers
