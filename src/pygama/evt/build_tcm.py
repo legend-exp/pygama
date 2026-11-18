@@ -92,6 +92,7 @@ def build_tcm(
     channel_views
         mode for creating View of TCM for each channel, with only events
         containing that channel. Options:
+
         - ``"sparse"``: use in sparse trigger mode; a minority of events contain each channel
         - ``"dense"``: use in global trigger mode; (almost) all events contain (almost) all channels
         - ``"all"``: use in global trigger mode; assume all events are contained in all channels;
@@ -99,12 +100,16 @@ def build_tcm(
         - ``"auto"``: choose sparse or dense based on the first batch of entries read; if >80% of
             entries are consecutive, use dense. Note, all channels will use the same thing!
         - ``"none"`` or ``None``: no channel views
+
     view_group
         format string for name of group containing view for each channel. View will
         be named ``out_name``. Can include the format specifiers:
+
         - ``key``: the index or hash integer of the channel
         - ``table``: the name of the input table
+
         Default: ``"ch{key}"`` (e.g. ``ch12345678/tcm``)
+
     wo_mode
         mode to send to :meth:`~lh5.io.store.LH5Store.write`.
 
