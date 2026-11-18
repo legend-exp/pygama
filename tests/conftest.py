@@ -10,8 +10,9 @@ config_dir = Path(__file__).parent / "configs"
 
 @pytest.fixture(scope="session")
 def lgnd_test_data():
-    return LegendTestData()
-
+    ldata = LegendTestData()
+    ldata.checkout("3cb98cc")
+    return ldata
 
 @pytest.fixture(scope="session")
 def tmp_dir(tmpdir_factory):
