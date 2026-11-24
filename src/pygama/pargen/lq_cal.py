@@ -426,7 +426,7 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
         hist, bins, _ = pgh.get_hist(lq, bins=nbins, range=test_range)
         try:
             mu, sigma, _ = pgh.get_gaussian_guess(hist, bins)
-            if sigma > 3*(bins[1]-bins[0]):
+            if sigma > 3 * (bins[1] - bins[0]):
                 break
         except IndexError:
             # get_gaussian_guess errors if bins are too wide
@@ -1156,7 +1156,7 @@ class LQCal:
 
                 log.info(f"  {result}")
 
-            except Exception as e:
+            except Exception:
                 if self.debug_mode:
                     raise
                 log.exception("LQ drift time correction (linear mode) failed")
@@ -1258,15 +1258,22 @@ class LQCal:
             # and [E_peak+7, E_peak+20] for sideband, with 1592.5 keV peak
             h = Hist(
                 Regular(100, -2.5, 2.5, label=lq_param),
-                Regular(28, 1584.5, 1612.5, label="Energy (keV)")
+                Regular(28, 1584.5, 1612.5, label="Energy (keV)"),
             )
             h.fill(df[lq_param], df[self.cal_energy_param])
             h_lq = h[:, 0:13:sum] - h[:, 15:28:sum]
-            h_lq_unc = np.maximum(np.sqrt(h[:, 0:13:sum].variances() + h[:, 15:28:sum].variances()), 1)
-            c1 = cost.LeastSquares(h.axes[0].centers, h_lq.values(), h_lq_unc, lambda x, A, mu, sigma: A*np.exp(-0.5*(x-mu)**2/sigma**2))
+            h_lq_unc = np.maximum(
+                np.sqrt(h[:, 0:13:sum].variances() + h[:, 15:28:sum].variances()), 1
+            )
+            c1 = cost.LeastSquares(
+                h.axes[0].centers,
+                h_lq.values(),
+                h_lq_unc,
+                lambda x, A, mu, sigma: A * np.exp(-0.5 * (x - mu) ** 2 / sigma**2),
+            )
             m1 = Minuit(c1, A=np.max(h_lq), mu=0, sigma=1)
             result = m1.migrad()
-            log.info(  f"{result}")
+            log.info(f"{result}")
 
             self.cut_fit_pars = result.values
             self.cut_fit_errs = result.errors
@@ -1276,7 +1283,9 @@ class LQCal:
             log.info(f"  pars: {self.cut_fit_pars}  errs: {self.cut_fit_errs}")
 
             try:
-                df[classifier_param] = np.divide(df[lq_param].to_numpy(), self.cut_fit_pars[2])
+                df[classifier_param] = np.divide(
+                    df[lq_param].to_numpy(), self.cut_fit_pars[2]
+                )
                 df[cut_param] = df[classifier_param] < self.cut_val
             except Exception as e:
                 msg = "applying LQ classifier/cut to data failed"
@@ -1287,7 +1296,7 @@ class LQCal:
                 raise
             log.exception("LQ cut determination failed")
             self.cut_val = np.nan
-            self.cut_fit_pars = np.full(3, np.nan)  # noqa: PD011
+            self.cut_fit_pars = np.full(3, np.nan)
 
         self.update_cal_dicts(
             {
@@ -1690,10 +1699,13 @@ def plot_lq_cut_fit(
             hist = lq_class.fit_hist
             fit_pars = lq_class.cut_fit_pars
 
-            hist.plot1d(ax=ax1, label="data", histtype='step')
+            hist.plot1d(ax=ax1, label="data", histtype="step")
             ax1.plot(
                 hist.axes[0].edges,
-                fit_pars[0] * np.exp(-0.5*(hist.axes[0].edges-fit_pars[1])**2/fit_pars[2]**2),
+                fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].edges - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                ),
                 label="Gaussian Fit",
             )
 
@@ -1702,9 +1714,16 @@ def plot_lq_cut_fit(
             ax1.legend()
 
             reses = (
-                hist - fit_pars[0] * np.exp(-0.5*(hist.axes[0].centers-fit_pars[1])**2/fit_pars[2]**2),
+                hist
+                - fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].centers - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                ),
             ) / (
-                fit_pars[0] * np.exp(-0.5*(hist.axes[0].centers-fit_pars[1])**2/fit_pars[2]**2)
+                fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].centers - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                )
             )
             ax2.plot(hist.axes[0].centers, reses.flatten(), marker="s", linestyle="")
             ax2.set_xlabel("LQ")
