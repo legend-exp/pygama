@@ -1226,7 +1226,6 @@ class LQCal:
         self,
         df: pd.DataFrame,
         lq_param: str,
-        cal_energy_param: str,
         classifier_param: str = "LQ_Classifier",
         cut_param: str = "LQ_Cut",
     ):
@@ -1400,7 +1399,6 @@ class LQCal:
         self.get_cut_lq_dep(
             df,
             lq_param=corrected_name,
-            cal_energy_param=self.cal_energy_param,
             classifier_param=classifier_name,
             cut_param=cut_name,
         )
