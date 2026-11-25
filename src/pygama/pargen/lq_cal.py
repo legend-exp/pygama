@@ -1408,11 +1408,13 @@ class LQCal:
         peak_names = ["dep_1592", "cc_2039", "sep_2103", "fep_2614"]
         peaks_of_interest = [1592.5, 2039, 2103.53, 2614.50]
         self.low_side_sf = pd.DataFrame()
-        fit_widths = [(40, 25), (0, 0), (25, 40), (50, 50)]
+        fit_widths = [(40, 25), (50, 50), (25, 40), (50, 50)]
         self.low_side_peak_dfs = {}
 
         log.info("Calculating peak survival fractions")
-        for key, peak, (emin, emax) in zip(peak_names, peaks_of_interest, fit_widths):
+        for key, peak, (emin, emax) in zip(
+            peak_names, peaks_of_interest, fit_widths, strict=True
+        ):
             try:
                 try:
                     select_df = (
@@ -1425,8 +1427,6 @@ class LQCal:
                     raise RuntimeError(msg) from e
                 fwhm = self.eres_func(peak)
                 if peak == 2039:
-                    emin = 2 * fwhm
-                    emax = 2 * fwhm
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
