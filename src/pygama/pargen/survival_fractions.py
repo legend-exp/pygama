@@ -761,7 +761,7 @@ def get_survival_fraction(
     m.simplex().migrad()
     m.hesse()
 
-    sf = m.values["epsilon_sig"] * 100  # noqa: PD011
+    sf = m.values["epsilon_sig"] * 100
     err = m.errors["epsilon_sig"] * 100
 
     if display > 1:
@@ -772,15 +772,15 @@ def get_survival_fraction(
         ax2.hist(energy[(~nan_idxs) & (fail_idxs)], bins=bins, histtype="step")
 
         if func == hpge_peak:
-            ax1.plot(bins, pass_pdf_hpge(bins, **m.values.to_dict())[1])  # noqa: PD011
-            ax2.plot(bins, fail_pdf_hpge(bins, **m.values.to_dict())[1])  # noqa: PD011
+            ax1.plot(bins, pass_pdf_hpge(bins, **m.values.to_dict())[1])
+            ax2.plot(bins, fail_pdf_hpge(bins, **m.values.to_dict())[1])
         elif func == gauss_on_step:
-            ax1.plot(bins, pass_pdf_gos(bins, **m.values.to_dict())[1])  # noqa: PD011
-            ax2.plot(bins, fail_pdf_gos(bins, **m.values.to_dict())[1])  # noqa: PD011
+            ax1.plot(bins, pass_pdf_gos(bins, **m.values.to_dict())[1])
+            ax2.plot(bins, fail_pdf_gos(bins, **m.values.to_dict())[1])
 
         plt.show()
 
-    return sf, err, m.values, m.errors  # noqa: PD011
+    return sf, err, m.values, m.errors
 
 
 def get_sf_sweep(

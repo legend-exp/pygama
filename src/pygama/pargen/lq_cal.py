@@ -419,10 +419,22 @@ def get_fit_range(lq: np.array) -> tuple(float, float):
     right_guess = np.nanpercentile(lq, 95)
     test_range = (left_guess, right_guess)
 
-    hist, bins, _ = pgh.get_hist(lq, bins=50, range=test_range)
-    bin_centers = (bins[:-1] + bins[1:]) / 2
-    mu = bin_centers[np.argmax(hist)]
-    _, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+    # Scale is very uncertain; scan through different binnings until we get bins that are
+    # narrower than the sigma we find
+    nbins = 25
+    while True:
+        hist, bins, _ = pgh.get_hist(lq, bins=nbins, range=test_range)
+        try:
+            mu, sigma, _ = pgh.get_gaussian_guess(hist, bins)
+            if sigma > 3 * (bins[1] - bins[0]):
+                break
+        except IndexError:
+            # get_gaussian_guess errors if bins are too wide
+            pass
+        nbins *= 2
+        if nbins >= 100000:
+            log.warning("get_fit_range failed to find peak")
+            return (left_guess, right_guess)
 
     left_edge = mu - 2.5 * sigma
     right_edge = mu + 2.5 * sigma
@@ -561,7 +573,7 @@ def binned_lq_fit(
     m1.simplex().migrad()
     m1.hesse()
 
-    return m1.values, m1.errors, hist, bins  # noqa: PD011
+    return m1.values, m1.errors, hist, bins
 
 
 def calculate_time_means(
@@ -895,6 +907,9 @@ class LQCal:
                             self.cal_energy_param,
                             peak=1592.5,
                         )
+                        log.info(
+                            "  timestamp: %s  pars: %s  errs: %s", tstamp, pars, errs
+                        )
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -918,7 +933,7 @@ class LQCal:
                     except Exception as e:
                         if self.debug_mode:
                             raise
-                        log.debug(
+                        log.warning(
                             "LQ time correction: fit failed for run_timestamp %s, filling nan: %s",
                             tstamp,
                             e,
@@ -975,6 +990,7 @@ class LQCal:
                         self.cal_energy_param,
                         peak=1592.5,
                     )
+                    log.info("  pars: %s  errs: %s", pars, errs)
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -1140,6 +1156,8 @@ class LQCal:
                 )
                 self.dt_fit_pars = result
 
+                log.info("  %s", result)
+
             except Exception:
                 if self.debug_mode:
                     raise
@@ -1149,28 +1167,15 @@ class LQCal:
         elif mode == "LR-MCD":
             # want to try with keeping the same dataselection as for the "linear" method
             try:
-                pars = binned_lq_fit(df, lq_param, self.cal_energy_param, peak=1592.5)[
-                    0
-                ]
-                mean = pars[0]
-                sigma = pars[1]
-
                 dep_events = df.query(
                     f"{self.cal_energy_param} > 1589.5 & {self.cal_energy_param} < 1595.5 & {self.cal_energy_param}=={self.cal_energy_param}&{lq_param}=={lq_param}"
                 )
 
-                dt_range = [
-                    np.nanpercentile(dep_events[self.dt_param], 10),
-                    np.nanpercentile(dep_events[self.dt_param], 95),
-                ]
-
-                lq_range = [mean - 2 * sigma, mean + 2 * sigma]
-
-                self.lq_range = lq_range
-                self.dt_range = dt_range
+                self.dt_range = np.nanpercentile(dep_events[self.dt_param], [10, 95])
+                self.lq_range = np.nanpercentile(dep_events[lq_param], [1, 95])
 
                 final_df = dep_events.query(
-                    f"{lq_param} > {lq_range[0]} & {lq_param} < {lq_range[1]} & {self.dt_param} > {dt_range[0]} & {self.dt_param} < {dt_range[1]}"
+                    f"{lq_param} > {self.lq_range[0]} & {lq_param} < {self.lq_range[1]} & {self.dt_param} > {self.dt_range[0]} & {self.dt_param} < {self.dt_range[1]}"
                 )
 
                 ###########here is the difference between linear and LR-MCD #############
@@ -1186,6 +1191,7 @@ class LQCal:
 
                 lr_mcd = LinearRegression().fit(inlier_dt.reshape(-1, 1), inlier_lq)
                 self.dt_fit_pars = (lr_mcd.coef_[0], lr_mcd.intercept_)
+                log.info("  %s", lr_mcd)
 
             except Exception:
                 if self.debug_mode:
@@ -1220,7 +1226,6 @@ class LQCal:
         self,
         df: pd.DataFrame,
         lq_param: str,
-        cal_energy_param: str,
         classifier_param: str = "LQ_Classifier",
         cut_param: str = "LQ_Cut",
     ):
@@ -1250,21 +1255,38 @@ class LQCal:
 
         log.info("Starting LQ Cut calculation")
         try:
-            try:
-                pars, errs, hist, bins = binned_lq_fit(
-                    df, lq_param, cal_energy_param, peak=1592.5
-                )
-            except Exception as e:
-                msg = "binned LQ fit at DEP failed"
-                raise RuntimeError(msg) from e
+            # Peak-sideband subtraction; use [E_peak-8, E_peak+5] for peak,
+            # and [E_peak+7, E_peak+20] for sideband, with 1592.5 keV peak
+            h = Hist(
+                Regular(100, -2.5, 2.5, label=lq_param),
+                Regular(28, 1584.5, 1612.5, label="Energy (keV)"),
+            )
+            h.fill(df[lq_param], df[self.cal_energy_param])
+            h_lq = h[:, 0:13:sum] - h[:, 15:28:sum]
+            h_lq_unc = np.maximum(
+                np.sqrt(h[:, 0:13:sum].variances() + h[:, 15:28:sum].variances()), 1
+            )
+            c1 = cost.LeastSquares(
+                h.axes[0].centers,
+                h_lq.values(),
+                h_lq_unc,
+                lambda x, A, mu, sigma: A * np.exp(-0.5 * (x - mu) ** 2 / sigma**2),
+            )
+            m1 = Minuit(c1, A=np.max(h_lq), mu=0, sigma=1)
+            result = m1.migrad()
+            log.info("%s", result)
 
-            self.cut_fit_pars = pars
-            self.cut_fit_errs = errs
-            self.fit_hist = (hist, bins)
+            self.cut_fit_pars = result.values
+            self.cut_fit_errs = result.errors
+            self.fit_hist = h_lq
             self.cut_val = 3
 
+            log.info("  pars: %s  errs: %s", self.cut_fit_pars, self.cut_fit_errs)
+
             try:
-                df[classifier_param] = np.divide(df[lq_param].to_numpy(), pars[1])
+                df[classifier_param] = np.divide(
+                    df[lq_param].to_numpy(), self.cut_fit_pars[2]
+                )
                 df[cut_param] = df[classifier_param] < self.cut_val
             except Exception as e:
                 msg = "applying LQ classifier/cut to data failed"
@@ -1275,15 +1297,13 @@ class LQCal:
                 raise
             log.exception("LQ cut determination failed")
             self.cut_val = np.nan
-            c = cost.UnbinnedNLL(np.array([0]), gaussian.pdf)
-            m = Minuit(c, np.full(2, np.nan))
-            self.cut_fit_pars = pars = m.values  # noqa: PD011
+            self.cut_fit_pars = np.full(3, np.nan)
 
         self.update_cal_dicts(
             {
                 classifier_param: {
                     "expression": f"({lq_param} / a)",
-                    "parameters": {"a": pars[1]},
+                    "parameters": {"a": self.cut_fit_pars[2]},
                 },
                 cut_param: {
                     "expression": f"({classifier_param} < a)",
@@ -1379,20 +1399,22 @@ class LQCal:
         self.get_cut_lq_dep(
             df,
             lq_param=corrected_name,
-            cal_energy_param=self.cal_energy_param,
             classifier_param=classifier_name,
             cut_param=cut_name,
         )
         log.info("Finished Calculating the LQ Cut Value")
 
         final_lq_param = classifier_name
+        peak_names = ["dep_1592", "cc_2039", "sep_2103", "fep_2614"]
         peaks_of_interest = [1592.5, 2039, 2103.53, 2614.50]
         self.low_side_sf = pd.DataFrame()
-        fit_widths = [(40, 25), (0, 0), (25, 40), (50, 50)]
+        fit_widths = [(40, 25), (50, 50), (25, 40), (50, 50)]
         self.low_side_peak_dfs = {}
 
         log.info("Calculating peak survival fractions")
-        for i, peak in enumerate(peaks_of_interest):
+        for key, peak, (emin, emax) in zip(
+            peak_names, peaks_of_interest, fit_widths, strict=True
+        ):
             try:
                 try:
                     select_df = (
@@ -1405,8 +1427,6 @@ class LQCal:
                     raise RuntimeError(msg) from e
                 fwhm = self.eres_func(peak)
                 if peak == 2039:
-                    emin = 2 * fwhm
-                    emax = 2 * fwhm
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{peak - emin})&({self.cal_energy_param}<{peak + emax})"
                     )
@@ -1426,12 +1446,11 @@ class LQCal:
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                            pd.DataFrame([{"peak": key, "sf": sf, "sf_err": sf_err}]),
                         ]
                     )
-                    self.low_side_peak_dfs[peak] = cut_df
+                    self.low_side_peak_dfs[key] = cut_df
                 else:
-                    emin, emax = fit_widths[i]
                     fit_range = (peak - emin, peak + emax)
                     peak_df = select_df.query(
                         f"({self.cal_energy_param}>{fit_range[0]})&({self.cal_energy_param}<{fit_range[1]})"
@@ -1455,10 +1474,10 @@ class LQCal:
                     self.low_side_sf = pd.concat(
                         [
                             self.low_side_sf,
-                            pd.DataFrame([{"peak": peak, "sf": sf, "sf_err": sf_err}]),
+                            pd.DataFrame([{"peak": key, "sf": sf, "sf_err": sf_err}]),
                         ]
                     )
-                    self.low_side_peak_dfs[peak] = cut_df
+                    self.low_side_peak_dfs[key] = cut_df
                 log.info("%skeV: %2.1f +/- %2.1f %%", peak, sf, sf_err)
             except Exception:
                 if self.debug_mode:
@@ -1466,7 +1485,7 @@ class LQCal:
                 self.low_side_sf = pd.concat(
                     [
                         self.low_side_sf,
-                        pd.DataFrame([{"peak": peak, "sf": np.nan, "sf_err": np.nan}]),
+                        pd.DataFrame([{"peak": key, "sf": np.nan, "sf_err": np.nan}]),
                     ]
                 )
                 log.exception(
@@ -1677,21 +1696,16 @@ def plot_lq_cut_fit(
             (ax1, ax2) = fig.subplots(2, 1)
 
         try:
-            hist, bins = lq_class.fit_hist
+            hist = lq_class.fit_hist
             fit_pars = lq_class.cut_fit_pars
 
-            x_low = bins[0]
-            x_high = bins[-1]
-
-            ax1.stairs(hist, bins, label="data")
-            xs = np.linspace(round(bins[0], 3), round(bins[-1], 3), len(bins) - 1)
-            ls = np.sum(hist)
-            dx = np.diff(bins)
+            hist.plot1d(ax=ax1, label="data", histtype="step")
             ax1.plot(
-                xs,
-                gaussian.pdf_norm(xs, x_low, x_high, fit_pars[0], fit_pars[1])
-                * dx
-                * ls,
+                hist.axes[0].edges,
+                fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].edges - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                ),
                 label="Gaussian Fit",
             )
 
@@ -1699,22 +1713,19 @@ def plot_lq_cut_fit(
             # ax1.set_title("Fit of LQ events in DEP")
             ax1.legend()
 
-            bin_centers = (bins[:-1] + bins[1:]) / 2
             reses = (
                 hist
-                - (
-                    gaussian.pdf_norm(
-                        bin_centers, x_low, x_high, fit_pars[0], fit_pars[1]
-                    )
-                    * dx
-                    * ls
-                )
+                - fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].centers - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                ),
             ) / (
-                gaussian.pdf_norm(bin_centers, x_low, x_high, fit_pars[0], fit_pars[1])
-                * dx
-                * ls
+                fit_pars[0]
+                * np.exp(
+                    -0.5 * (hist.axes[0].centers - fit_pars[1]) ** 2 / fit_pars[2] ** 2
+                )
             )
-            ax2.plot(bin_centers, reses, marker="s", linestyle="")
+            ax2.plot(hist.axes[0].centers, reses.flatten(), marker="s", linestyle="")
             ax2.set_xlabel("LQ")
             ax2.set_ylabel("residuals")
 

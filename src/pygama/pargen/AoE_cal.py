@@ -186,7 +186,7 @@ def aoe_peak_guess(func, hist, bins, var, **kwargs):
     for item, value in kwargs.items():
         guess_dict[item] = value
 
-    return convert_to_minuit(guess_dict, func).values  # noqa: PD011
+    return convert_to_minuit(guess_dict, func).values
 
 
 def aoe_peak_bounds(func, guess, **kwargs):
@@ -418,11 +418,11 @@ def unbinned_aoe_fit(
     msig.migrad()
 
     # Range to fit over, below this tail behaviour more exponential, few events above
-    fmin = msig.values["mu"] - 15 * msig.values["sigma"]  # noqa: PD011
+    fmin = msig.values["mu"] - 15 * msig.values["sigma"]
     fmin = max(fmin, np.nanmin(aoe))
-    fmax_bkg = msig.values["mu"] - 5 * msig.values["sigma"]  # noqa: PD011
-    fmax = msig.values["mu"] + 5 * msig.values["sigma"]  # noqa: PD011
-    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - msig.values["area"]  # noqa: PD011
+    fmax_bkg = msig.values["mu"] - 5 * msig.values["sigma"]
+    fmax = msig.values["mu"] + 5 * msig.values["sigma"]
+    n_bkg_guess = len(aoe[(aoe < fmax) & (aoe > fmin)]) - msig.values["area"]
 
     bkg_guess = aoe_peak_guess(
         exgauss,
@@ -430,8 +430,8 @@ def unbinned_aoe_fit(
         bins,
         var,
         area=n_bkg_guess,
-        mu=msig.values["mu"],  # noqa: PD011
-        sigma=msig.values["sigma"] * 0.9,  # noqa: PD011
+        mu=msig.values["mu"],
+        sigma=msig.values["sigma"] * 0.9,
         x_lo=fmin,
         x_hi=fmax_bkg,
     )
@@ -451,14 +451,14 @@ def unbinned_aoe_fit(
     mbkg.hesse()
 
     nsig_guess = (
-        msig.values["area"]  # noqa: PD011
+        msig.values["area"]
         - np.diff(
             exgauss.cdf_ext(
-                np.array([msig.values["mu"] - 2 * msig.values["sigma"], fmax]),  # noqa: PD011
-                mbkg.values["area"],  # noqa: PD011
-                msig.values["mu"],  # noqa: PD011
-                msig.values["sigma"],  # noqa: PD011
-                mbkg.values["tau"],  # noqa: PD011
+                np.array([msig.values["mu"] - 2 * msig.values["sigma"], fmax]),
+                mbkg.values["area"],
+                msig.values["mu"],
+                msig.values["sigma"],
+                mbkg.values["tau"],
             )
         )[0]
     )
@@ -470,10 +470,10 @@ def unbinned_aoe_fit(
         bins,
         var,
         n_sig=nsig_guess,
-        mu=msig.values["mu"],  # noqa: PD011
-        sigma=msig.values["sigma"],  # noqa: PD011
-        n_bkg=mbkg.values["area"],  # noqa: PD011
-        tau=mbkg.values["tau"],  # noqa: PD011
+        mu=msig.values["mu"],
+        sigma=msig.values["sigma"],
+        n_bkg=mbkg.values["area"],
+        tau=mbkg.values["tau"],
         x_lo=fmin,
         x_hi=fmax,
     )
@@ -517,7 +517,7 @@ def unbinned_aoe_fit(
     )
     cs = (cs[0], cs[1] + len(np.where(mask)[0]))
 
-    fit1 = (m.values, m.errors, m.covariance, cs, pdf, mask, valid1, m)  # noqa: PD011
+    fit1 = (m.values, m.errors, m.covariance, cs, pdf, mask, valid1, m)
 
     m2 = Minuit(c, *x0)
     for arg, val in bounds.items():
@@ -544,7 +544,7 @@ def unbinned_aoe_fit(
     )
     cs2 = (cs2[0], cs2[1] + len(np.where(mask)[0]))
 
-    fit2 = (m2.values, m2.errors, m2.covariance, cs2, pdf, mask, valid2, m2)  # noqa: PD011
+    fit2 = (m2.values, m2.errors, m2.covariance, cs2, pdf, mask, valid2, m2)
 
     frac_errors1 = np.sum(
         np.abs(
@@ -594,10 +594,10 @@ def unbinned_aoe_fit(
         plt.plot(xs, bkg * dx[0], label="Background")
         plt.plot(
             xs,
-            gaussian.pdf_ext(xs, *msig.values)[1] * dx[0],  # noqa: PD011
+            gaussian.pdf_ext(xs, *msig.values)[1] * dx[0],
             label="Initial Gaussian",
         )
-        plt.plot(xs, exgauss.pdf_ext(xs, *mbkg.values)[1] * dx[0], label="Bkg guess")  # noqa: PD011
+        plt.plot(xs, exgauss.pdf_ext(xs, *mbkg.values)[1] * dx[0], label="Bkg guess")
         plt.xlabel("A/E")
         plt.ylabel("Counts")
         plt.legend(loc="upper left")
@@ -1092,7 +1092,7 @@ def _fit_dispersion_vs_energy(model, x, y, yerr):
     m.simplex()
     m.migrad()
     m.hesse()
-    pars = m.values  # noqa: PD011
+    pars = m.values
     errs = m.errors
     csqr = np.sum(((y - model.func(x, *pars)) ** 2) / yerr)
     dof = len(y) - len(pars)
@@ -1983,10 +1983,10 @@ class CalAoE:
                 xs = np.arange(
                     np.nanmin(valid_fits.index), np.nanmax(valid_fits.index), 0.01
                 )
-                p = SigmoidFit.func(xs, *m1.values)  # noqa: PD011
+                p = SigmoidFit.func(xs, *m1.values)
                 self.cut_fit = {
                     "function": SigmoidFit.__name__,
-                    "pars": m1.values.to_dict(),  # noqa: PD011
+                    "pars": m1.values.to_dict(),
                     "errs": m1.errors.to_dict(),
                 }
                 self.low_cut_val = round(xs[np.argmin(np.abs(p - (100 * dep_acc)))], 3)

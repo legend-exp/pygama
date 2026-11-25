@@ -95,10 +95,10 @@ def return_nans(input) -> tuple:
     if isinstance(input, FunctionType):
         args = input.__code__.co_varnames[: input.__code__.co_argcount][1:]
         m = convert_to_minuit(np.full(len(args), np.nan), input)
-        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)  # noqa: PD011
+        return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
     args = input.required_args()
     m = convert_to_minuit(np.full(len(args), np.nan), input)
-    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)  # noqa: PD011
+    return m.values, m.errors, np.full((len(m.values), len(m.values)), np.nan)
 
 
 def load_data(

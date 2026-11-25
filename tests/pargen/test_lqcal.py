@@ -76,9 +76,7 @@ def test_lq_cal_suffix(lgnd_test_data):
         debug_mode=True,
     )
 
-    data_df["LQ_Ecorr_alt"] = np.divide(data_df["lq80"], data_df["cuspEmax"])
-
-    lqcal.calibrate(data_df, "LQ_Ecorr_alt", suffix="alt")
+    lqcal.calibrate(data_df, "lq80", suffix="alt")
     assert (lqcal.cut_val > 0) & (~np.isnan(lqcal.cut_val))
 
     for name in ("LQ_Timecorr", "LQ_Corrected", "LQ_Classifier", "LQ_Cut"):
