@@ -907,7 +907,9 @@ class LQCal:
                             self.cal_energy_param,
                             peak=1592.5,
                         )
-                        log.info(f"  timestamp: {tstamp}  pars: {pars}  errs: {errs}")
+                        log.info(
+                            "  timestamp: %s  pars: %s  errs: %s", tstamp, pars, errs
+                        )
                         self.timecorr_df = pd.concat(
                             [
                                 self.timecorr_df,
@@ -988,7 +990,7 @@ class LQCal:
                         self.cal_energy_param,
                         peak=1592.5,
                     )
-                    log.info(f"  pars: {pars}  errs: {errs}")
+                    log.info("  pars: %s  errs: %s", pars, errs)
                     self.timecorr_df = pd.concat(
                         [
                             self.timecorr_df,
@@ -1154,7 +1156,7 @@ class LQCal:
                 )
                 self.dt_fit_pars = result
 
-                log.info(f"  {result}")
+                log.info("  %s", result)
 
             except Exception:
                 if self.debug_mode:
@@ -1189,7 +1191,7 @@ class LQCal:
 
                 lr_mcd = LinearRegression().fit(inlier_dt.reshape(-1, 1), inlier_lq)
                 self.dt_fit_pars = (lr_mcd.coef_[0], lr_mcd.intercept_)
-                log.info(f"  {lr_mcd}")
+                log.info("  %s", lr_mcd)
 
             except Exception:
                 if self.debug_mode:
@@ -1273,14 +1275,14 @@ class LQCal:
             )
             m1 = Minuit(c1, A=np.max(h_lq), mu=0, sigma=1)
             result = m1.migrad()
-            log.info(f"{result}")
+            log.info("%s", result)
 
             self.cut_fit_pars = result.values
             self.cut_fit_errs = result.errors
             self.fit_hist = h_lq
             self.cut_val = 3
 
-            log.info(f"  pars: {self.cut_fit_pars}  errs: {self.cut_fit_errs}")
+            log.info("  pars: %s  errs: %s", self.cut_fit_pars, self.cut_fit_errs)
 
             try:
                 df[classifier_param] = np.divide(
