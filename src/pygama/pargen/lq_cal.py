@@ -573,7 +573,7 @@ def binned_lq_fit(
     m1.simplex().migrad()
     m1.hesse()
 
-    return m1.values, m1.errors, hist, bins  # noqa: PD011
+    return m1.values, m1.errors, hist, bins
 
 
 def calculate_time_means(
